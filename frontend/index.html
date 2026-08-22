@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waste Bank System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased min-h-screen flex flex-col">
+    <!-- Navigation Bar -->
+    <nav class="bg-green-600 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <i class="fa-solid fa-recycle text-2xl mr-2"></i>
+                    <span class="font-bold text-lg md:text-xl tracking-tight">Waste Bank</span>
+                </div>
+                
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex items-center space-x-1">
+                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-dashboard">
+                        <i class="fa-solid fa-chart-pie mr-1"></i> แดชบอร์ด
+                    </button>
+                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-register">
+                        <i class="fa-solid fa-user-plus mr-1"></i> ลงทะเบียน
+                    </button>
+                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-sell">
+                        <i class="fa-solid fa-scale-balanced mr-1"></i> ขายขยะ
+                    </button>
+                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-lookup">
+                        <i class="fa-solid fa-magnifying-glass mr-1"></i> เช็กประวัติ
+                    </button>
+                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-leaderboard">
+                        <i class="fa-solid fa-trophy mr-1"></i> อันดับขยะ
+                    </button>
+                    <button id="adminNavBtn" class="px-3 py-2 rounded-md text-sm font-medium bg-green-800 hover:bg-green-900 transition ml-2">
+                        <i class="fa-solid fa-lock mr-1"></i> จัดการระบบ
+                    </button>
+                </div>
+
+                <!-- Mobile menu button -->
+                <div class="flex items-center md:hidden">
+                    <button id="mobileMenuBtn" class="text-white hover:text-green-200 focus:outline-none p-2">
+                        <i class="fa-solid fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu Panel -->
+        <div id="mobileMenu" class="md:hidden hidden bg-green-700">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <button class="nav-link w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-600 transition" data-target="page-dashboard">
+                    <i class="fa-solid fa-chart-pie mr-2 w-5"></i> แดชบอร์ด
+                </button>
+                <button class="nav-link w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-600 transition" data-target="page-register">
+                    <i class="fa-solid fa-user-plus mr-2 w-5"></i> ลงทะเบียน
+                </button>
+                <button class="nav-link w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-600 transition" data-target="page-sell">
+                    <i class="fa-solid fa-scale-balanced mr-2 w-5"></i> ขายขยะด้วยตัวเอง
+                </button>
+                <button class="nav-link w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-600 transition" data-target="page-lookup">
+                    <i class="fa-solid fa-magnifying-glass mr-2 w-5"></i> เช็กประวัติ
+                </button>
+                <button class="nav-link w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-600 transition" data-target="page-leaderboard">
+                    <i class="fa-solid fa-trophy mr-2 w-5"></i> อันดับขยะ
+                </button>
+                <button id="adminMobileBtn" class="w-full text-left px-3 py-2 rounded-md text-base font-medium bg-green-800 hover:bg-green-900 transition mt-2">
+                    <i class="fa-solid fa-lock mr-2 w-5"></i> จัดการระบบ (Admin)
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content App Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        <!-- ==================== 1. Dashboard Page ==================== -->
+        <section id="page-dashboard" class="page-section active block">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800"><i class="fa-solid fa-chart-pie mr-2 text-green-600"></i> ภาพรวมระบบ (Dashboard)</h2>
+            
+            <div class="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
+                <!-- Date Filter -->
+                <div class="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
+                    <label class="font-medium text-gray-600">กรองข้อมูลตามวันที่:</label>
+                    <select id="dateFilter" class="w-full sm:w-auto border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500 px-3 py-2 border">
+                        <option value="today">วันนี้</option>
+                        <option value="this_week">สัปดาห์นี้</option>
+                        <option value="this_month" selected>เดือนนี้</option>
+                        <option value="three_months">3 เดือน</option>
+                        <option value="this_year">ปีนี้</option>
+                        <option value="all">ทั้งหมด</option>
+                        <option value="custom">เลือกวันที่เอง</option>
+                    </select>
+                    
+                    <div id="customDateRange" class="hidden w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2">
+                        <div class="flex items-center w-full sm:w-auto">
+                            <input type="date" id="startDate" class="w-full sm:w-auto border-gray-300 rounded-md shadow-sm text-sm px-2 py-1.5 border">
+                            <span class="mx-2 text-gray-500">-</span>
+                            <input type="date" id="endDate" class="w-full sm:w-auto border-gray-300 rounded-md shadow-sm text-sm px-2 py-1.5 border">
+                        </div>
+                        <button id="applyCustomDateBtn" class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 px-4 py-1.5 rounded-md text-sm border font-medium transition">นำไปใช้</button>
+                    </div>
+                </div>
+
+                <!-- Stats Grid (Weights) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-5 flex items-center shadow-sm">
+                        <div class="p-4 bg-blue-500 rounded-full text-white mr-4 shadow">
+                            <i class="fa-solid fa-bottle-water text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-blue-600 font-semibold mb-1">น้ำหนักขวดพลาสติก</p>
+                            <div class="flex items-baseline">
+                                <p id="totalBottleWeight" class="text-2xl lg:text-3xl font-bold text-gray-800">0.00</p>
+                                <span class="ml-1 text-sm text-gray-500 font-medium">กก.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-orange-50 border border-orange-100 rounded-lg p-5 flex items-center shadow-sm">
+                        <div class="p-4 bg-orange-500 rounded-full text-white mr-4 shadow">
+                            <i class="fa-solid fa-prescription-bottle text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-orange-600 font-semibold mb-1">น้ำหนักกระป๋องอลูฯ</p>
+                            <div class="flex items-baseline">
+                                <p id="totalCanWeight" class="text-2xl lg:text-3xl font-bold text-gray-800">0.00</p>
+                                <span class="ml-1 text-sm text-gray-500 font-medium">กก.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Grid (Financials) -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                    <div class="bg-green-50 border border-green-100 rounded-lg p-5 flex items-center shadow-sm">
+                        <div class="p-4 bg-green-500 rounded-full text-white mr-4 shadow">
+                            <i class="fa-solid fa-arrow-trend-up text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-green-600 font-semibold mb-1">รายได้ทั้งหมด</p>
+                            <div class="flex items-baseline">
+                                <p id="totalMoney" class="text-2xl lg:text-3xl font-bold text-gray-800">0.00</p>
+                                <span class="ml-1 text-sm text-gray-500 font-medium">บาท</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-red-50 border border-red-100 rounded-lg p-5 flex items-center shadow-sm">
+                        <div class="p-4 bg-red-500 rounded-full text-white mr-4 shadow">
+                            <i class="fa-solid fa-arrow-trend-down text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-red-600 font-semibold mb-1">รายจ่ายทั้งหมด</p>
+                            <div class="flex items-baseline">
+                                <p id="totalPayout" class="text-2xl lg:text-3xl font-bold text-gray-800">0.00</p>
+                                <span class="ml-1 text-sm text-gray-500 font-medium">บาท</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-100 rounded-lg p-5 flex items-center shadow-sm">
+                        <div class="p-4 bg-purple-500 rounded-full text-white mr-4 shadow">
+                            <i class="fa-solid fa-sack-dollar text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-purple-600 font-semibold mb-1">เงินรวม (คงเหลือ)</p>
+                            <div class="flex items-baseline">
+                                <p id="netBalance" class="text-2xl lg:text-3xl font-bold text-gray-800">0.00</p>
+                                <span class="ml-1 text-sm text-gray-500 font-medium">บาท</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 2. Register Page ==================== -->
+        <section id="page-register" class="page-section hidden">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800"><i class="fa-solid fa-user-plus mr-2 text-blue-600"></i> ลงทะเบียนสมาชิกใหม่</h2>
+            
+            <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-6 sm:p-8 border border-gray-100">
+                <p class="text-gray-600 mb-6">กรอกข้อมูลด้านล่างเพื่อเปิดบัญชีธนาคารขยะสำหรับรับเงิน</p>
+                <form id="registerForm" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">รหัสนักเรียน (Student ID) <span class="text-red-500">*</span></label>
+                        <input type="text" id="regStudentId" required autocomplete="off" class="block w-full border-gray-300 px-4 py-2.5 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm" placeholder="เช่น 65001">
+                        <p id="regErrorId" class="text-red-500 text-xs mt-1 hidden">รหัสนักเรียนนี้มีการลงทะเบียนแล้ว!</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">ชื่อ - นามสกุล <span class="text-red-500">*</span></label>
+                        <input type="text" id="regFullName" required autocomplete="off" class="block w-full border-gray-300 px-4 py-2.5 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm" placeholder="นายสมชาย ใจดี">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">ระดับชั้น <span class="text-red-500">*</span></label>
+                            <select id="regGrade" required class="block w-full border-gray-300 px-4 py-2.5 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                <option value="" disabled selected>เลือกชั้น</option>
+                                <option value="ม.1">ม.1</option>
+                                <option value="ม.2">ม.2</option>
+                                <option value="ม.3">ม.3</option>
+                                <option value="ม.4">ม.4</option>
+                                <option value="ม.5">ม.5</option>
+                                <option value="ม.6">ม.6</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">ห้อง</label>
+                            <input type="number" id="regRoom" min="1" class="block w-full border-gray-300 px-4 py-2.5 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm" placeholder="เช่น 1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">เลขที่</label>
+                            <input type="number" id="regSeat" min="1" class="block w-full border-gray-300 px-4 py-2.5 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm" placeholder="เช่น 15">
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            <i class="fa-solid fa-save mr-2 mt-0.5"></i> ลงทะเบียนบัญชี
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ==================== 2.5 Sell Waste Page (Self Service) ==================== -->
+        <section id="page-sell" class="page-section hidden">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800"><i class="fa-solid fa-scale-balanced mr-2 text-green-600"></i> บันทึกขายขยะ (บริการตัวเอง)</h2>
+            
+            <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-6 sm:p-8 border border-gray-100">
+                <div class="bg-green-50 border border-green-200 text-green-800 p-4 rounded-md mb-6 text-sm">
+                    <p><i class="fa-solid fa-circle-info mr-1"></i> นักเรียนสามารถบันทึกน้ำหนักขยะที่นำมาฝากได้ด้วยตนเอง ยอดเงินจะถูกคำนวณและเข้าบัญชีโดยอัตโนมัติ</p>
+                </div>
+
+                <form id="selfSellForm" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">รหัสนักเรียนของคุณ <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <input type="text" id="selfStudentId" required autocomplete="off" class="block w-full border-gray-300 pl-10 px-4 py-3 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm text-lg" placeholder="กรอกรหัสนักเรียน...">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-id-card text-gray-400 text-lg"></i>
+                            </div>
+                        </div>
+                        <div id="selfStudentNameBox" class="mt-2 hidden bg-blue-50 border border-blue-100 p-2 rounded text-sm text-blue-700 font-medium"></div>
+                        <p id="selfErrorId" class="text-red-500 text-xs mt-1 hidden">ไม่พบรหัสนักเรียนนี้ในระบบ กรุณาสมัครสมาชิกก่อน</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">ประเภทขยะ <span class="text-red-500">*</span></label>
+                            <select id="selfWasteType" required class="block w-full border-gray-300 px-4 py-3 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                <option value="ขวด">ขวดพลาสติก (ขวดละประมาณ 0.02 กก.)</option>
+                                <option value="กระป๋อง">กระป๋องอลูมิเนียม (กระป๋องละ 0.015 กก.)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">น้ำหนักที่ชั่งได้ (กิโลกรัม) <span class="text-red-500">*</span></label>
+                            <input type="number" step="0.01" min="0.01" id="selfWeight" required autocomplete="off" class="block w-full border-gray-300 px-4 py-3 border rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm text-lg" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-md border border-gray-200 text-center mt-4">
+                        <p class="text-sm text-gray-500 mb-1">ยอดเงินที่คุณจะได้รับ</p>
+                        <p id="selfCalculatedAmount" class="text-4xl font-black text-green-600">0.00 <span class="text-xl font-normal text-gray-500">฿</span></p>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" id="selfSubmitBtn" disabled class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-bold text-white bg-gray-400 cursor-not-allowed transition-colors">
+                            <i class="fa-solid fa-check-circle mr-2"></i> ยืนยันการฝากขยะ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ==================== 3. Member Lookup Page ==================== -->
+        <section id="page-lookup" class="page-section hidden">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800"><i class="fa-solid fa-magnifying-glass mr-2 text-purple-600"></i> เช็กข้อมูลและประวัติส่วนตัว</h2>
+            
+            <div class="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                <!-- Search Box -->
+                <div class="max-w-xl mx-auto mb-8 relative">
+                    <form id="searchStudentForm" class="flex gap-2">
+                        <div class="relative flex-grow">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-id-card text-gray-400"></i>
+                            </div>
+                            <input type="text" id="searchStudentId" placeholder="กรอกรหัสนักเรียนเพื่อค้นหา..." class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm shadow-sm" autocomplete="off" required>
+                        </div>
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-md font-medium transition shadow-sm whitespace-nowrap">
+                            ค้นหา
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Not Found Msg -->
+                <div id="studentNotFound" class="hidden max-w-xl mx-auto bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-center">
+                    <i class="fa-solid fa-circle-xmark mr-1"></i> ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบรหัสอีกครั้ง
+                </div>
+
+                <!-- Result Area -->
+                <div id="studentInfoResult" class="hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Profile Card -->
+                        <div class="lg:col-span-1">
+                            <div class="bg-gray-50 rounded-xl p-5 border border-gray-200 shadow-inner text-center h-full">
+                                <div class="w-20 h-20 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 border-2 border-purple-200">
+                                    <i class="fa-solid fa-user"></i>
+                                </div>
+                                <h3 id="studentName" class="text-xl font-bold text-gray-900 mb-1"></h3>
+                                <p class="text-sm text-gray-500 mb-3">รหัส: <span id="studentIdDisplay" class="font-semibold text-gray-700"></span></p>
+                                
+                                <div class="inline-block px-3 py-1 rounded-full text-sm font-semibold mb-4" id="studentStatusBadge"></div>
+                                
+                                <div class="grid grid-cols-2 gap-2 text-sm text-left bg-white p-3 rounded-lg border">
+                                    <div class="text-gray-500">ระดับชั้น</div>
+                                    <div class="font-medium text-right text-gray-800" id="studentGradeDisplay"></div>
+                                    
+                                    <div class="text-gray-500">ห้อง</div>
+                                    <div class="font-medium text-right text-gray-800" id="studentRoomDisplay"></div>
+                                    
+                                    <div class="text-gray-500">เลขที่</div>
+                                    <div class="font-medium text-right text-gray-800" id="studentSeatDisplay"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Balance & History -->
+                        <div class="lg:col-span-2 flex flex-col gap-6">
+                            <!-- Balance Cards -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
+                                    <p class="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1">ยอดเงินสะสมทั้งหมด</p>
+                                    <p id="studentTotalEarned" class="text-2xl font-bold text-gray-800">0.00 <span class="text-base text-gray-500 font-normal">฿</span></p>
+                                </div>
+                                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
+                                    <p class="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1">รับเงินไปแล้ว</p>
+                                    <p id="studentTotalPaid" class="text-2xl font-bold text-gray-800">0.00 <span class="text-base text-gray-500 font-normal">฿</span></p>
+                                </div>
+                                <div class="bg-green-50 p-4 rounded-xl border border-green-200 shadow-sm text-center transform hover:scale-105 transition">
+                                    <p class="text-xs text-green-700 uppercase tracking-wide font-bold mb-1">ยอดเงินคงเหลือ</p>
+                                    <p id="studentBalance" class="text-3xl font-black text-green-600">0.00 <span class="text-base text-green-700 font-normal">฿</span></p>
+                                </div>
+                            </div>
+
+                            <!-- History Table -->
+                            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-grow flex flex-col">
+                                <div class="px-5 py-4 border-b border-gray-200 bg-gray-50">
+                                    <h4 class="font-bold text-gray-700"><i class="fa-solid fa-list text-gray-400 mr-2"></i> ประวัติการทำรายการล่าสุด</h4>
+                                </div>
+                                <div class="overflow-x-auto flex-grow h-48 sm:h-auto">
+                                    <table class="min-w-full text-sm divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">วัน/เวลา</th>
+                                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">รายการ</th>
+                                                <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">จำนวนเงิน</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="studentHistoryTable" class="bg-white divide-y divide-gray-100">
+                                            <!-- JS Populated -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 4. Leaderboard Page ==================== -->
+        <section id="page-leaderboard" class="page-section hidden">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800"><i class="fa-solid fa-trophy mr-2 text-yellow-500"></i> อันดับผู้ฝากขยะสูงสุด (Top 10)</h2>
+            
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100">
+                <div class="p-4 bg-yellow-50 border-b border-yellow-100 flex items-center justify-between">
+                    <p class="text-yellow-800 text-sm font-medium">การจัดอันดับคำนวณจากน้ำหนักขยะรวมทั้งหมดในระบบ</p>
+                    <button id="refreshLeaderboardBtn" class="text-yellow-600 hover:text-yellow-800 text-sm">
+                        <i class="fa-solid fa-rotate-right"></i> รีเฟรช
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-16">อันดับ</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">ชื่อ - สกุล</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">ระดับชั้น</th>
+                                <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">น้ำหนักขยะรวม</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardTable" class="bg-white divide-y divide-gray-100">
+                            <!-- JS Populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 5. Admin Page ==================== -->
+        <section id="page-admin" class="page-section hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b pb-4">
+                <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-user-shield mr-2 text-red-600"></i> ระบบจัดการ (Admin Mode)</h2>
+                <div class="flex items-center space-x-4 bg-gray-100 px-4 py-2 rounded-full border border-gray-200">
+                    <span class="text-sm">เรทราคาปัจจุบัน:</span>
+                    <span class="text-sm font-semibold text-blue-600">ขวด <span id="priceBottleDisplay"></span> ฿/กก.</span>
+                    <span class="text-sm text-gray-300">|</span>
+                    <span class="text-sm font-semibold text-orange-600">กระป๋อง <span id="priceCanDisplay"></span> ฿/กก.</span>
+                </div>
+            </div>
+
+            <!-- Admin Sub-Navigation -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
+                <div class="flex flex-wrap border-b border-gray-200 bg-gray-50">
+                    <button class="admin-tab active flex-1 min-w-[120px] py-3 px-4 text-sm font-medium border-b-2 border-red-500 text-red-600 focus:outline-none transition-colors" data-target="admin-waste">
+                        <i class="fa-solid fa-scale-balanced mr-1"></i> รับขยะ
+                    </button>
+                    <button class="admin-tab flex-1 min-w-[120px] py-3 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none transition-colors" data-target="admin-payout">
+                        <i class="fa-solid fa-hand-holding-dollar mr-1"></i> จ่ายเงิน
+                    </button>
+                    <button class="admin-tab flex-1 min-w-[120px] py-3 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none transition-colors" data-target="admin-members">
+                        <i class="fa-solid fa-users-gear mr-1"></i> สมาชิก
+                    </button>
+                    <button class="admin-tab flex-1 min-w-[120px] py-3 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none transition-colors" data-target="admin-settings">
+                        <i class="fa-solid fa-gear mr-1"></i> ตั้งค่า
+                    </button>
+                </div>
+
+                <div class="p-4 sm:p-6">
+                    <!-- 5.1 Admin: Record Waste -->
+                    <div id="admin-waste" class="admin-tab-content block">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div class="bg-white">
+                                <h3 class="text-lg font-bold mb-4 text-gray-700 border-l-4 border-red-500 pl-3">ฟอร์มบันทึกรับขยะ</h3>
+                                <form id="recordWasteForm" class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-1">รหัสนักเรียน</label>
+                                        <div class="relative">
+                                            <input type="text" id="rwStudentId" class="block w-full border-gray-300 pl-10 px-3 py-2 border rounded-md focus:ring-red-500 focus:border-red-500 sm:text-sm" required autocomplete="off" placeholder="กรอกรหัสเพื่อค้นหา...">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <i class="fa-solid fa-search text-gray-400"></i>
+                                            </div>
+                                        </div>
+                                        <p id="rwStudentName" class="text-sm mt-1.5 font-medium min-h-[1.25rem]"></p>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-1">ประเภท</label>
+                                            <select id="rwWasteType" class="block w-full border-gray-300 px-3 py-2 border rounded-md focus:ring-red-500 focus:border-red-500 sm:text-sm">
+                                                <option value="ขวด">ขวดพลาสติก</option>
+                                                <option value="กระป๋อง">กระป๋อง</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-1">น้ำหนัก (กก.)</label>
+                                            <input type="number" step="0.01" min="0.01" id="rwWeight" class="block w-full border-gray-300 px-3 py-2 border rounded-md focus:ring-red-500 focus:border-red-500 sm:text-sm" required autocomplete="off" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-50 p-4 rounded-md border border-gray-200 text-center">
+                                        <p class="text-sm text-gray-500 mb-1">คำนวณจำนวนเงินที่ได้</p>
+                                        <p id="rwCalculatedAmount" class="text-3xl font-black text-green-600">0.00 <span class="text-lg font-normal text-gray-500">฿</span></p>
+                                    </div>
+                                    <button type="submit" class="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition">
+                                        <i class="fa-solid fa-check mr-2"></i> บันทึกข้อมูล
+                                    </button>
+                                </form>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold mb-4 text-gray-700 border-l-4 border-gray-400 pl-3">ประวัติการบันทึกล่าสุด (Session)</h3>
+                                <div class="bg-gray-50 rounded-md border border-gray-200 h-64 overflow-y-auto">
+                                    <ul id="rwRecentList" class="divide-y divide-gray-200">
+                                        <li class="p-4 text-center text-sm text-gray-500 italic" id="rwEmptyState">ยังไม่มีการบันทึกในรอบนี้</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5.2 Admin: Payout -->
+                    <div id="admin-payout" class="admin-tab-content hidden">
+                        <div class="max-w-xl mx-auto">
+                            <h3 class="text-lg font-bold mb-4 text-gray-700 border-l-4 border-blue-500 pl-3">ฟอร์มบันทึกการจ่ายเงินสด</h3>
+                            <form id="recordPayoutForm" class="space-y-4 bg-gray-50 p-5 rounded-lg border border-gray-200">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">รหัสนักเรียน</label>
+                                    <div class="relative">
+                                        <input type="text" id="poStudentId" class="block w-full border-gray-300 pl-10 px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required autocomplete="off">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fa-solid fa-user-check text-gray-400"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="poStudentDetails" class="mt-3 text-sm hidden bg-white p-3 rounded border border-blue-100 shadow-sm">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-gray-500">ชื่อ-สกุล:</span>
+                                            <span id="poName" class="font-bold text-gray-800"></span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-500">ยอดคงเหลือที่ถอนได้:</span>
+                                            <span class="font-bold text-blue-600"><span id="poBalance" class="text-lg">0.00</span> ฿</span>
+                                        </div>
+                                    </div>
+                                    <p id="poErrorMsg" class="text-sm text-red-500 mt-1 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ไม่พบนักเรียน</p>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">จำนวนเงินที่จ่าย (บาท)</label>
+                                    <input type="number" step="0.25" min="0.25" id="poAmount" class="block w-full border-gray-300 px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-lg font-bold text-blue-700" required autocomplete="off">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">หมายเหตุ</label>
+                                    <input type="text" id="poNote" class="block w-full border-gray-300 px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="เช่น เบิกเงินสด, จ่ายค่าเทอม" autocomplete="off">
+                                </div>
+                                
+                                <button type="submit" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition mt-2">
+                                    <i class="fa-solid fa-money-bill-wave mr-2 mt-0.5"></i> บันทึกการจ่ายเงิน
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- 5.3 Admin: Manage Members -->
+                    <div id="admin-members" class="admin-tab-content hidden">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                            <h3 class="text-lg font-bold text-gray-700 border-l-4 border-purple-500 pl-3">รายชื่อสมาชิกทั้งหมด</h3>
+                            <button id="promoteGradeBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-bold transition shadow-sm w-full sm:w-auto flex items-center justify-center">
+                                <i class="fa-solid fa-graduation-cap mr-2"></i> เลื่อนชั้นประจำปี
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto border border-gray-200 rounded-md shadow-sm max-h-[500px]">
+                            <table class="min-w-full text-sm divide-y divide-gray-200">
+                                <thead class="bg-gray-50 sticky top-0 shadow-sm">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">รหัส</th>
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">ชื่อ-สกุล</th>
+                                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">ชั้น/ห้อง</th>
+                                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminMembersTable" class="bg-white divide-y divide-gray-100">
+                                    <!-- JS Populated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 5.4 Admin: Settings -->
+                    <div id="admin-settings" class="admin-tab-content hidden">
+                        <div class="max-w-md mx-auto">
+                            <h3 class="text-lg font-bold mb-4 text-gray-700 border-l-4 border-gray-800 pl-3">ตั้งค่าราคารับซื้อขยะ</h3>
+                            <form id="updatePricesForm" class="space-y-5 bg-gray-50 p-5 rounded-lg border border-gray-200">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">ราคาขวดพลาสติก (บาท/กก.)</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.5" min="0" id="setPriceBottle" class="block w-full border-gray-300 pl-10 px-3 py-2 border rounded-md focus:ring-gray-800 focus:border-gray-800 sm:text-sm font-bold text-gray-800" required>
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fa-solid fa-bottle-water text-gray-400"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">ราคากระป๋อง (บาท/กก.)</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.5" min="0" id="setPriceCan" class="block w-full border-gray-300 pl-10 px-3 py-2 border rounded-md focus:ring-gray-800 focus:border-gray-800 sm:text-sm font-bold text-gray-800" required>
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fa-solid fa-prescription-bottle text-gray-400"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-gray-800 hover:bg-gray-900 transition">
+                                    <i class="fa-solid fa-save mr-2 mt-0.5"></i> บันทึกการตั้งค่า
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <button id="exitAdminBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-full text-sm font-bold transition shadow-sm">
+                    <i class="fa-solid fa-door-open mr-1"></i> ออกจากระบบจัดการ (Logout)
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t py-5 mt-auto shadow-inner">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-sm text-gray-500 font-medium">
+                &copy; 2026 Waste Bank System. All rights reserved.
+            </p>
+            <p class="text-xs text-gray-400 mt-1 flex justify-center items-center gap-1">
+                <i class="fa-solid fa-code text-green-500"></i> with <i class="fa-solid fa-heart text-red-500"></i> by <span class="font-bold text-gray-600">Pragasit Suriya</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- PIN Modal for Admin Access -->
+    <div id="adminPinModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50 px-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm transform scale-100 transition-transform">
+            <div class="flex justify-between items-center mb-5">
+                <div class="flex items-center">
+                    <div class="bg-red-100 text-red-600 p-2 rounded-full mr-3">
+                        <i class="fa-solid fa-shield-halved text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800">ยืนยันตัวตน</h3>
+                </div>
+                <button id="closePinModal" class="text-gray-400 hover:text-gray-600 transition p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="mb-5">
+                <label class="block text-sm font-medium text-gray-700 mb-2">กรุณาใส่รหัส PIN เพื่อเข้าสู่โหมด Admin</label>
+                <input type="password" id="adminPinInput" class="w-full border-gray-300 text-center text-2xl tracking-widest px-4 py-3 border rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 bg-gray-50" autocomplete="off" placeholder="••••">
+                <p id="pinErrorMsg" class="text-red-500 text-sm mt-2 hidden text-center font-medium animate-pulse">PIN ไม่ถูกต้อง ลองอีกครั้ง</p>
+            </div>
+            <button id="verifyPinBtn" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold transition shadow-md">
+                เข้าสู่ระบบ
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-3 pointer-events-none w-full max-w-xs sm:max-w-sm px-4 sm:px-0"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
