@@ -10,6 +10,23 @@ let appData = {
     payouts: []
 };
 
+const LOCAL_DATA_CACHE_KEY = 'waste-bank-initial-data-v1';
+const LOCAL_DATA_CACHE_TTL_MS = 2 * 60 * 1000;
+
+function getCachedInitialData() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(LOCAL_DATA_CACHE_KEY));
+        if (cached && cached.data && Date.now() - cached.savedAt < LOCAL_DATA_CACHE_TTL_MS) return cached.data;
+    } catch (error) {}
+    return null;
+}
+
+function cacheInitialData(data) {
+    try {
+        localStorage.setItem(LOCAL_DATA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data }));
+    } catch (error) {}
+}
+
 // ==========================================
 // Helper Functions
 // ==========================================
@@ -24,7 +41,7 @@ const formatDate = (isoString) => {
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
-    
+
     let bgColor = 'bg-blue-600';
     let icon = 'fa-circle-info';
     
@@ -79,16 +96,17 @@ function getStudentBalanceData(studentId) {
 // ==========================================
 
 // โหลดข้อมูลเริ่มต้น
-async function fetchInitialData() {
-    const loadingToast = showToast('กำลังเชื่อมต่อฐานข้อมูล...', 'loading');
+async function fetchInitialData({ showLoading = true, showSuccess = true } = {}) {
+    const loadingToast = showLoading ? showToast('กำลังเชื่อมต่อฐานข้อมูล...', 'loading') : null;
     try {
         const response = await fetch(`${API_URL}?action=getInitialData`);
         const result = await response.json();
         
-        loadingToast.remove();
+        if (loadingToast) loadingToast.remove();
         
         if (result.success) {
             appData = result.data;
+            cacheInitialData(appData);
             
             // Format dates from string
             appData.transactions.forEach(tx => {
@@ -100,20 +118,22 @@ async function fetchInitialData() {
 
             renderDashboard();
             renderLeaderboard();
-            showToast('อัปเดตข้อมูลล่าสุดเรียบร้อย', 'success');
+            if (showSuccess) showToast('อัปเดตข้อมูลล่าสุดเรียบร้อย', 'success');
         } else {
             showToast('เซิร์ฟเวอร์: ' + (result.message || 'เกิดข้อผิดพลาด'), 'error');
             console.error("Server Error:", result);
         }
     } catch (err) {
-        loadingToast.remove();
-        showToast('การเชื่อมต่อล้มเหลว', 'error');
+        if (loadingToast) loadingToast.remove();
+        if (showLoading) showToast('การเชื่อมต่อล้มเหลว', 'error');
         console.error(err);
     }
 }
 
 // ส่ง Request แบบ POST ทั่วไป
-async function apiPost(action, payload) {
+let adminSessionToken = null;
+
+async function apiPost(action, payload, requiresAdmin = false) {
     const loadingToast = showToast('กำลังประมวลผล...', 'loading');
     try {
         // ใช้ text/plain เพื่อเลี่ยง Preflight CORS Request (ข้อจำกัดของ Google Apps Script)
@@ -122,7 +142,11 @@ async function apiPost(action, payload) {
             headers: {
                 'Content-Type': 'text/plain;charset=utf-8',
             },
-            body: JSON.stringify({ action, payload })
+            body: JSON.stringify({
+                action,
+                payload,
+                adminToken: requiresAdmin ? adminSessionToken : undefined
+            })
         });
         
         const result = await response.json();
@@ -137,7 +161,15 @@ async function apiPost(action, payload) {
 }
 
 // โหลดข้อมูลตอนเปิดหน้าเว็บ
-document.addEventListener('DOMContentLoaded', fetchInitialData);
+document.addEventListener('DOMContentLoaded', () => {
+    const cachedData = getCachedInitialData();
+    if (cachedData) {
+        appData = cachedData;
+        renderDashboard();
+        renderLeaderboard();
+    }
+    fetchInitialData({ showLoading: !cachedData, showSuccess: !cachedData });
+});
 
 // ==========================================
 // SPA Navigation & Mobile Menu
@@ -149,6 +181,7 @@ const pageSections = document.querySelectorAll('.page-section');
 
 mobileMenuBtn.addEventListener('click', () => {
     mobileMenu.classList.toggle('hidden');
+    mobileMenuBtn.setAttribute('aria-expanded', (!mobileMenu.classList.contains('hidden')).toString());
 });
 
 function navigateTo(targetId) {
@@ -172,6 +205,8 @@ function navigateTo(targetId) {
     });
     
     mobileMenu.classList.add('hidden');
+    mobileMenuBtn.setAttribute('aria-expanded', 'false');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (targetId === 'page-dashboard') renderDashboard();
     if (targetId === 'page-leaderboard') renderLeaderboard();
@@ -270,6 +305,8 @@ function renderDashboard() {
     document.getElementById('totalMoney').innerText = formatMoney(totalMoney);
     document.getElementById('totalPayout').innerText = formatMoney(totalPayout);
     document.getElementById('netBalance').innerText = formatMoney(netBalance);
+    document.getElementById('bottlePriceHint').innerText = `ขวดพลาสติก ${formatMoney(appData.config.price_bottle || 0)} บาท/กก.`;
+    document.getElementById('canPriceHint').innerText = `กระป๋อง ${formatMoney(appData.config.price_can || 0)} บาท/กก.`;
 }
 
 document.getElementById('dateFilter').addEventListener('change', renderDashboard);
@@ -339,12 +376,14 @@ const selfSellForm = document.getElementById('selfSellForm');
 const selfStudentId = document.getElementById('selfStudentId');
 const selfStudentNameBox = document.getElementById('selfStudentNameBox');
 const selfErrorId = document.getElementById('selfErrorId');
+const selfRegisterCta = document.getElementById('selfRegisterCta');
 const selfWasteType = document.getElementById('selfWasteType');
 const selfWeight = document.getElementById('selfWeight');
 const selfCalculatedAmount = document.getElementById('selfCalculatedAmount');
 const selfSubmitBtn = document.getElementById('selfSubmitBtn');
 
 let isSelfStudentValid = false;
+let isSelfSubmitting = false;
 
 selfStudentId.addEventListener('input', (e) => {
     const id = e.target.value.trim();
@@ -353,6 +392,7 @@ selfStudentId.addEventListener('input', (e) => {
         selfStudentNameBox.innerHTML = `<i class="fa-solid fa-user-check mr-1"></i> พบชื่อผู้ฝาก: <strong>${member.Full_Name}</strong> (${member.Grade})`;
         selfStudentNameBox.classList.remove('hidden');
         selfErrorId.classList.add('hidden');
+        selfRegisterCta.classList.add('hidden');
         selfStudentId.classList.remove('border-red-500', 'focus:ring-red-500');
         selfStudentId.classList.add('border-green-500', 'focus:ring-green-500');
         isSelfStudentValid = true;
@@ -364,10 +404,12 @@ selfStudentId.addEventListener('input', (e) => {
         selfStudentNameBox.classList.add('hidden');
         if (id.length > 0) {
             selfErrorId.classList.remove('hidden');
+            selfRegisterCta.classList.remove('hidden');
             selfStudentId.classList.add('border-red-500', 'focus:ring-red-500');
             selfStudentId.classList.remove('border-green-500', 'focus:ring-green-500');
         } else {
             selfErrorId.classList.add('hidden');
+            selfRegisterCta.classList.add('hidden');
             selfStudentId.classList.remove('border-red-500', 'focus:ring-red-500', 'border-green-500', 'focus:ring-green-500');
         }
         isSelfStudentValid = false;
@@ -381,6 +423,7 @@ function calculateSelfAmount() {
     const price = type === 'ขวด' ? parseFloat(appData.config.price_bottle || 0) : parseFloat(appData.config.price_can || 0);
     const amount = weight * price;
     selfCalculatedAmount.innerHTML = `${formatMoney(amount)} <span class="text-xl font-normal text-gray-500">฿</span>`;
+    document.getElementById('selfUnitPriceHint').innerText = `เรทราคาปัจจุบัน: ${formatMoney(price)} บาท/กก.`;
     
     if(weight > 0 && isSelfStudentValid) {
         enableSelfSubmitBtn();
@@ -390,6 +433,7 @@ function calculateSelfAmount() {
 }
 
 function enableSelfSubmitBtn() {
+    if (isSelfSubmitting) return;
     selfSubmitBtn.disabled = false;
     selfSubmitBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
     selfSubmitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
@@ -406,7 +450,7 @@ selfWeight.addEventListener('input', calculateSelfAmount);
 
 selfSellForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if(!isSelfStudentValid) return;
+    if(!isSelfStudentValid || isSelfSubmitting) return;
 
     const id = selfStudentId.value.trim();
     const member = appData.members.find(m => m.Student_ID.toString() === id);
@@ -423,16 +467,24 @@ selfSellForm.addEventListener('submit', async (e) => {
         Amount: amount
     };
 
+    isSelfSubmitting = true;
+    selfSubmitBtn.disabled = true;
+    selfSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังบันทึก...';
     const res = await apiPost('addTransaction', payload);
+    isSelfSubmitting = false;
+    selfSubmitBtn.innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> ยืนยันการฝากขยะ';
 
     if (res.success) {
-        showToast(`✅ บันทึกฝากขยะให้ ${member.Full_Name} สำเร็จ ได้รับเงิน ${formatMoney(amount)} บาท`);
+        const confirmedAmount = Number(res.data.Amount);
+        const confirmedPrice = Number(res.data.Unit_Price);
         
         // Update local state
         appData.transactions.push({
             Tx_ID: res.data.Tx_ID,
             Datetime: res.data.Datetime,
-            ...payload
+            ...payload,
+            Unit_Price: confirmedPrice,
+            Amount: confirmedAmount
         });
 
         // Reset Form
@@ -442,14 +494,37 @@ selfSellForm.addEventListener('submit', async (e) => {
         selfCalculatedAmount.innerHTML = `0.00 <span class="text-xl font-normal text-gray-500">฿</span>`;
         isSelfStudentValid = false;
         disableSelfSubmitBtn();
-
-        navigateTo('page-lookup');
-        document.getElementById('searchStudentId').value = id;
-        performSearch();
+        showTransactionSuccess(member, type, weight, confirmedAmount, id);
     } else {
         showToast(res.message, 'error');
+        calculateSelfAmount();
     }
 });
+
+function showTransactionSuccess(member, type, weight, amount, studentId) {
+    const balance = getStudentBalanceData(studentId).balance;
+    document.getElementById('successTransactionDetail').innerText = `${member.Full_Name} • ${type} ${formatWeight(weight)} กก.`;
+    document.getElementById('successTransactionAmount').innerText = `+${formatMoney(amount)} ฿`;
+    document.getElementById('successTransactionBalance').innerText = `ยอดเงินคงเหลือของคุณ: ${formatMoney(balance)} ฿`;
+
+    const modal = document.getElementById('transactionSuccessModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    document.getElementById('successDepositMoreBtn').onclick = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        navigateTo('page-sell');
+        selfStudentId.focus();
+    };
+    document.getElementById('successViewHistoryBtn').onclick = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        navigateTo('page-lookup');
+        document.getElementById('searchStudentId').value = studentId;
+        performSearch();
+    };
+}
 
 
 // ==========================================
@@ -496,14 +571,17 @@ function performSearch() {
         document.getElementById('studentBalance').innerHTML = `${formatMoney(balData.balance)} <span class="text-base text-green-700 font-normal">฿</span>`;
 
         const historyTbody = document.getElementById('studentHistoryTable');
+        const historyCards = document.getElementById('studentHistoryCards');
         const allHistory = [
             ...appData.transactions.filter(tx => tx.Student_ID.toString() === id).map(tx => ({ type: 'earn', date: tx.Datetime, item: `ฝากขยะ (${tx.Waste_Type}) ${tx.Weight_kg}kg`, amount: tx.Amount })),
             ...appData.payouts.filter(po => po.Student_ID.toString() === id).map(po => ({ type: 'pay', date: po.Datetime, item: `ถอนเงิน (${po.Admin_Note})`, amount: po.Amount_Paid }))
         ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
 
         historyTbody.innerHTML = '';
+        historyCards.innerHTML = '';
         if (allHistory.length === 0) {
             historyTbody.innerHTML = '<tr><td colspan="3" class="px-5 py-8 text-center text-gray-500 italic bg-gray-50/50">ยังไม่มีประวัติการทำรายการ</td></tr>';
+            historyCards.innerHTML = '<p class="px-5 py-8 text-center text-sm text-gray-500 italic">ยังไม่มีประวัติการทำรายการ</p>';
         } else {
             allHistory.forEach(row => {
                 const isEarn = row.type === 'earn';
@@ -515,6 +593,15 @@ function performSearch() {
                             ${isEarn ? '+' : '-'}${formatMoney(row.amount)}
                         </td>
                     </tr>
+                `;
+                historyCards.innerHTML += `
+                    <article class="p-4 flex items-center justify-between gap-3">
+                        <div>
+                            <p class="font-semibold text-sm ${isEarn ? 'text-gray-800' : 'text-blue-600'}">${row.item}</p>
+                            <p class="text-xs text-gray-500 mt-1">${formatDate(row.date)}</p>
+                        </div>
+                        <p class="font-bold whitespace-nowrap ${isEarn ? 'text-green-600' : 'text-red-500'}">${isEarn ? '+' : '-'}${formatMoney(row.amount)} ฿</p>
+                    </article>
                 `;
             });
         }
@@ -619,12 +706,12 @@ adminNavBtn.addEventListener('click', showPinModal);
 adminMobileBtn.addEventListener('click', showPinModal);
 closePinModal.addEventListener('click', hidePinModal);
 
-function verifyPin() {
+async function verifyPin() {
     const pin = adminPinInput.value;
-    // ใช้ PIN จาก Database 
-    const realPin = appData.config.admin_pin ? appData.config.admin_pin.toString() : "1234";
+    const res = await apiPost('verifyAdminPin', { pin });
 
-    if (pin === realPin) {
+    if (res.success) {
+        adminSessionToken = res.data.token;
         hidePinModal();
         navigateTo('page-admin');
         openAdminSection('admin-waste'); // Default tab
@@ -642,6 +729,7 @@ adminPinInput.addEventListener('keypress', (e) => {
 });
 
 document.getElementById('exitAdminBtn').addEventListener('click', () => {
+    adminSessionToken = null;
     navigateTo('page-dashboard');
     showToast('ออกจากระบบจัดการแล้ว', 'success');
 });
@@ -827,7 +915,7 @@ document.getElementById('recordPayoutForm').addEventListener('submit', async (e)
         Admin_Note: note
     };
 
-    const res = await apiPost('recordPayout', payload);
+    const res = await apiPost('recordPayout', payload, true);
 
     if (res.success) {
         showToast(`จ่ายเงินให้ ${member.Full_Name} สำเร็จ (-${formatMoney(amount)}฿)`);
@@ -878,7 +966,7 @@ document.getElementById('promoteGradeBtn').addEventListener('click', async () =>
         return;
     }
 
-    const res = await apiPost('promoteGrade', {});
+    const res = await apiPost('promoteGrade', {}, true);
     
     if (res.success) {
         showToast('ดำเนินการเลื่อนชั้นประจำปีในฐานข้อมูลเสร็จสิ้น', 'success');
@@ -903,7 +991,7 @@ document.getElementById('updatePricesForm').addEventListener('submit', async (e)
         price_can: pCan
     };
 
-    const res = await apiPost('updatePrices', payload);
+    const res = await apiPost('updatePrices', payload, true);
 
     if (res.success) {
         appData.config.price_bottle = pBottle;

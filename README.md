@@ -31,9 +31,10 @@
 2. ไปที่เมนู `ส่วนขยาย (Extensions) -> Apps Script`
 3. คัดลอกโค้ดจากไฟล์ `backend/Code.js` ไปวางทับในหน้า Apps Script
 4. กดบันทึก (Save)
-5. กดปุ่ม `Deploy -> Manage deployments -> New version`
-6. ตั้งค่าการเข้าถึง: `Execute as: Me` และ `Who has access: Anyone`
-7. คัดลอก **Web app URL** ที่ได้รับมา
+5. ในชีต `Config` ให้มีแถว `admin_pin` ในคอลัมน์ `Key` และ PIN ในคอลัมน์ `Value`
+6. กดปุ่ม `Deploy -> Manage deployments -> New version`
+7. ตั้งค่าการเข้าถึง: `Execute as: Me` และ `Who has access: Anyone`
+8. คัดลอก **Web app URL** ที่ได้รับมา
 
 ### 2. ส่วนแสดงผล (Frontend)
 1. เปิดไฟล์ `frontend/app.js`
@@ -44,7 +45,10 @@
 3. รันไฟล์ `index.html` บนเบราว์เซอร์เพื่อเริ่มใช้งานได้ทันที (หรือนำไป Host บน GitHub Pages ฟรี)
 
 ## 🛡️ ความปลอดภัย (Security)
-* รหัส PIN ของ Admin จะถูกตั้งค่าไว้ที่ฝั่ง Google Sheets (`Config` tab) ทำให้ไม่สามารถเจาะดูจากฝั่ง Frontend ได้
+* PIN ของ Admin เก็บในชีต `Config` แต่ Apps Script ใช้ตรวจสอบฝั่งเซิร์ฟเวอร์เท่านั้น และจะไม่ส่งกลับไปยัง Frontend
+* คำสั่งจ่ายเงิน เปลี่ยนราคา และเลื่อนชั้นต้องมี Admin session token ที่ออกโดย Apps Script
+* Apps Script คำนวณราคาและจำนวนเงินของรายการรับขยะเอง ไม่เชื่อค่าราคาหรือยอดเงินจาก browser
+* ระบบยังเปิดให้นักเรียนกรอกรหัสและน้ำหนักเองโดยไม่ยืนยันตัวตนตามรูปแบบที่เลือก จึงไม่สามารถป้องกันการสวมรอยหรือกรอกน้ำหนักเท็จได้
 * ตัวแปร SPREADSHEET_ID ไม่ได้ถูกเก็บไว้ในโค้ด ทำให้ไม่มีใครรู้ว่าฐานข้อมูลจริงอยู่ที่ไหน
 
 ---

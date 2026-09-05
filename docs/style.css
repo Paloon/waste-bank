@@ -1,4 +1,8 @@
 /* Custom styles to handle input focus and appearance without tailwind forms plugin */
+body {
+    font-family: "Noto Sans Thai", system-ui, sans-serif;
+}
+
 [type='text'], [type='email'], [type='url'], [type='password'], [type='number'], [type='date'], [type='datetime-local'], [type='month'], [type='search'], [type='tel'], [type='time'], [type='week'], [multiple], textarea, select {
     appearance: none;
     background-color: #fff;
@@ -36,7 +40,10 @@
 }
 
 /* Nav Link Active State styling */
-.nav-link.active-nav {
-    background-color: #047857; /* Tailwind green-700 */
+.nav-link.active-nav,
+.nav-link.active-nav:hover,
+.nav-link.active-nav:focus-visible {
+    background-color: #047857 !important; /* Tailwind green-700 */
     font-weight: 700;
+    color: #fff !important;
 }
