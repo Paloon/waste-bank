@@ -717,6 +717,7 @@ async function verifyPin() {
         openAdminSection('admin-waste'); // Default tab
         updateAdminDisplay();
     } else {
+        pinErrorMsg.innerText = res.message || 'PIN ไม่ถูกต้อง ลองอีกครั้ง';
         pinErrorMsg.classList.remove('hidden');
         adminPinInput.value = '';
         adminPinInput.focus();
