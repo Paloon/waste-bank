@@ -116,6 +116,7 @@ async function fetchInitialData({ showLoading = true, showSuccess = true } = {})
                if(!po.Datetime || po.Datetime === "") po.Datetime = new Date().toISOString();
             });
 
+            updateRoomDropdowns();
             renderDashboard();
             renderLeaderboard();
             if (showSuccess) showToast('อัปเดตข้อมูลล่าสุดเรียบร้อย', 'success');
@@ -160,11 +161,38 @@ async function apiPost(action, payload, requiresAdmin = false) {
     }
 }
 
+// อัปเดตตัวเลือกห้องแบบไดนามิก
+function updateRoomDropdowns() {
+    if (!appData || !appData.members) return;
+    const rooms = [...new Set(appData.members
+        .map(m => m.Room)
+        .filter(r => r !== '' && r !== null && r !== undefined)
+    )].sort((a, b) => Number(a) - Number(b));
+
+    const optionsHtml = '<option value="all">ทุกห้อง</option>' + 
+        rooms.map(r => `<option value="${r}">${r}</option>`).join('');
+
+    const lbFilterRoom = document.getElementById('lbFilterRoom');
+    const adminMemRoom = document.getElementById('adminMemRoom');
+
+    if (lbFilterRoom && adminMemRoom) {
+        const currentLbRoom = lbFilterRoom.value;
+        const currentAdminRoom = adminMemRoom.value;
+
+        lbFilterRoom.innerHTML = optionsHtml;
+        adminMemRoom.innerHTML = optionsHtml;
+
+        if (rooms.includes(currentLbRoom) || rooms.includes(Number(currentLbRoom))) lbFilterRoom.value = currentLbRoom;
+        if (rooms.includes(currentAdminRoom) || rooms.includes(Number(currentAdminRoom))) adminMemRoom.value = currentAdminRoom;
+    }
+}
+
 // โหลดข้อมูลตอนเปิดหน้าเว็บ
 document.addEventListener('DOMContentLoaded', () => {
     const cachedData = getCachedInitialData();
     if (cachedData) {
         appData = cachedData;
+        updateRoomDropdowns();
         renderDashboard();
         renderLeaderboard();
     }
@@ -620,10 +648,22 @@ document.getElementById('refreshLeaderboardBtn').addEventListener('click', async
     await fetchInitialData();
 });
 
+document.getElementById('lbFilterGrade').addEventListener('change', renderLeaderboard);
+document.getElementById('lbFilterRoom').addEventListener('change', renderLeaderboard);
+
 function renderLeaderboard() {
+    const filterGrade = document.getElementById('lbFilterGrade').value;
+    const filterRoom = document.getElementById('lbFilterRoom').value;
+
     const memberStats = {};
     
     appData.transactions.forEach(tx => {
+        const member = appData.members.find(m => m.Student_ID.toString() === tx.Student_ID.toString());
+        if (!member) return;
+        
+        if (filterGrade !== 'all' && member.Grade !== filterGrade) return;
+        if (filterRoom !== 'all' && String(member.Room) !== filterRoom) return;
+
         if (!memberStats[tx.Student_ID]) {
             memberStats[tx.Student_ID] = 0;
         }
@@ -636,7 +676,7 @@ function renderLeaderboard() {
             return {
                 id,
                 name: member ? member.Full_Name : 'ไม่ทราบชื่อ',
-                grade: member ? member.Grade : '-',
+                grade: member ? `${member.Grade} ${member.Room ? '/ ' + member.Room : ''}` : '-',
                 weight: memberStats[id]
             };
         })
@@ -945,7 +985,23 @@ function renderAdminMembersTable() {
     const tbody = document.getElementById('adminMembersTable');
     tbody.innerHTML = '';
     
-    appData.members.forEach(m => {
+    const searchVal = document.getElementById('adminMemSearch').value.toLowerCase().trim();
+    const gradeVal = document.getElementById('adminMemGrade').value;
+    const roomVal = document.getElementById('adminMemRoom').value;
+
+    const filteredMembers = appData.members.filter(m => {
+        if (searchVal && !String(m.Student_ID).includes(searchVal) && !m.Full_Name.toLowerCase().includes(searchVal)) return false;
+        if (gradeVal !== 'all' && m.Grade !== gradeVal) return false;
+        if (roomVal !== 'all' && String(m.Room) !== roomVal) return false;
+        return true;
+    });
+
+    if (filteredMembers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">ไม่พบข้อมูลนักเรียน</td></tr>';
+        return;
+    }
+    
+    filteredMembers.forEach(m => {
         let statusHtml = '';
         if (m.Status === 'Active') statusHtml = `<span class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Active</span>`;
         else if (m.Status === 'Pending_Class') statusHtml = `<span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full font-bold">Pending</span>`;
@@ -957,10 +1013,19 @@ function renderAdminMembersTable() {
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-bold">${m.Full_Name}</td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 text-center">${m.Grade} ${m.Room ? '/ '+m.Room : ''}</td>
                 <td class="px-4 py-3 whitespace-nowrap text-center">${statusHtml}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-center">
+                    <button onclick="openAdminStudentHistory('${m.Student_ID}')" class="text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded transition text-sm font-bold">
+                        <i class="fa-solid fa-list-check"></i> จัดการ
+                    </button>
+                </td>
             </tr>
         `;
     });
 }
+
+document.getElementById('adminMemSearch').addEventListener('input', renderAdminMembersTable);
+document.getElementById('adminMemGrade').addEventListener('change', renderAdminMembersTable);
+document.getElementById('adminMemRoom').addEventListener('change', renderAdminMembersTable);
 
 document.getElementById('promoteGradeBtn').addEventListener('click', async () => {
     if(!confirm('⚠️ ยืนยันการเลื่อนชั้นประจำปี?\n- ม.1-ม.5 จะถูกเลื่อนขึ้น 1 ชั้น\n- ม.3 ขึ้น ม.4 จะถูกตั้งเป็น Pending รอระบุห้อง\n- ม.6 จะถูกปรับสถานะเป็น จบการศึกษา')) {
@@ -977,6 +1042,149 @@ document.getElementById('promoteGradeBtn').addEventListener('click', async () =>
         showToast(res.message, 'error');
     }
 });
+
+// Admin Student History Modal & Management
+const ashModal = document.getElementById('adminStudentHistoryModal');
+document.getElementById('closeAshModal').addEventListener('click', () => {
+    ashModal.classList.add('hidden');
+    ashModal.classList.remove('flex');
+});
+
+window.openAdminStudentHistory = function(studentId) {
+    const member = appData.members.find(m => m.Student_ID.toString() === studentId.toString());
+    if (!member) return;
+
+    document.getElementById('ashStudentName').innerText = member.Full_Name;
+    document.getElementById('ashStudentId').innerText = member.Student_ID;
+    
+    const balData = getStudentBalanceData(studentId);
+    document.getElementById('ashStudentBalance').innerText = formatMoney(balData.balance);
+
+    const historyTbody = document.getElementById('ashHistoryTable');
+    
+    const allHistory = [
+        ...appData.transactions.filter(tx => tx.Student_ID.toString() === studentId.toString()).map(tx => ({ type: 'tx', id: tx.Tx_ID, date: tx.Datetime, item: `ฝากขยะ (${tx.Waste_Type}) ${tx.Weight_kg}kg`, amount: tx.Amount })),
+        ...appData.payouts.filter(po => po.Student_ID.toString() === studentId.toString()).map(po => ({ type: 'po', id: po.Payout_ID, date: po.Datetime, item: `ถอนเงิน (${po.Admin_Note})`, amount: po.Amount_Paid }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    historyTbody.innerHTML = '';
+    if (allHistory.length === 0) {
+        historyTbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500 italic">ไม่มีประวัติการทำรายการ</td></tr>';
+    } else {
+        allHistory.forEach(row => {
+            const isEarn = row.type === 'tx';
+            historyTbody.innerHTML += `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatDate(row.date)}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium ${isEarn ? 'text-gray-800' : 'text-blue-600'}">${row.item}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold ${isEarn ? 'text-green-600' : 'text-red-500'}">
+                        ${isEarn ? '+' : '-'}${formatMoney(row.amount)}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-center space-x-1">
+                        <button onclick="editRecord('${row.type}', '${row.id}', '${studentId}')" class="text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition text-xs font-bold">
+                            <i class="fa-solid fa-pen"></i> แก้ไข
+                        </button>
+                        <button onclick="deleteRecord('${row.type}', '${row.id}', '${studentId}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition text-xs font-bold">
+                            <i class="fa-solid fa-trash-can"></i> ลบ
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    ashModal.classList.remove('hidden');
+    ashModal.classList.add('flex');
+};
+
+const editModal = document.getElementById('adminEditRecordModal');
+document.getElementById('closeEditModal').addEventListener('click', () => {
+    editModal.classList.add('hidden');
+    editModal.classList.remove('flex');
+});
+
+window.editRecord = function(type, id, studentId) {
+    document.getElementById('editRecordType').value = type;
+    document.getElementById('editRecordId').value = id;
+    document.getElementById('editStudentId').value = studentId;
+
+    const txFields = document.getElementById('editTxFields');
+    const poFields = document.getElementById('editPoFields');
+    
+    if (type === 'tx') {
+        const tx = appData.transactions.find(t => t.Tx_ID === id);
+        if (!tx) return;
+        document.getElementById('editWasteType').value = tx.Waste_Type;
+        document.getElementById('editWeight').value = tx.Weight_kg;
+        txFields.classList.remove('hidden');
+        poFields.classList.add('hidden');
+        document.getElementById('editWeight').required = true;
+        document.getElementById('editAmount').required = false;
+    } else {
+        const po = appData.payouts.find(p => p.Payout_ID === id);
+        if (!po) return;
+        document.getElementById('editAmount').value = po.Amount_Paid;
+        document.getElementById('editNote').value = po.Admin_Note || '';
+        poFields.classList.remove('hidden');
+        txFields.classList.add('hidden');
+        document.getElementById('editAmount').required = true;
+        document.getElementById('editWeight').required = false;
+    }
+
+    editModal.classList.remove('hidden');
+    editModal.classList.add('flex');
+};
+
+document.getElementById('editRecordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const type = document.getElementById('editRecordType').value;
+    const id = document.getElementById('editRecordId').value;
+    const studentId = document.getElementById('editStudentId').value;
+
+    let action, payload;
+    if (type === 'tx') {
+        action = 'updateTransaction';
+        payload = {
+            Tx_ID: id,
+            Waste_Type: document.getElementById('editWasteType').value,
+            Weight_kg: parseFloat(document.getElementById('editWeight').value)
+        };
+    } else {
+        action = 'updatePayout';
+        payload = {
+            Payout_ID: id,
+            Amount_Paid: parseFloat(document.getElementById('editAmount').value),
+            Admin_Note: document.getElementById('editNote').value
+        };
+    }
+
+    const res = await apiPost(action, payload, true);
+    if (res.success) {
+        showToast('แก้ไขรายการสำเร็จ', 'success');
+        editModal.classList.add('hidden');
+        editModal.classList.remove('flex');
+        await fetchInitialData({showLoading: false, showSuccess: false});
+        openAdminStudentHistory(studentId); // Refresh modal
+    } else {
+        showToast(res.message, 'error');
+    }
+});
+
+window.deleteRecord = async function(type, id, studentId) {
+    if (!confirm(`⚠️ ยืนยันการลบรายการนี้ใช่หรือไม่?\nการลบจะไม่สามารถกู้คืนได้ และยอดเงินจะถูกคำนวณใหม่`)) return;
+
+    const action = type === 'tx' ? 'deleteTransaction' : 'deletePayout';
+    const payload = type === 'tx' ? { Tx_ID: id } : { Payout_ID: id };
+
+    const res = await apiPost(action, payload, true);
+    if (res.success) {
+        showToast('ลบรายการสำเร็จ', 'success');
+        await fetchInitialData({showLoading: false, showSuccess: false});
+        openAdminStudentHistory(studentId); // Refresh modal
+    } else {
+        showToast(res.message, 'error');
+    }
+};
 
 
 // ==========================================

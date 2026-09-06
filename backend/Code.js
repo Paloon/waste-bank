@@ -57,6 +57,10 @@ function doPost(e) {
       case 'verifyAdminPin': return outputJSON(createAdminSession(payload.pin));
       case 'addTransaction': return outputJSON(addTransaction(payload));
       case 'recordPayout': requireAdmin(adminToken); return outputJSON(recordPayout(payload));
+      case 'deleteTransaction': requireAdmin(adminToken); return outputJSON(deleteTransaction(payload));
+      case 'deletePayout': requireAdmin(adminToken); return outputJSON(deletePayout(payload));
+      case 'updateTransaction': requireAdmin(adminToken); return outputJSON(updateTransaction(payload));
+      case 'updatePayout': requireAdmin(adminToken); return outputJSON(updatePayout(payload));
       case 'updatePrices': requireAdmin(adminToken); return outputJSON(updatePrices(payload));
       case 'promoteGrade': requireAdmin(adminToken); return outputJSON(promoteGrade());
       case 'registerMember': return outputJSON(registerMember(payload));
@@ -182,6 +186,79 @@ function recordPayout(payload) {
   sheet.appendRow([Payout_ID, Datetime, Student_ID, Amount_Paid, Admin_Note]);
   invalidateInitialDataCache();
   return { success: true, message: 'บันทึกการจ่ายเงินสำเร็จ', data: { Payout_ID, Datetime } };
+}
+
+function deleteTransaction(payload) {
+  const Tx_ID = String(payload.Tx_ID || '').trim();
+  if (!Tx_ID) return { success: false, message: 'ไม่พบรหัสรายการ' };
+  const sheet = getSheet('Transactions');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === Tx_ID) {
+      sheet.deleteRow(i + 1);
+      invalidateInitialDataCache();
+      return { success: true, message: 'ลบรายการฝากขยะสำเร็จ' };
+    }
+  }
+  return { success: false, message: 'ไม่พบรายการที่ต้องการลบ' };
+}
+
+function deletePayout(payload) {
+  const Payout_ID = String(payload.Payout_ID || '').trim();
+  if (!Payout_ID) return { success: false, message: 'ไม่พบรหัสรายการ' };
+  const sheet = getSheet('Payouts');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === Payout_ID) {
+      sheet.deleteRow(i + 1);
+      invalidateInitialDataCache();
+      return { success: true, message: 'ลบรายการจ่ายเงินสำเร็จ' };
+    }
+  }
+  return { success: false, message: 'ไม่พบรายการที่ต้องการลบ' };
+}
+
+function updateTransaction(payload) {
+  const Tx_ID = String(payload.Tx_ID || '').trim();
+  const Waste_Type = String(payload.Waste_Type || '').trim();
+  const Weight_kg = Number(payload.Weight_kg);
+  if (!Tx_ID || !['ขวด', 'กระป๋อง'].includes(Waste_Type) || !Number.isFinite(Weight_kg) || Weight_kg <= 0) {
+    return { success: false, message: 'ข้อมูลไม่ถูกต้อง' };
+  }
+  const sheet = getSheet('Transactions');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === Tx_ID) {
+      const unitPrice = Number(data[i][5]); // ใช้ราคาต่อหน่วยเดิม
+      const amount = Weight_kg * unitPrice;
+      sheet.getRange(i + 1, 4).setValue(Waste_Type);
+      sheet.getRange(i + 1, 5).setValue(Weight_kg);
+      sheet.getRange(i + 1, 7).setValue(amount);
+      invalidateInitialDataCache();
+      return { success: true, message: 'แก้ไขรายการสำเร็จ' };
+    }
+  }
+  return { success: false, message: 'ไม่พบรายการที่ต้องการแก้ไข' };
+}
+
+function updatePayout(payload) {
+  const Payout_ID = String(payload.Payout_ID || '').trim();
+  const Amount_Paid = Number(payload.Amount_Paid);
+  const Admin_Note = String(payload.Admin_Note || '').trim().slice(0, 200);
+  if (!Payout_ID || !Number.isFinite(Amount_Paid) || Amount_Paid <= 0) {
+    return { success: false, message: 'ข้อมูลไม่ถูกต้อง' };
+  }
+  const sheet = getSheet('Payouts');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === Payout_ID) {
+      sheet.getRange(i + 1, 4).setValue(Amount_Paid);
+      sheet.getRange(i + 1, 5).setValue(Admin_Note);
+      invalidateInitialDataCache();
+      return { success: true, message: 'แก้ไขรายการสำเร็จ' };
+    }
+  }
+  return { success: false, message: 'ไม่พบรายการที่ต้องการแก้ไข' };
 }
 
 function updatePrices(payload) {
