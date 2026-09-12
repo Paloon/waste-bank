@@ -1,29 +1,13 @@
-// =========================================================================
-// 1. วิธีตั้งค่า: คุณไม่จำเป็นต้องใส่ ID ใดๆ เลย 
-// ขอแค่เอาโค้ดนี้ไปใส่โดยกดจากเมนู "ส่วนขยาย (Extensions) -> Apps Script" ในหน้า Google Sheets ของคุณ
-// =========================================================================
-
-// ฟังก์ชันสำหรับดึงไฟล์ Google Sheets อัตโนมัติ
 function getDatabase() {
-  try {
-    // ดึงไฟล์ Sheets ที่สคริปต์นี้ถูกฝังอยู่ (ไม่ต้องใช้ ID)
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (ss) return ss;
-  } catch (e) {
-    throw new Error("เกิดข้อผิดพลาด: สคริปต์นี้ไม่ได้ผูกกับ Google Sheets กรุณาเปิด Apps Script จากเมนู 'ส่วนขยาย' ในหน้า Sheets");
-  }
+  return SpreadsheetApp.getActiveSpreadsheet();
 }
 
 function getSheet(sheetName) {
-  const ss = getDatabase();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) throw new Error("ไม่พบชีตชื่อ: " + sheetName + " กรุณาสร้างแท็บชื่อนี้ใน Google Sheets");
+  var db = getDatabase();
+  var sheet = db.getSheetByName(sheetName);
+  if (!sheet) throw new Error('ไม่พบแผ่นงาน: ' + sheetName);
   return sheet;
 }
-
-// =========================================================================
-// 2. HTTP Request Handlers (doGet / doPost) & CORS
-// =========================================================================
 
 function outputJSON(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -31,311 +15,549 @@ function outputJSON(data) {
 }
 
 function doOptions(e) {
-  return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
+  return outputJSON({ success: true });
+}
+
+function getConfig() {
+  var sheet = getSheet('Config');
+  var data = sheet.getDataRange().getValues();
+  var config = {};
+  for (var i = 1; i < data.length; i++) {
+    config[data[i][0]] = data[i][1];
+  }
+  return config;
+}
+
+function getPublicConfig() {
+  return {};
+}
+
+function getSheetData(sheetName) {
+  var sheet = getSheet(sheetName);
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 1) return [];
+  var headers = data[0];
+  var result = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = {};
+    for (var j = 0; j < headers.length; j++) {
+      row[headers[j]] = data[i][j];
+    }
+    result.push(row);
+  }
+  return result;
+}
+
+// Admin Token System
+function createAdminSession(pin) {
+  var config = getConfig();
+  if (String(pin) !== String(config['admin_pin'])) {
+    throw new Error('รหัสผ่านไม่ถูกต้อง');
+  }
+  var token = Utilities.getUuid();
+  var cache = CacheService.getScriptCache();
+  cache.put('admin_token_' + token, 'true', 1800);
+  return token;
+}
+
+function requireAdmin(token) {
+  if (!token) throw new Error('ไม่พบ Token ผู้ดูแลระบบ');
+  var cache = CacheService.getScriptCache();
+  var isValid = cache.get('admin_token_' + token);
+  if (!isValid) throw new Error('เซสชันผู้ดูแลระบบหมดอายุหรือไม่ถูกต้อง โปรดเข้าสู่ระบบใหม่');
+}
+
+// Cache System
+function invalidateInitialDataCache() {
+  CacheService.getScriptCache().remove('initial-data-v2');
+}
+
+function getInitialData() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('initial-data-v2');
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      // Ignore parse error and fetch fresh
+    }
+  }
+  var data = {
+    config: getPublicConfig(),
+    members: getSheetData('Members'),
+    transactions: getSheetData('Transactions'),
+    rewards: getSheetData('Rewards'),
+    redemptions: getSheetData('Redemptions')
+  };
+  try {
+    cache.put('initial-data-v2', JSON.stringify(data), 60);
+  } catch (e) {
+    // Ignore cache put error if data is too large
+  }
+  return data;
+}
+
+// Google Drive Integration
+function getOrCreateImageFolder() {
+  const folderName = 'WasteBank_Images';
+  const folders = DriveApp.getFoldersByName(folderName);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(folderName);
+}
+
+function saveImageToDrive(base64Data, fileName) {
+  const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, '');
+  const blob = Utilities.newBlob(Utilities.base64Decode(base64Clean), 'image/jpeg', fileName);
+  const folder = getOrCreateImageFolder();
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return 'https://drive.google.com/uc?id=' + file.getId();
 }
 
 function doGet(e) {
   try {
-    const action = e.parameter.action;
+    var action = e.parameter.action;
     if (action === 'getInitialData') {
       return outputJSON({ success: true, data: getInitialData() });
     }
-    return outputJSON({ success: false, message: 'Invalid action for GET' });
+    throw new Error('ไม่พบคำสั่ง (Action)');
   } catch (error) {
-    return outputJSON({ success: false, message: error.toString() });
+    return outputJSON({ success: false, error: error.message || String(error) });
   }
 }
 
 function doPost(e) {
   try {
-    const postData = JSON.parse(e.postData.contents);
-    const action = postData.action;
-    const payload = postData.payload || {};
-    const adminToken = postData.adminToken || '';
-    
+    if (!e.postData || !e.postData.contents) {
+      throw new Error('ไม่มีข้อมูลถูกส่งมา');
+    }
+    var body = JSON.parse(e.postData.contents);
+    var action = body.action;
+    var payload = body.payload || {};
+    var adminToken = body.adminToken;
+    var result = null;
+
     switch (action) {
-      case 'verifyAdminPin': return outputJSON(createAdminSession(payload.pin));
-      case 'addTransaction': return outputJSON(addTransaction(payload));
-      case 'recordPayout': requireAdmin(adminToken); return outputJSON(recordPayout(payload));
-      case 'deleteTransaction': requireAdmin(adminToken); return outputJSON(deleteTransaction(payload));
-      case 'deletePayout': requireAdmin(adminToken); return outputJSON(deletePayout(payload));
-      case 'updateTransaction': requireAdmin(adminToken); return outputJSON(updateTransaction(payload));
-      case 'updatePayout': requireAdmin(adminToken); return outputJSON(updatePayout(payload));
-      case 'updatePrices': requireAdmin(adminToken); return outputJSON(updatePrices(payload));
-      case 'promoteGrade': requireAdmin(adminToken); return outputJSON(promoteGrade());
-      case 'registerMember': return outputJSON(registerMember(payload));
-      default: return outputJSON({ success: false, message: 'Invalid action for POST' });
+      // Public Actions
+      case 'verifyAdminPin':
+        result = { token: createAdminSession(payload.pin) };
+        break;
+      case 'registerMember':
+        result = registerMember(payload);
+        break;
+      case 'submitTrashImage':
+        result = submitTrashImage(payload);
+        break;
+      case 'cancelTransaction':
+        result = cancelTransaction(payload);
+        break;
+      case 'redeemReward':
+        result = redeemReward(payload);
+        break;
+      case 'cancelRedemption':
+        result = cancelRedemption(payload);
+        break;
+
+      // Admin Actions
+      case 'approveTransaction':
+        requireAdmin(adminToken);
+        result = approveTransaction(payload);
+        break;
+      case 'rejectTransaction':
+        requireAdmin(adminToken);
+        result = rejectTransaction(payload);
+        break;
+      case 'confirmRedemption':
+        requireAdmin(adminToken);
+        result = confirmRedemption(payload);
+        break;
+      case 'addReward':
+        requireAdmin(adminToken);
+        result = addReward(payload);
+        break;
+      case 'updateReward':
+        requireAdmin(adminToken);
+        result = updateReward(payload);
+        break;
+      case 'deleteReward':
+        requireAdmin(adminToken);
+        result = deleteReward(payload);
+        break;
+      case 'promoteGrade':
+        requireAdmin(adminToken);
+        result = promoteGrade(payload);
+        break;
+      default:
+        throw new Error('ไม่พบคำสั่ง (Action): ' + action);
     }
+    return outputJSON({ success: true, data: result });
   } catch (error) {
-    return outputJSON({ success: false, message: error.toString() });
+    return outputJSON({ success: false, error: error.message || String(error) });
   }
 }
 
-// อ่าน PIN จากชีต Config (Key: admin_pin) เพื่อตรวจสอบบนเซิร์ฟเวอร์เท่านั้น
-// ห้ามส่งค่า admin_pin กลับไปที่ browser
-function createAdminSession(pin) {
-  const expectedPin = String(getConfig().admin_pin || '').trim();
-  if (!expectedPin) throw new Error('ผู้ดูแลยังไม่ได้ตั้งค่า admin_pin ในชีต Config');
-  if (String(pin || '').trim() !== expectedPin) return { success: false, message: 'PIN ไม่ถูกต้อง' };
-  const token = Utilities.getUuid();
-  CacheService.getScriptCache().put('admin-token-' + token, '1', 1800);
-  return { success: true, data: { token: token }, message: 'ยืนยันตัวตนสำเร็จ' };
-}
-
-function requireAdmin(token) {
-  if (!token || CacheService.getScriptCache().get('admin-token-' + token) !== '1') {
-    throw new Error('ไม่มีสิทธิ์ใช้งาน Admin หรือ session หมดอายุ');
-  }
-}
-
-// =========================================================================
-// 3. Database Helper Functions
-// =========================================================================
-
-function getSheetData(sheetName) {
-  const sheet = getSheet(sheetName);
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return []; 
-  
-  const headers = data[0];
-  const result = [];
-  
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const obj = {};
-    for (let j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j];
-    }
-    result.push(obj);
-  }
-  
-  return result;
-}
-
-function getConfig() {
-  const data = getSheetData('Config');
-  const config = {};
-  data.forEach(row => {
-    if(row.Key) config[row.Key] = row.Value;
-  });
-  return config;
-}
-
-function getPublicConfig() {
-  const config = getConfig();
-  return { price_bottle: Number(config.price_bottle || 0), price_can: Number(config.price_can || 0) };
-}
-
-// =========================================================================
-// 4. Business Logic Functions
-// =========================================================================
-
-function getInitialData() {
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get('initial-data-v1');
-  if (cached) return JSON.parse(cached);
-
-  const data = {
-    config: getPublicConfig(),
-    members: getSheetData('Members'),
-    transactions: getSheetData('Transactions'),
-    payouts: getSheetData('Payouts')
-  };
-  // ลดเวลาตอบสนองระหว่างที่ไม่มีรายการใหม่; หากข้อมูลใหญ่เกิน Cache จะข้ามได้โดยไม่ทำให้ระบบล้ม
-  try { cache.put('initial-data-v1', JSON.stringify(data), 60); } catch (error) {}
-  return data;
-}
-
-function invalidateInitialDataCache() {
-  CacheService.getScriptCache().remove('initial-data-v1');
-}
-
-function addTransaction(payload) {
-  const Student_ID = String(payload.Student_ID || '').trim();
-  const Waste_Type = String(payload.Waste_Type || '').trim();
-  const Weight_kg = Number(payload.Weight_kg);
-  if (!Student_ID || !['ขวด', 'กระป๋อง'].includes(Waste_Type)) return { success: false, message: 'ข้อมูลประเภทขยะหรือรหัสนักเรียนไม่ถูกต้อง' };
-  if (!Number.isFinite(Weight_kg) || Weight_kg <= 0 || Weight_kg > 100) return { success: false, message: 'น้ำหนักต้องมากกว่า 0 และไม่เกิน 100 กก.' };
-  const member = getSheetData('Members').find(function(row) { return String(row.Student_ID) === Student_ID && String(row.Status) === 'Active'; });
-  if (!member) return { success: false, message: 'ไม่พบสมาชิกที่ใช้งานได้' };
-  // ไม่เชื่อราคาและจำนวนเงินจาก browser
-  const config = getPublicConfig();
-  const Unit_Price = Waste_Type === 'ขวด' ? config.price_bottle : config.price_can;
-  const Amount = Weight_kg * Unit_Price;
-  const sheet = getSheet('Transactions');
-  const Tx_ID = 'TX' + Date.now().toString().slice(-6); 
-  const Datetime = new Date().toISOString();
-  
-  sheet.appendRow([Tx_ID, Datetime, Student_ID, Waste_Type, Weight_kg, Unit_Price, Amount]);
-  invalidateInitialDataCache();
-  return { success: true, message: 'บันทึกขยะสำเร็จ', data: { Tx_ID, Datetime, Unit_Price, Amount } };
-}
-
-function recordPayout(payload) {
-  const Student_ID = String(payload.Student_ID || '').trim();
-  const Amount_Paid = Number(payload.Amount_Paid);
-  const Admin_Note = String(payload.Admin_Note || '').trim().slice(0, 200);
-  if (!Student_ID || !Number.isFinite(Amount_Paid) || Amount_Paid <= 0) return { success: false, message: 'ข้อมูลการจ่ายเงินไม่ถูกต้อง' };
-  const earned = getSheetData('Transactions').filter(function(tx) { return String(tx.Student_ID) === Student_ID; }).reduce(function(sum, tx) { return sum + Number(tx.Amount || 0); }, 0);
-  const paid = getSheetData('Payouts').filter(function(po) { return String(po.Student_ID) === Student_ID; }).reduce(function(sum, po) { return sum + Number(po.Amount_Paid || 0); }, 0);
-  if (Amount_Paid > earned - paid) return { success: false, message: 'ยอดเงินคงเหลือไม่พอให้ถอน' };
-  const sheet = getSheet('Payouts');
-  const Payout_ID = 'PO' + Date.now().toString().slice(-6);
-  const Datetime = new Date().toISOString();
-  
-  sheet.appendRow([Payout_ID, Datetime, Student_ID, Amount_Paid, Admin_Note]);
-  invalidateInitialDataCache();
-  return { success: true, message: 'บันทึกการจ่ายเงินสำเร็จ', data: { Payout_ID, Datetime } };
-}
-
-function deleteTransaction(payload) {
-  const Tx_ID = String(payload.Tx_ID || '').trim();
-  if (!Tx_ID) return { success: false, message: 'ไม่พบรหัสรายการ' };
-  const sheet = getSheet('Transactions');
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === Tx_ID) {
-      sheet.deleteRow(i + 1);
-      invalidateInitialDataCache();
-      return { success: true, message: 'ลบรายการฝากขยะสำเร็จ' };
-    }
-  }
-  return { success: false, message: 'ไม่พบรายการที่ต้องการลบ' };
-}
-
-function deletePayout(payload) {
-  const Payout_ID = String(payload.Payout_ID || '').trim();
-  if (!Payout_ID) return { success: false, message: 'ไม่พบรหัสรายการ' };
-  const sheet = getSheet('Payouts');
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === Payout_ID) {
-      sheet.deleteRow(i + 1);
-      invalidateInitialDataCache();
-      return { success: true, message: 'ลบรายการจ่ายเงินสำเร็จ' };
-    }
-  }
-  return { success: false, message: 'ไม่พบรายการที่ต้องการลบ' };
-}
-
-function updateTransaction(payload) {
-  const Tx_ID = String(payload.Tx_ID || '').trim();
-  const Waste_Type = String(payload.Waste_Type || '').trim();
-  const Weight_kg = Number(payload.Weight_kg);
-  if (!Tx_ID || !['ขวด', 'กระป๋อง'].includes(Waste_Type) || !Number.isFinite(Weight_kg) || Weight_kg <= 0) {
-    return { success: false, message: 'ข้อมูลไม่ถูกต้อง' };
-  }
-  const sheet = getSheet('Transactions');
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === Tx_ID) {
-      const unitPrice = Number(data[i][5]); // ใช้ราคาต่อหน่วยเดิม
-      const amount = Weight_kg * unitPrice;
-      sheet.getRange(i + 1, 4).setValue(Waste_Type);
-      sheet.getRange(i + 1, 5).setValue(Weight_kg);
-      sheet.getRange(i + 1, 7).setValue(amount);
-      invalidateInitialDataCache();
-      return { success: true, message: 'แก้ไขรายการสำเร็จ' };
-    }
-  }
-  return { success: false, message: 'ไม่พบรายการที่ต้องการแก้ไข' };
-}
-
-function updatePayout(payload) {
-  const Payout_ID = String(payload.Payout_ID || '').trim();
-  const Amount_Paid = Number(payload.Amount_Paid);
-  const Admin_Note = String(payload.Admin_Note || '').trim().slice(0, 200);
-  if (!Payout_ID || !Number.isFinite(Amount_Paid) || Amount_Paid <= 0) {
-    return { success: false, message: 'ข้อมูลไม่ถูกต้อง' };
-  }
-  const sheet = getSheet('Payouts');
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === Payout_ID) {
-      sheet.getRange(i + 1, 4).setValue(Amount_Paid);
-      sheet.getRange(i + 1, 5).setValue(Admin_Note);
-      invalidateInitialDataCache();
-      return { success: true, message: 'แก้ไขรายการสำเร็จ' };
-    }
-  }
-  return { success: false, message: 'ไม่พบรายการที่ต้องการแก้ไข' };
-}
-
-function updatePrices(payload) {
-  const price_bottle = Number(payload.price_bottle);
-  const price_can = Number(payload.price_can);
-  if (!Number.isFinite(price_bottle) || !Number.isFinite(price_can) || price_bottle < 0 || price_can < 0) return { success: false, message: 'เรทราคาไม่ถูกต้อง' };
-  const sheet = getSheet('Config');
-  const data = sheet.getDataRange().getValues();
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === 'price_bottle') {
-      sheet.getRange(i + 1, 2).setValue(price_bottle);
-    }
-    if (data[i][0] === 'price_can') {
-      sheet.getRange(i + 1, 2).setValue(price_can);
-    }
-  }
-  invalidateInitialDataCache();
-  return { success: true, message: 'อัปเดตราคาสำเร็จ' };
-}
-
-function promoteGrade() {
-  const sheet = getSheet('Members');
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return { success: false, message: 'ไม่มีข้อมูลนักเรียน' };
-  
-  const headers = data[0];
-  const gradeIdx = headers.indexOf('Grade');
-  const roomIdx = headers.indexOf('Room');
-  const seatIdx = headers.indexOf('Seat_No');
-  const statusIdx = headers.indexOf('Status');
-  
-  if (gradeIdx === -1 || statusIdx === -1) {
-    return { success: false, message: 'ไม่พบคอลัมน์ที่จำเป็นในชีต Members' };
-  }
-  
-  for (let i = 1; i < data.length; i++) {
-    let status = data[i][statusIdx];
-    let grade = data[i][gradeIdx];
-    if (status === 'Graduated') continue; 
-    
-    let match = String(grade).match(/ม\.(\d)/);
-    if (match) {
-      let gradeNum = parseInt(match[1]);
-      if (gradeNum === 6) {
-        sheet.getRange(i + 1, statusIdx + 1).setValue('Graduated');
-      } else if (gradeNum === 3) {
-        sheet.getRange(i + 1, gradeIdx + 1).setValue('ม.4');
-        sheet.getRange(i + 1, roomIdx + 1).setValue('');
-        sheet.getRange(i + 1, seatIdx + 1).setValue('');
-        sheet.getRange(i + 1, statusIdx + 1).setValue('Pending_Class');
-      } else if (gradeNum < 6) {
-        sheet.getRange(i + 1, gradeIdx + 1).setValue(`ม.${gradeNum + 1}`);
-      }
-    }
-  }
-  invalidateInitialDataCache();
-  return { success: true, message: 'ดำเนินการเลื่อนชั้นสำเร็จ' };
-}
+// ----------------------------------------------------------------------
+// Action Implementations
+// ----------------------------------------------------------------------
 
 function registerMember(payload) {
-  const Student_ID = String(payload.Student_ID || '').trim();
-  const Full_Name = String(payload.Full_Name || '').trim();
-  const Grade = String(payload.Grade || '').trim();
-  const Room = String(payload.Room || '').trim();
-  const Seat_No = String(payload.Seat_No || '').trim();
-  if (!/^\d{3,20}$/.test(Student_ID) || !Full_Name || !/^ม\.[1-6]$/.test(Grade)) return { success: false, message: 'กรุณากรอกรหัส ชื่อ และระดับชั้นให้ถูกต้อง' };
-  const sheet = getSheet('Members');
+  var studentId = String(payload.Student_ID || '').trim();
+  if (studentId.length < 3 || studentId.length > 20) throw new Error('รหัสนักเรียนต้องมีความยาว 3-20 ตัวอักษร');
+  if (!payload.Full_Name) throw new Error('กรุณาระบุชื่อ-นามสกุล');
+  if (!payload.Grade) throw new Error('กรุณาระบุระดับชั้น');
   
-  const members = getSheetData('Members');
-  const isDuplicate = members.some(m => String(m.Student_ID) === String(Student_ID));
-  
-  if (isDuplicate) {
-    return { success: false, message: 'รหัสนักเรียนนี้มีการลงทะเบียนแล้ว' };
+  var sheet = getSheet('Members');
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === studentId) {
+      throw new Error('รหัสนักเรียนนี้มีในระบบแล้ว');
+    }
   }
   
-  sheet.appendRow([Student_ID, Full_Name, Grade, Room, Seat_No, 'Active']);
+  // [Student_ID, Full_Name, Grade, Room, Seat_No, Status, Coins_Balance]
+  sheet.appendRow([studentId, payload.Full_Name, payload.Grade, payload.Room || '', payload.Seat_No || '', 'Active', 0]);
   invalidateInitialDataCache();
   return { success: true, message: 'ลงทะเบียนสำเร็จ' };
+}
+
+function submitTrashImage(payload) {
+  var studentId = String(payload.Student_ID || '').trim();
+  var imageBase64 = payload.imageBase64;
+  if (!studentId || !imageBase64) throw new Error('ข้อมูลไม่ครบถ้วน (ต้องการ Student_ID และ imageBase64)');
+
+  var sheet = getSheet('Members');
+  var data = sheet.getDataRange().getValues();
+  var found = false;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === studentId) {
+      if (data[i][5] !== 'Active') throw new Error('สถานะบัญชีไม่สามารถดำเนินการได้');
+      found = true;
+      break;
+    }
+  }
+  if (!found) throw new Error('ไม่พบรหัสนักเรียนในระบบ');
+
+  var fileName = 'Trash_' + studentId + '_' + Date.now() + '.jpg';
+  var imageUrl = saveImageToDrive(imageBase64, fileName);
+  var txId = 'TX' + Date.now().toString().slice(-8);
+
+  var txSheet = getSheet('Transactions');
+  // [Tx_ID, Datetime, Student_ID, Image_URL, Status, Coins_Awarded]
+  txSheet.appendRow([txId, new Date().toISOString(), studentId, imageUrl, 'Pending', 0]);
+  
+  invalidateInitialDataCache();
+  return { success: true, txId: txId, message: 'ส่งรูปขยะสำเร็จ รอดำเนินการ' };
+}
+
+function cancelTransaction(payload) {
+  var txId = payload.Tx_ID;
+  var studentId = payload.Student_ID;
+  if (!txId || !studentId) throw new Error('ข้อมูลไม่ครบถ้วน');
+
+  var sheet = getSheet('Transactions');
+  var data = sheet.getDataRange().getValues();
+  var rowIndex = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(txId)) {
+      if (String(data[i][2]) !== String(studentId)) {
+        throw new Error('รหัสนักเรียนไม่ตรงกับรายการนี้');
+      }
+      if (data[i][4] !== 'Pending') {
+        throw new Error('สามารถยกเลิกได้เฉพาะรายการที่รอดำเนินการเท่านั้น');
+      }
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  if (rowIndex === -1) throw new Error('ไม่พบรายการนี้');
+
+  sheet.getRange(rowIndex, 5).setValue('Cancelled');
+  invalidateInitialDataCache();
+  return { success: true, message: 'ยกเลิกรายการสำเร็จ' };
+}
+
+function redeemReward(payload) {
+  var studentId = payload.Student_ID;
+  var rewardId = payload.Reward_ID;
+
+  var memberSheet = getSheet('Members');
+  var memberData = memberSheet.getDataRange().getValues();
+  var memberRow = -1;
+  var currentCoins = 0;
+  for (var i = 1; i < memberData.length; i++) {
+    if (String(memberData[i][0]) === String(studentId)) {
+      if (memberData[i][5] !== 'Active') throw new Error('สถานะบัญชีไม่สามารถแลกของรางวัลได้');
+      currentCoins = Number(memberData[i][6]) || 0;
+      memberRow = i + 1;
+      break;
+    }
+  }
+  if (memberRow === -1) throw new Error('ไม่พบข้อมูลนักเรียน');
+
+  var rewardSheet = getSheet('Rewards');
+  var rewardData = rewardSheet.getDataRange().getValues();
+  var rewardRow = -1;
+  var coinCost = 0;
+  var stock = 0;
+  var successMessage = '';
+  for (var j = 1; j < rewardData.length; j++) {
+    if (String(rewardData[j][0]) === String(rewardId)) {
+      coinCost = Number(rewardData[j][2]) || 0;
+      stock = Number(rewardData[j][3]) || 0;
+      successMessage = rewardData[j][5];
+      rewardRow = j + 1;
+      break;
+    }
+  }
+  if (rewardRow === -1) throw new Error('ไม่พบของรางวัลนี้');
+
+  if (currentCoins < coinCost) throw new Error('เหรียญไม่เพียงพอ');
+  if (stock <= 0) throw new Error('ของรางวัลหมดแล้ว');
+
+  // Deduct coins & stock
+  memberSheet.getRange(memberRow, 7).setValue(currentCoins - coinCost);
+  rewardSheet.getRange(rewardRow, 4).setValue(stock - 1);
+
+  // [Redeem_ID, Datetime, Student_ID, Reward_ID, Coins_Used, Status]
+  var redeemId = 'RD' + Date.now().toString().slice(-8);
+  var redemptionSheet = getSheet('Redemptions');
+  redemptionSheet.appendRow([redeemId, new Date().toISOString(), studentId, rewardId, coinCost, 'Pending_Pickup']);
+
+  invalidateInitialDataCache();
+  return { success: true, message: successMessage || 'แลกของรางวัลสำเร็จ' };
+}
+
+function cancelRedemption(payload) {
+  var redeemId = payload.Redeem_ID;
+  var studentId = payload.Student_ID;
+  if (!redeemId || !studentId) throw new Error('ข้อมูลไม่ครบถ้วน');
+
+  var sheet = getSheet('Redemptions');
+  var data = sheet.getDataRange().getValues();
+  var rowIndex = -1;
+  var coinsUsed = 0;
+  var rewardId = '';
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(redeemId)) {
+      if (String(data[i][2]) !== String(studentId)) {
+        throw new Error('รหัสนักเรียนไม่ตรงกับรายการนี้');
+      }
+      if (data[i][5] !== 'Pending_Pickup') {
+        throw new Error('สามารถยกเลิกได้เฉพาะรายการที่รอรับของเท่านั้น');
+      }
+      rewardId = data[i][3];
+      coinsUsed = Number(data[i][4]) || 0;
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  if (rowIndex === -1) throw new Error('ไม่พบรายการแลกของรางวัลนี้');
+
+  // Refund member coins
+  var memberSheet = getSheet('Members');
+  var memberData = memberSheet.getDataRange().getValues();
+  for (var m = 1; m < memberData.length; m++) {
+    if (String(memberData[m][0]) === String(studentId)) {
+      var currentCoins = Number(memberData[m][6]) || 0;
+      memberSheet.getRange(m + 1, 7).setValue(currentCoins + coinsUsed);
+      break;
+    }
+  }
+
+  // Refund reward stock
+  var rewardSheet = getSheet('Rewards');
+  var rewardData = rewardSheet.getDataRange().getValues();
+  for (var r = 1; r < rewardData.length; r++) {
+    if (String(rewardData[r][0]) === String(rewardId)) {
+      var currentStock = Number(rewardData[r][3]) || 0;
+      rewardSheet.getRange(r + 1, 4).setValue(currentStock + 1);
+      break;
+    }
+  }
+
+  // Update redemption status
+  sheet.getRange(rowIndex, 6).setValue('Cancelled');
+
+  invalidateInitialDataCache();
+  return { success: true, message: 'ยกเลิกการแลกของรางวัลสำเร็จ คืนเหรียญแล้ว' };
+}
+
+function approveTransaction(payload) {
+  var txId = payload.Tx_ID;
+  var coinsAwarded = Number(payload.Coins_Awarded) || 0;
+
+  var txSheet = getSheet('Transactions');
+  var txData = txSheet.getDataRange().getValues();
+  var txRow = -1;
+  var studentId = '';
+
+  for (var i = 1; i < txData.length; i++) {
+    if (String(txData[i][0]) === String(txId)) {
+      if (txData[i][4] !== 'Pending') throw new Error('รายการนี้ไม่ได้อยู่ในสถานะรอดำเนินการ');
+      studentId = String(txData[i][2]);
+      txRow = i + 1;
+      break;
+    }
+  }
+  if (txRow === -1) throw new Error('ไม่พบรายการนี้');
+
+  // Update Member Coins
+  var memberSheet = getSheet('Members');
+  var memberData = memberSheet.getDataRange().getValues();
+  var memberFound = false;
+  for (var m = 1; m < memberData.length; m++) {
+    if (String(memberData[m][0]) === studentId) {
+      var currentCoins = Number(memberData[m][6]) || 0;
+      memberSheet.getRange(m + 1, 7).setValue(currentCoins + coinsAwarded);
+      memberFound = true;
+      break;
+    }
+  }
+  if (!memberFound) throw new Error('ไม่พบรหัสนักเรียนผู้ทำรายการ');
+
+  // Update Transaction
+  txSheet.getRange(txRow, 5).setValue('Approved');
+  txSheet.getRange(txRow, 6).setValue(coinsAwarded);
+
+  invalidateInitialDataCache();
+  return { success: true, message: 'อนุมัติรายการและเพิ่มเหรียญสำเร็จ' };
+}
+
+function rejectTransaction(payload) {
+  var txId = payload.Tx_ID;
+  var txSheet = getSheet('Transactions');
+  var txData = txSheet.getDataRange().getValues();
+  var txRow = -1;
+
+  for (var i = 1; i < txData.length; i++) {
+    if (String(txData[i][0]) === String(txId)) {
+      if (txData[i][4] !== 'Pending') throw new Error('รายการนี้ไม่ได้อยู่ในสถานะรอดำเนินการ');
+      txRow = i + 1;
+      break;
+    }
+  }
+  if (txRow === -1) throw new Error('ไม่พบรายการนี้');
+
+  txSheet.getRange(txRow, 5).setValue('Rejected');
+  invalidateInitialDataCache();
+  return { success: true, message: 'ปฏิเสธรายการสำเร็จ' };
+}
+
+function confirmRedemption(payload) {
+  var redeemId = payload.Redeem_ID;
+  var sheet = getSheet('Redemptions');
+  var data = sheet.getDataRange().getValues();
+  var row = -1;
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(redeemId)) {
+      if (data[i][5] !== 'Pending_Pickup') throw new Error('รายการไม่ได้อยู่ในสถานะรอรับของ');
+      row = i + 1;
+      break;
+    }
+  }
+  if (row === -1) throw new Error('ไม่พบรายการนี้');
+
+  sheet.getRange(row, 6).setValue('Completed');
+  invalidateInitialDataCache();
+  return { success: true, message: 'ยืนยันการรับของรางวัลสำเร็จ' };
+}
+
+function addReward(payload) {
+  var rewardId = 'RW' + Date.now().toString().slice(-8);
+  var sheet = getSheet('Rewards');
+  // [Reward_ID, Name, Coin_Cost, Stock, Description, Success_Message, Image_URL]
+  sheet.appendRow([
+    rewardId, 
+    payload.Name, 
+    Number(payload.Coin_Cost) || 0, 
+    Number(payload.Stock) || 0, 
+    payload.Description || '', 
+    payload.Success_Message || '', 
+    payload.Image_URL || ''
+  ]);
+  invalidateInitialDataCache();
+  return { success: true, message: 'เพิ่มของรางวัลสำเร็จ' };
+}
+
+function updateReward(payload) {
+  var rewardId = payload.Reward_ID;
+  var sheet = getSheet('Rewards');
+  var data = sheet.getDataRange().getValues();
+  var row = -1;
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(rewardId)) {
+      row = i + 1;
+      break;
+    }
+  }
+  if (row === -1) throw new Error('ไม่พบของรางวัลนี้');
+
+  sheet.getRange(row, 2).setValue(payload.Name);
+  sheet.getRange(row, 3).setValue(Number(payload.Coin_Cost) || 0);
+  sheet.getRange(row, 4).setValue(Number(payload.Stock) || 0);
+  sheet.getRange(row, 5).setValue(payload.Description || '');
+  sheet.getRange(row, 6).setValue(payload.Success_Message || '');
+  sheet.getRange(row, 7).setValue(payload.Image_URL || '');
+
+  invalidateInitialDataCache();
+  return { success: true, message: 'อัปเดตของรางวัลสำเร็จ' };
+}
+
+function deleteReward(payload) {
+  var rewardId = payload.Reward_ID;
+  var sheet = getSheet('Rewards');
+  var data = sheet.getDataRange().getValues();
+  var row = -1;
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(rewardId)) {
+      row = i + 1;
+      break;
+    }
+  }
+  if (row === -1) throw new Error('ไม่พบของรางวัลนี้');
+
+  sheet.deleteRow(row);
+  invalidateInitialDataCache();
+  return { success: true, message: 'ลบของรางวัลสำเร็จ' };
+}
+
+function promoteGrade(payload) {
+  var sheet = getSheet('Members');
+  var data = sheet.getDataRange().getValues();
+  
+  // Logic: ม.1->ม.2, ม.2->ม.3, ม.3->ม.4 (Pending_Class), ม.4->ม.5, ม.5->ม.6, ม.6->Graduated
+  for (var i = 1; i < data.length; i++) {
+    var currentGrade = String(data[i][2]);
+    var currentStatus = String(data[i][5]);
+    if (currentStatus === 'Graduated') continue;
+
+    var newGrade = currentGrade;
+    var newStatus = currentStatus;
+
+    if (currentGrade === 'ม.1') newGrade = 'ม.2';
+    else if (currentGrade === 'ม.2') newGrade = 'ม.3';
+    else if (currentGrade === 'ม.3') {
+      newGrade = 'ม.4';
+      newStatus = 'Pending_Class';
+    }
+    else if (currentGrade === 'ม.4') newGrade = 'ม.5';
+    else if (currentGrade === 'ม.5') newGrade = 'ม.6';
+    else if (currentGrade === 'ม.6') {
+      newStatus = 'Graduated';
+    }
+
+    if (newGrade !== currentGrade) {
+      sheet.getRange(i + 1, 3).setValue(newGrade);
+    }
+    if (newStatus !== currentStatus) {
+      sheet.getRange(i + 1, 6).setValue(newStatus);
+    }
+  }
+
+  invalidateInitialDataCache();
+  return { success: true, message: 'เลื่อนชั้นนักเรียนทั้งหมดเรียบร้อย' };
 }

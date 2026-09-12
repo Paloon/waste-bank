@@ -1,194 +1,1201 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbxNhfE6sPUcxCW-eMLyMPnvH6cXfTeEVa5XFJN0QbXgvODky8KAQgUeHi2WDm9TjQB-8Q/exec';
 
-// ==========================================
-// Application State (Replaces Mock Data)
-// ==========================================
+const LOCAL_DATA_CACHE_KEY = 'waste-bank-initial-data-v2';
+const LOCAL_DATA_CACHE_TTL_MS = 2 * 60 * 1000;
+
 let appData = {
     config: {},
     members: [],
     transactions: [],
-    payouts: []
+    rewards: [],
+    redemptions: []
 };
 
-const LOCAL_DATA_CACHE_KEY = 'waste-bank-initial-data-v1';
-const LOCAL_DATA_CACHE_TTL_MS = 2 * 60 * 1000;
+let adminSessionToken = null;
+let currentShopStudent = null;
+
+// ==========================================
+// 1. Core Infrastructure
+// ==========================================
 
 function getCachedInitialData() {
     try {
-        const cached = JSON.parse(localStorage.getItem(LOCAL_DATA_CACHE_KEY));
-        if (cached && cached.data && Date.now() - cached.savedAt < LOCAL_DATA_CACHE_TTL_MS) return cached.data;
-    } catch (error) {}
+        const cached = localStorage.getItem(LOCAL_DATA_CACHE_KEY);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed.savedAt && (Date.now() - parsed.savedAt < LOCAL_DATA_CACHE_TTL_MS)) {
+                return parsed.data;
+            }
+        }
+    } catch (e) {
+        console.error("Cache read error:", e);
+    }
     return null;
 }
 
 function cacheInitialData(data) {
     try {
-        localStorage.setItem(LOCAL_DATA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data }));
-    } catch (error) {}
+        localStorage.setItem(LOCAL_DATA_CACHE_KEY, JSON.stringify({
+            savedAt: Date.now(),
+            data: data
+        }));
+    } catch (e) {
+        console.error("Cache write error:", e);
+    }
 }
 
-// ==========================================
-// Helper Functions
-// ==========================================
-const formatMoney = (amount) => Number(amount).toFixed(2);
-const formatWeight = (weight) => Number(weight).toFixed(2);
-const formatDate = (isoString) => {
-    if(!isoString) return '-';
-    const d = new Date(isoString);
-    return d.toLocaleDateString('th-TH') + ' ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-};
+function formatDate(isoString) {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    if (isNaN(date)) return isoString;
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
+
     const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'primary'} border-0 mb-2`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
 
-    let bgColor = 'bg-blue-600';
-    let icon = 'fa-circle-info';
-    
-    if (type === 'success') {
-        bgColor = 'bg-green-600';
-        icon = 'fa-circle-check';
-    } else if (type === 'error') {
-        bgColor = 'bg-red-600';
-        icon = 'fa-circle-exclamation';
-    } else if (type === 'loading') {
-        bgColor = 'bg-gray-700';
-        icon = 'fa-spinner fa-spin';
-    }
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${type === 'loading' ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' : ''}
+                ${message}
+            </div>
+            ${type !== 'loading' ? '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>' : ''}
+        </div>
+    `;
 
-    toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-xl transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto flex items-center border border-white/20`;
-    toast.innerHTML = `<i class="fa-solid ${icon} text-xl mr-3"></i> <span class="font-medium">${message}</span>`;
-    
     container.appendChild(toast);
     
-    setTimeout(() => {
-        toast.classList.remove('translate-x-full', 'opacity-0');
-    }, 10);
-
-    if (type !== 'loading') {
-        setTimeout(() => {
-            toast.classList.add('translate-x-full', 'opacity-0');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
-    
-    return toast; // return element so we can remove it manually (for loading state)
-}
-
-function getStudentBalanceData(studentId) {
-    const earned = appData.transactions
-        .filter(tx => tx.Student_ID.toString() === studentId.toString())
-        .reduce((sum, tx) => sum + parseFloat(tx.Amount || 0), 0);
-    
-    const paid = appData.payouts
-        .filter(po => po.Student_ID.toString() === studentId.toString())
-        .reduce((sum, po) => sum + parseFloat(po.Amount_Paid || 0), 0);
-        
-    return {
-        earned,
-        paid,
-        balance: earned - paid
-    };
-}
-
-// ==========================================
-// API Communication
-// ==========================================
-
-// โหลดข้อมูลเริ่มต้น
-async function fetchInitialData({ showLoading = true, showSuccess = true } = {}) {
-    const loadingToast = showLoading ? showToast('กำลังเชื่อมต่อฐานข้อมูล...', 'loading') : null;
-    try {
-        const response = await fetch(`${API_URL}?action=getInitialData`);
-        const result = await response.json();
-        
-        if (loadingToast) loadingToast.remove();
-        
-        if (result.success) {
-            appData = result.data;
-            cacheInitialData(appData);
-            
-            // Format dates from string
-            appData.transactions.forEach(tx => {
-               if(!tx.Datetime || tx.Datetime === "") tx.Datetime = new Date().toISOString(); 
+    // Using Bootstrap Toast API if available
+    if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+        const bsToast = new bootstrap.Toast(toast, { autohide: type !== 'loading', delay: 3000 });
+        bsToast.show();
+        if (type !== 'loading') {
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
             });
-            appData.payouts.forEach(po => {
-               if(!po.Datetime || po.Datetime === "") po.Datetime = new Date().toISOString();
-            });
-
-            updateRoomDropdowns();
-            renderDashboard();
-            renderLeaderboard();
-            if (showSuccess) showToast('อัปเดตข้อมูลล่าสุดเรียบร้อย', 'success');
-        } else {
-            showToast('เซิร์ฟเวอร์: ' + (result.message || 'เกิดข้อผิดพลาด'), 'error');
-            console.error("Server Error:", result);
         }
-    } catch (err) {
-        if (loadingToast) loadingToast.remove();
-        if (showLoading) showToast('การเชื่อมต่อล้มเหลว', 'error');
-        console.error(err);
+    } else {
+        // Fallback if bootstrap is not globally available
+        toast.classList.add('show');
+        if (type !== 'loading') {
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 150);
+            }, 3000);
+        }
     }
+    return toast;
 }
 
-// ส่ง Request แบบ POST ทั่วไป
-let adminSessionToken = null;
+async function apiPost(action, payload = {}, requiresAdmin = false) {
+    let loadingToast = null;
+    if (action !== 'getInitialData') {
+        loadingToast = showToast('กำลังดำเนินการ...', 'loading');
+    }
 
-async function apiPost(action, payload, requiresAdmin = false) {
-    const loadingToast = showToast('กำลังประมวลผล...', 'loading');
     try {
-        // ใช้ text/plain เพื่อเลี่ยง Preflight CORS Request (ข้อจำกัดของ Google Apps Script)
+        const body = {
+            action: action,
+            payload: payload
+        };
+        
+        if (requiresAdmin) {
+            body.adminToken = adminSessionToken;
+        }
+
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'text/plain;charset=utf-8',
             },
-            body: JSON.stringify({
-                action,
-                payload,
-                adminToken: requiresAdmin ? adminSessionToken : undefined
-            })
+            body: JSON.stringify(body)
+        });
+
+        const result = await response.json();
+        
+        if (loadingToast) {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                bootstrap.Toast.getInstance(loadingToast)?.hide();
+            } else {
+                loadingToast.remove();
+            }
+        }
+
+        if (!result.success) {
+            showToast(result.error || 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์', 'error');
+            throw new Error(result.error);
+        }
+
+        return result;
+    } catch (error) {
+        if (loadingToast) {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                bootstrap.Toast.getInstance(loadingToast)?.hide();
+            } else {
+                loadingToast.remove();
+            }
+        }
+        console.error(`API Error (${action}):`, error);
+        throw error;
+    }
+}
+
+async function fetchInitialData({ showLoading = false, showSuccess = false } = {}) {
+    let loadingToast = null;
+    if (showLoading) {
+        loadingToast = showToast('กำลังโหลดข้อมูล...', 'loading');
+    }
+    try {
+        const response = await fetch(`${API_URL}?action=getInitialData`);
+        const result = await response.json();
+        
+        if (result.success) {
+            appData = result.data;
+            cacheInitialData(appData);
+            updateRoomDropdowns();
+            renderDashboard();
+            renderLeaderboard();
+            
+            // Refresh current active view if needed
+            const activePage = document.querySelector('.page-section:not(.d-none)');
+            if (activePage) {
+                if (activePage.id === 'page-shop') renderShop();
+                if (activePage.id === 'page-status') performSearch(); // re-render search results
+                if (activePage.id === 'page-admin') {
+                    const activeAdminTab = document.querySelector('.admin-tab.active');
+                    if (activeAdminTab) {
+                        openAdminSection(activeAdminTab.getAttribute('data-target'));
+                    }
+                }
+            }
+
+            if (showSuccess) {
+                showToast('โหลดข้อมูลสำเร็จ', 'success');
+            }
+        } else {
+            showToast('ไม่สามารถโหลดข้อมูลได้', 'error');
+        }
+    } catch (e) {
+        console.error("Fetch Initial Data Error:", e);
+        showToast('การเชื่อมต่อมีปัญหา', 'error');
+    } finally {
+        if (loadingToast) {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                bootstrap.Toast.getInstance(loadingToast)?.hide();
+            } else {
+                loadingToast.remove();
+            }
+        }
+    }
+}
+
+function updateRoomDropdowns() {
+    const rooms = new Set();
+    appData.members.forEach(m => {
+        if (m.Room) rooms.add(m.Room);
+    });
+    
+    const sortedRooms = Array.from(rooms).sort();
+    
+    const lbRoom = document.getElementById('lbFilterRoom');
+    const adminRoom = document.getElementById('adminMemRoom');
+    
+    const createOptions = (selectElem) => {
+        if (!selectElem) return;
+        const currentVal = selectElem.value;
+        selectElem.innerHTML = '<option value="">ทุกห้อง</option>';
+        sortedRooms.forEach(room => {
+            const opt = document.createElement('option');
+            opt.value = room;
+            opt.textContent = room;
+            selectElem.appendChild(opt);
+        });
+        selectElem.value = currentVal;
+    };
+    
+    createOptions(lbRoom);
+    createOptions(adminRoom);
+}
+
+// ==========================================
+// 2. SPA Navigation
+// ==========================================
+
+function navigateTo(targetId) {
+    // Hide all pages
+    document.querySelectorAll('.page-section').forEach(el => el.classList.add('d-none'));
+    
+    // Show target page
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) targetEl.classList.remove('d-none');
+    
+    // Update nav links
+    document.querySelectorAll('.nav-link').forEach(el => {
+        if (el.getAttribute('data-target') === targetId) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
+    });
+
+    // Close mobile menu if open
+    const mobileMenu = document.getElementById('mobileMenu');
+    if (mobileMenu && !mobileMenu.classList.contains('d-none')) {
+        mobileMenu.classList.add('d-none');
+    }
+    
+    window.scrollTo(0, 0);
+
+    // Render specific page data
+    if (targetId === 'page-dashboard') renderDashboard();
+    if (targetId === 'page-leaderboard') renderLeaderboard();
+    if (targetId === 'page-shop') {
+        currentShopStudent = null; // reset shop student
+        document.getElementById('shopStudentId').value = '';
+        document.getElementById('shopStudentInfo').classList.add('d-none');
+        document.getElementById('rewardsGrid').innerHTML = '';
+    }
+    if (targetId === 'page-admin') {
+        const activeAdminTab = document.querySelector('.admin-tab.active');
+        if (activeAdminTab) {
+            openAdminSection(activeAdminTab.getAttribute('data-target'));
+        } else {
+            openAdminSection('admin-approve'); // default
+        }
+    }
+}
+
+function openAdminSection(targetId) {
+    // Update tabs
+    document.querySelectorAll('.admin-tab').forEach(el => {
+        if (el.getAttribute('data-target') === targetId) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
+    });
+
+    // Update content panels
+    document.querySelectorAll('.admin-content').forEach(el => {
+        if (el.id === targetId) {
+            el.classList.remove('d-none');
+        } else {
+            el.classList.add('d-none');
+        }
+    });
+
+    // Render logic
+    if (targetId === 'admin-approve') renderPendingApprovals();
+    if (targetId === 'admin-handover') renderPendingHandovers();
+    if (targetId === 'admin-rewards') renderManageRewards();
+    if (targetId === 'admin-members') renderAdminMembersTable();
+}
+
+// ==========================================
+// 3. Image Compression
+// ==========================================
+
+function compressImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_SIZE = 800;
+                let width = img.width;
+                let height = img.height;
+                if (width > height) {
+                    if (width > MAX_SIZE) { 
+                        height *= MAX_SIZE / width; 
+                        width = MAX_SIZE; 
+                    }
+                } else {
+                    if (height > MAX_SIZE) { 
+                        width *= MAX_SIZE / height; 
+                        height = MAX_SIZE; 
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const base64 = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(base64);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// ==========================================
+// 4. Dashboard
+// ==========================================
+
+function renderDashboard() {
+    const pendingImagesCount = appData.transactions.filter(t => t.Status === 'Pending').length;
+    let totalCoinsAwarded = 0;
+    appData.transactions.forEach(t => {
+        if (t.Status === 'Approved') {
+            totalCoinsAwarded += (parseFloat(t.Coins_Awarded) || 0);
+        }
+    });
+    const totalRedeemed = appData.redemptions.filter(r => r.Status !== 'Cancelled').length;
+    const totalMembers = appData.members.filter(m => m.Status === 'Active').length;
+
+    const elemPending = document.getElementById('statPendingImages');
+    const elemCoins = document.getElementById('statTotalCoins');
+    const elemRedeemed = document.getElementById('statTotalRedeemed');
+    const elemMembers = document.getElementById('statTotalMembers');
+
+    if (elemPending) elemPending.textContent = pendingImagesCount;
+    if (elemCoins) elemCoins.textContent = totalCoinsAwarded;
+    if (elemRedeemed) elemRedeemed.textContent = totalRedeemed;
+    if (elemMembers) elemMembers.textContent = totalMembers;
+}
+
+// ==========================================
+// 5. Submit Trash Image
+// ==========================================
+
+function setupSubmitTrash() {
+    const inputId = document.getElementById('submitStudentId');
+    const inputName = document.getElementById('submitStudentName');
+    const errorMsg = document.getElementById('submitStudentError');
+    const imageInput = document.getElementById('submitImageInput');
+    const imagePreview = document.getElementById('submitImagePreview');
+    const submitBtn = document.getElementById('submitTrashBtn');
+    const form = document.getElementById('submitTrashForm');
+
+    if (!inputId || !form) return;
+
+    inputId.addEventListener('input', () => {
+        const val = inputId.value.trim();
+        if (!val) {
+            inputName.value = '';
+            errorMsg.classList.add('d-none');
+            return;
+        }
+
+        const member = appData.members.find(m => m.Student_ID == val);
+        if (member) {
+            inputName.value = member.Full_Name;
+            errorMsg.classList.add('d-none');
+            errorMsg.innerHTML = '';
+        } else {
+            inputName.value = '';
+            errorMsg.classList.remove('d-none');
+            errorMsg.innerHTML = `ไม่พบรหัสนักเรียน <a href="#" id="registerLink">คลิกเพื่อลงทะเบียน</a>`;
+            document.getElementById('registerLink').addEventListener('click', (e) => {
+                e.preventDefault();
+                promptRegister(val);
+            });
+        }
+    });
+
+    imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e2) => {
+                imagePreview.src = e2.target.result;
+                imagePreview.classList.remove('d-none');
+            };
+            reader.readAsDataURL(file);
+            submitBtn.disabled = false;
+        } else {
+            imagePreview.classList.add('d-none');
+            imagePreview.src = '';
+            submitBtn.disabled = true;
+        }
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const studentId = inputId.value.trim();
+        const file = imageInput.files[0];
+
+        if (!studentId || !inputName.value) {
+            showToast('กรุณากรอกรหัสนักเรียนที่ถูกต้อง', 'error');
+            return;
+        }
+
+        if (!file) {
+            showToast('กรุณาเลือกรูปภาพ', 'error');
+            return;
+        }
+
+        try {
+            submitBtn.disabled = true;
+            const base64 = await compressImage(file);
+            const base64Data = base64.split(',')[1]; // Remove data:image/jpeg;base64,
+            
+            await apiPost('submitTrashImage', { Student_ID: studentId, imageBase64: base64Data });
+            showToast('ส่งรูปภาพสำเร็จ รอแอดมินตรวจสอบ', 'success');
+            
+            // Reset form
+            form.reset();
+            inputName.value = '';
+            imagePreview.src = '';
+            imagePreview.classList.add('d-none');
+            submitBtn.disabled = true;
+            
+            await fetchInitialData();
+        } catch (error) {
+            submitBtn.disabled = false;
+            // Error toast handled in apiPost
+        }
+    });
+}
+
+async function promptRegister(studentId) {
+    const name = prompt(`ลงทะเบียนรหัส ${studentId}\nกรุณากรอกชื่อ-นามสกุล:`);
+    if (!name) return;
+    const grade = prompt('ระดับชั้น (เช่น ป.1, ม.1):');
+    const room = prompt('ห้อง (เช่น 1, 2):');
+    const seat = prompt('เลขที่:');
+
+    try {
+        await apiPost('registerMember', {
+            Student_ID: studentId,
+            Full_Name: name,
+            Grade: grade || '-',
+            Room: room || '-',
+            Seat_No: seat || '-'
+        });
+        showToast('ลงทะเบียนสำเร็จ!', 'success');
+        await fetchInitialData();
+        // Trigger input event to refresh name
+        document.getElementById('submitStudentId').dispatchEvent(new Event('input'));
+    } catch (error) {
+        // Error toast handled in apiPost
+    }
+}
+
+// ==========================================
+// 6. Status/History Page
+// ==========================================
+
+function setupStatusPage() {
+    const form = document.getElementById('searchStudentForm');
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            performSearch();
+        });
+    }
+}
+
+function performSearch() {
+    const inputId = document.getElementById('searchStudentId');
+    if (!inputId) return;
+    const studentId = inputId.value.trim();
+    if (!studentId) return;
+
+    const member = appData.members.find(m => m.Student_ID == studentId);
+    const resultDiv = document.getElementById('studentStatusResult');
+    
+    if (!member) {
+        showToast('ไม่พบรหัสนักเรียน', 'error');
+        resultDiv.classList.add('d-none');
+        return;
+    }
+
+    // Populate info
+    document.getElementById('statusStudentName').textContent = member.Full_Name;
+    document.getElementById('statusStudentId').textContent = member.Student_ID;
+    document.getElementById('statusCoinBalance').textContent = member.Coins_Balance || 0;
+
+    // Pending Images
+    const pendingImages = appData.transactions.filter(t => t.Student_ID == studentId && t.Status === 'Pending');
+    const listPendingImgs = document.getElementById('statusPendingList');
+    listPendingImgs.innerHTML = '';
+    if (pendingImages.length === 0) {
+        listPendingImgs.innerHTML = '<li class="list-group-item text-muted">ไม่มีรูปภาพรอตรวจ</li>';
+    } else {
+        pendingImages.forEach(img => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.innerHTML = `
+                <div>
+                    <img src="${img.Image_URL}" alt="Trash" style="width: 50px; height: 50px; object-fit: cover;" class="me-2 rounded">
+                    <span>${formatDate(img.Datetime)}</span>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="cancelStudentTransaction('${img.Tx_ID}', '${studentId}')">ยกเลิก</button>
+            `;
+            listPendingImgs.appendChild(li);
+        });
+    }
+
+    // Pending Rewards
+    const pendingRewards = appData.redemptions.filter(r => r.Student_ID == studentId && r.Status === 'Pending_Pickup');
+    const listPendingRwds = document.getElementById('statusPendingRewardsList');
+    listPendingRwds.innerHTML = '';
+    if (pendingRewards.length === 0) {
+        listPendingRwds.innerHTML = '<li class="list-group-item text-muted">ไม่มีของรางวัลรอมอบ</li>';
+    } else {
+        pendingRewards.forEach(r => {
+            const reward = appData.rewards.find(rw => rw.Reward_ID == r.Reward_ID);
+            const rName = reward ? reward.Name : 'ไม่ทราบชื่อ';
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.innerHTML = `
+                <div>
+                    <strong>${rName}</strong><br>
+                    <small class="text-muted">${formatDate(r.Datetime)} (ใช้ ${r.Coins_Used} เหรียญ)</small>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="cancelStudentRedemption('${r.Redeem_ID}', '${studentId}')">ยกเลิก</button>
+            `;
+            listPendingRwds.appendChild(li);
+        });
+    }
+
+    // History Table
+    const tbody = document.getElementById('statusHistoryTable');
+    tbody.innerHTML = '';
+    
+    let history = [];
+    appData.transactions.forEach(t => {
+        if (t.Student_ID == studentId && t.Status !== 'Pending') {
+            history.push({
+                date: new Date(t.Datetime),
+                dtStr: t.Datetime,
+                type: 'ส่งรูปขยะ',
+                detail: `สถานะ: ${t.Status === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ/ยกเลิก'}`,
+                coinChange: t.Status === 'Approved' ? `+${t.Coins_Awarded}` : '0',
+                color: t.Status === 'Approved' ? 'text-success' : 'text-secondary'
+            });
+        }
+    });
+    appData.redemptions.forEach(r => {
+        if (r.Student_ID == studentId && r.Status !== 'Pending_Pickup') {
+            const reward = appData.rewards.find(rw => rw.Reward_ID == r.Reward_ID);
+            const rName = reward ? reward.Name : 'ของรางวัล';
+            history.push({
+                date: new Date(r.Datetime),
+                dtStr: r.Datetime,
+                type: 'แลกรางวัล',
+                detail: `${rName} (สถานะ: ${r.Status === 'Completed' ? 'รับแล้ว' : 'ยกเลิก'})`,
+                coinChange: r.Status === 'Completed' ? `-${r.Coins_Used}` : '0',
+                color: r.Status === 'Completed' ? 'text-danger' : 'text-secondary'
+            });
+        }
+    });
+
+    history.sort((a, b) => b.date - a.date);
+    history = history.slice(0, 20); // Last 20
+
+    if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ไม่มีประวัติ</td></tr>';
+    } else {
+        history.forEach(h => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${formatDate(h.dtStr)}</td>
+                <td>${h.type}</td>
+                <td>${h.detail}</td>
+                <td class="${h.color} fw-bold">${h.coinChange}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    resultDiv.classList.remove('d-none');
+}
+
+window.cancelStudentTransaction = async function(txId, studentId) {
+    if (!confirm('ต้องการยกเลิกการส่งรูปนี้หรือไม่?')) return;
+    try {
+        await apiPost('cancelTransaction', { Tx_ID: txId, Student_ID: studentId });
+        showToast('ยกเลิกรายการสำเร็จ', 'success');
+        await fetchInitialData();
+    } catch (e) {}
+};
+
+window.cancelStudentRedemption = async function(redeemId, studentId) {
+    if (!confirm('ต้องการยกเลิกการแลกรางวัลนี้หรือไม่? (เหรียญจะถูกคืน)')) return;
+    try {
+        await apiPost('cancelRedemption', { Redeem_ID: redeemId, Student_ID: studentId });
+        showToast('ยกเลิกการแลกรางวัลสำเร็จ', 'success');
+        await fetchInitialData();
+    } catch (e) {}
+};
+
+// ==========================================
+// 7. Reward Shop
+// ==========================================
+
+function setupShopPage() {
+    const btn = document.getElementById('shopVerifyBtn');
+    const input = document.getElementById('shopStudentId');
+    if (!btn || !input) return;
+
+    btn.addEventListener('click', () => {
+        const val = input.value.trim();
+        if (!val) {
+            showToast('กรุณากรอกรหัสนักเรียน', 'error');
+            return;
+        }
+        const member = appData.members.find(m => m.Student_ID == val);
+        if (member) {
+            currentShopStudent = member;
+            document.getElementById('shopStudentInfo').classList.remove('d-none');
+            document.getElementById('shopCoinBalance').textContent = member.Coins_Balance || 0;
+            renderShop();
+        } else {
+            showToast('ไม่พบรหัสนักเรียน', 'error');
+            document.getElementById('shopStudentInfo').classList.add('d-none');
+            currentShopStudent = null;
+        }
+    });
+}
+
+function renderShop() {
+    const grid = document.getElementById('rewardsGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    // Sort rewards: available first, then by cost
+    const sortedRewards = [...appData.rewards].sort((a, b) => {
+        const aAvail = a.Stock > 0 ? 1 : 0;
+        const bAvail = b.Stock > 0 ? 1 : 0;
+        if (aAvail !== bAvail) return bAvail - aAvail;
+        return a.Coin_Cost - b.Coin_Cost;
+    });
+
+    sortedRewards.forEach(r => {
+        const isOutOfStock = parseInt(r.Stock) <= 0;
+        const studentCoins = currentShopStudent ? (parseInt(currentShopStudent.Coins_Balance) || 0) : 0;
+        const canAfford = studentCoins >= parseInt(r.Coin_Cost);
+        
+        let btnHtml = '';
+        if (isOutOfStock) {
+            btnHtml = `<button class="btn btn-secondary w-100" disabled>ของหมด</button>`;
+        } else if (!currentShopStudent) {
+            btnHtml = `<button class="btn btn-outline-primary w-100" disabled>ระบุรหัสนักเรียนก่อน</button>`;
+        } else if (!canAfford) {
+            btnHtml = `<button class="btn btn-outline-danger w-100" disabled>เหรียญไม่พอ</button>`;
+        } else {
+            btnHtml = `<button class="btn btn-primary w-100" onclick="redeemReward('${r.Reward_ID}')">แลกรางวัล</button>`;
+        }
+
+        const imgUrl = r.Image_URL || 'https://via.placeholder.com/150?text=Reward';
+
+        const card = document.createElement('div');
+        card.className = 'col-6 col-md-4 col-lg-3 mb-3';
+        card.innerHTML = `
+            <div class="card h-100 shadow-sm ${isOutOfStock ? 'opacity-75' : ''}">
+                <img src="${imgUrl}" class="card-img-top" alt="${r.Name}" style="height: 120px; object-fit: contain; padding: 10px;">
+                <div class="card-body d-flex flex-column text-center p-2">
+                    <h6 class="card-title mb-1 text-truncate">${r.Name}</h6>
+                    <p class="card-text small text-muted mb-2 text-truncate">${r.Description || '-'}</p>
+                    <div class="mt-auto">
+                        <span class="badge bg-warning text-dark mb-2 fs-6">🪙 ${r.Coin_Cost}</span>
+                        ${btnHtml}
+                        <div class="small text-muted mt-1">เหลือ: ${r.Stock}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+window.redeemReward = async function(rewardId) {
+    if (!currentShopStudent) return;
+    const reward = appData.rewards.find(r => r.Reward_ID == rewardId);
+    if (!reward) return;
+
+    if (!confirm(`ยืนยันการแลก "${reward.Name}" ใช้ ${reward.Coin_Cost} เหรียญ?`)) return;
+
+    try {
+        const result = await apiPost('redeemReward', {
+            Student_ID: currentShopStudent.Student_ID,
+            Reward_ID: rewardId
         });
         
-        const result = await response.json();
-        loadingToast.remove();
-        return result;
-    } catch (err) {
-        loadingToast.remove();
-        showToast('การเชื่อมต่อขัดข้อง กรุณาลองใหม่', 'error');
-        console.error(err);
-        return { success: false, message: 'Connection Error' };
+        // Show success modal
+        const msg = result.data.successMessage || 'แลกรางวัลสำเร็จ กรุณาติดต่อรับของรางวัล';
+        document.getElementById('redeemSuccessMessage').textContent = msg;
+        const modal = new bootstrap.Modal(document.getElementById('redeemSuccessModal'));
+        modal.show();
+
+        await fetchInitialData();
+        
+        // Update local state for UI before next render if needed
+        const updatedMember = appData.members.find(m => m.Student_ID == currentShopStudent.Student_ID);
+        if (updatedMember) {
+            currentShopStudent = updatedMember;
+            document.getElementById('shopCoinBalance').textContent = updatedMember.Coins_Balance || 0;
+        }
+        
+    } catch (e) {}
+};
+
+// ==========================================
+// 8. Leaderboard
+// ==========================================
+
+function setupLeaderboard() {
+    const fGrade = document.getElementById('lbFilterGrade');
+    const fRoom = document.getElementById('lbFilterRoom');
+    const btn = document.getElementById('refreshLeaderboardBtn');
+
+    if (fGrade) fGrade.addEventListener('change', renderLeaderboard);
+    if (fRoom) fRoom.addEventListener('change', renderLeaderboard);
+    if (btn) btn.addEventListener('click', () => fetchInitialData({ showSuccess: true }));
+}
+
+function renderLeaderboard() {
+    const fGrade = document.getElementById('lbFilterGrade')?.value || '';
+    const fRoom = document.getElementById('lbFilterRoom')?.value || '';
+    
+    // Calculate total earned
+    let earnedMap = {};
+    appData.transactions.forEach(t => {
+        if (t.Status === 'Approved') {
+            const sid = t.Student_ID;
+            earnedMap[sid] = (earnedMap[sid] || 0) + (parseFloat(t.Coins_Awarded) || 0);
+        }
+    });
+
+    let lbData = [];
+    appData.members.forEach(m => {
+        if (m.Status !== 'Active') return;
+        if (fGrade && m.Grade != fGrade) return;
+        if (fRoom && m.Room != fRoom) return;
+
+        lbData.push({
+            id: m.Student_ID,
+            name: m.Full_Name,
+            grade: m.Grade,
+            room: m.Room,
+            earned: earnedMap[m.Student_ID] || 0
+        });
+    });
+
+    lbData.sort((a, b) => b.earned - a.earned);
+    const top10 = lbData.slice(0, 10);
+
+    const tbody = document.getElementById('leaderboardTable');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (top10.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">ไม่มีข้อมูล</td></tr>';
+        return;
+    }
+
+    top10.forEach((item, index) => {
+        let rankHtml = `${index + 1}`;
+        if (index === 0) rankHtml = '🥇 1';
+        else if (index === 1) rankHtml = '🥈 2';
+        else if (index === 2) rankHtml = '🥉 3';
+
+        const tr = document.createElement('tr');
+        if (index < 3) tr.className = 'fw-bold';
+        tr.innerHTML = `
+            <td class="text-center">${rankHtml}</td>
+            <td>${item.name}</td>
+            <td class="text-center">${item.grade}/${item.room}</td>
+            <td class="text-center text-warning fw-bold">${item.earned}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// ==========================================
+// 9. Admin PIN Flow
+// ==========================================
+
+function setupAdminPin() {
+    const adminBtn = document.getElementById('adminNavBtn');
+    const mobileBtn = document.getElementById('adminMobileBtn');
+    const exitBtn = document.getElementById('exitAdminBtn');
+    const verifyBtn = document.getElementById('verifyPinBtn');
+    const pinInput = document.getElementById('adminPinInput');
+
+    const requireLogin = () => {
+        if (adminSessionToken) {
+            navigateTo('page-admin');
+        } else {
+            showPinModal();
+        }
+    };
+
+    if (adminBtn) adminBtn.addEventListener('click', requireLogin);
+    if (mobileBtn) mobileBtn.addEventListener('click', requireLogin);
+    if (exitBtn) exitBtn.addEventListener('click', () => {
+        adminSessionToken = null;
+        navigateTo('page-dashboard');
+        showToast('ออกจากระบบแอดมินแล้ว', 'success');
+    });
+
+    if (verifyBtn) verifyBtn.addEventListener('click', verifyPin);
+    if (pinInput) {
+        pinInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') verifyPin();
+        });
     }
 }
 
-// อัปเดตตัวเลือกห้องแบบไดนามิก
-function updateRoomDropdowns() {
-    if (!appData || !appData.members) return;
-    const rooms = [...new Set(appData.members
-        .map(m => m.Room)
-        .filter(r => r !== '' && r !== null && r !== undefined)
-    )].sort((a, b) => Number(a) - Number(b));
+function showPinModal() {
+    document.getElementById('adminPinInput').value = '';
+    document.getElementById('pinErrorMsg').classList.add('d-none');
+    const modal = new bootstrap.Modal(document.getElementById('adminPinModal'));
+    modal.show();
+}
 
-    const optionsHtml = '<option value="all">ทุกห้อง</option>' + 
-        rooms.map(r => `<option value="${r}">${r}</option>`).join('');
+function hidePinModal() {
+    const modalEl = document.getElementById('adminPinModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+}
 
-    const lbFilterRoom = document.getElementById('lbFilterRoom');
-    const adminMemRoom = document.getElementById('adminMemRoom');
+async function verifyPin() {
+    const pin = document.getElementById('adminPinInput').value;
+    if (!pin) return;
 
-    if (lbFilterRoom && adminMemRoom) {
-        const currentLbRoom = lbFilterRoom.value;
-        const currentAdminRoom = adminMemRoom.value;
-
-        lbFilterRoom.innerHTML = optionsHtml;
-        adminMemRoom.innerHTML = optionsHtml;
-
-        if (rooms.includes(currentLbRoom) || rooms.includes(Number(currentLbRoom))) lbFilterRoom.value = currentLbRoom;
-        if (rooms.includes(currentAdminRoom) || rooms.includes(Number(currentAdminRoom))) adminMemRoom.value = currentAdminRoom;
+    try {
+        const result = await apiPost('verifyAdminPin', { pin: pin });
+        if (result.success && result.data && result.data.token) {
+            adminSessionToken = result.data.token;
+            hidePinModal();
+            navigateTo('page-admin');
+        }
+    } catch (e) {
+        document.getElementById('pinErrorMsg').classList.remove('d-none');
     }
 }
 
-// โหลดข้อมูลตอนเปิดหน้าเว็บ
+// ==========================================
+// 10. Admin: Approve Trash Images
+// ==========================================
+
+function renderPendingApprovals() {
+    const container = document.getElementById('approvalList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const pending = appData.transactions.filter(t => t.Status === 'Pending');
+    
+    if (pending.length === 0) {
+        container.innerHTML = '<div class="alert alert-info text-center">ไม่มีรูปรอตรวจ</div>';
+        return;
+    }
+
+    pending.sort((a, b) => new Date(a.Datetime) - new Date(b.Datetime));
+
+    pending.forEach(t => {
+        const member = appData.members.find(m => m.Student_ID == t.Student_ID);
+        const name = member ? member.Full_Name : 'ไม่ทราบชื่อ';
+
+        const card = document.createElement('div');
+        card.className = 'col-12 col-md-6 col-lg-4 mb-3';
+        card.innerHTML = `
+            <div class="card h-100">
+                <img src="${t.Image_URL}" class="card-img-top" alt="Trash" loading="lazy" style="height: 200px; object-fit: cover;">
+                <div class="card-body">
+                    <h6 class="card-title">${name} (${t.Student_ID})</h6>
+                    <p class="card-text small text-muted">เวลา: ${formatDate(t.Datetime)}</p>
+                    
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">ให้เหรียญ</span>
+                        <input type="number" class="form-control" id="coinInput_${t.Tx_ID}" value="1" min="1" max="100">
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-success" onclick="approveTransaction('${t.Tx_ID}')">อนุมัติ</button>
+                        <button class="btn btn-danger" onclick="rejectTransaction('${t.Tx_ID}')">ไม่อนุมัติ</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+window.approveTransaction = async function(txId) {
+    const input = document.getElementById(`coinInput_${txId}`);
+    const coins = input ? parseInt(input.value) : 1;
+    if (isNaN(coins) || coins < 1) {
+        showToast('กรุณาระบุจำนวนเหรียญให้ถูกต้อง', 'warning');
+        return;
+    }
+
+    try {
+        await apiPost('approveTransaction', { Tx_ID: txId, Coins_Awarded: coins }, true);
+        showToast('อนุมัติสำเร็จ', 'success');
+        await fetchInitialData();
+    } catch (e) {}
+};
+
+window.rejectTransaction = async function(txId) {
+    if (!confirm('ยืนยันการไม่อนุมัติภาพนี้?')) return;
+    try {
+        await apiPost('rejectTransaction', { Tx_ID: txId }, true);
+        showToast('ปฏิเสธสำเร็จ', 'success');
+        await fetchInitialData();
+    } catch (e) {}
+};
+
+// ==========================================
+// 11. Admin: Handover Rewards
+// ==========================================
+
+function renderPendingHandovers() {
+    const container = document.getElementById('handoverList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const pending = appData.redemptions.filter(r => r.Status === 'Pending_Pickup');
+    
+    if (pending.length === 0) {
+        container.innerHTML = '<div class="alert alert-info text-center">ไม่มีรายการรอมอบ</div>';
+        return;
+    }
+
+    pending.sort((a, b) => new Date(a.Datetime) - new Date(b.Datetime));
+
+    pending.forEach(r => {
+        const member = appData.members.find(m => m.Student_ID == r.Student_ID);
+        const name = member ? member.Full_Name : 'ไม่ทราบชื่อ';
+        const reward = appData.rewards.find(rw => rw.Reward_ID == r.Reward_ID);
+        const rName = reward ? reward.Name : 'ไม่ทราบชื่อรางวัล';
+
+        const card = document.createElement('div');
+        card.className = 'col-12 col-md-6 mb-3';
+        card.innerHTML = `
+            <div class="card border-primary">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">${rName}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">ผู้แลก: ${name} (${r.Student_ID})</h6>
+                    <p class="card-text mb-1">ใช้เหรียญ: ${r.Coins_Used} เหรียญ</p>
+                    <p class="card-text small text-muted">เวลาแลก: ${formatDate(r.Datetime)}</p>
+                    <button class="btn btn-primary mt-2" onclick="confirmHandover('${r.Redeem_ID}')">ยืนยันมอบของแล้ว</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+window.confirmHandover = async function(redeemId) {
+    if (!confirm('ยืนยันว่านักเรียนได้รับของรางวัลนี้แล้ว?')) return;
+    try {
+        await apiPost('confirmRedemption', { Redeem_ID: redeemId }, true);
+        showToast('บันทึกการมอบสำเร็จ', 'success');
+        await fetchInitialData();
+    } catch (e) {}
+};
+
+// ==========================================
+// 12. Admin: Manage Rewards
+// ==========================================
+
+function setupManageRewards() {
+    const addBtn = document.getElementById('addRewardBtn');
+    const form = document.getElementById('editRewardForm');
+    
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            document.getElementById('editRewardTitle').textContent = 'เพิ่มของรางวัล';
+            form.reset();
+            document.getElementById('editRewardId').value = '';
+            const modal = new bootstrap.Modal(document.getElementById('editRewardModal'));
+            modal.show();
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editRewardId').value;
+            const payload = {
+                Name: document.getElementById('editRewardName').value,
+                Coin_Cost: document.getElementById('editRewardCost').value,
+                Stock: document.getElementById('editRewardStock').value,
+                Description: document.getElementById('editRewardDesc').value,
+                Success_Message: document.getElementById('editRewardMsg').value,
+                Image_URL: document.getElementById('editRewardImageUrl').value
+            };
+
+            try {
+                if (id) {
+                    payload.Reward_ID = id;
+                    await apiPost('updateReward', payload, true);
+                    showToast('แก้ไขสำเร็จ', 'success');
+                } else {
+                    await apiPost('addReward', payload, true);
+                    showToast('เพิ่มสำเร็จ', 'success');
+                }
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editRewardModal'));
+                if (modal) modal.hide();
+                await fetchInitialData();
+            } catch (err) {}
+        });
+    }
+}
+
+function renderManageRewards() {
+    const list = document.getElementById('rewardsManageList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    appData.rewards.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'list-group-item d-flex justify-content-between align-items-center';
+        div.innerHTML = `
+            <div class="d-flex align-items-center">
+                <img src="${r.Image_URL || 'https://via.placeholder.com/50'}" alt="" style="width:50px; height:50px; object-fit:cover;" class="me-3 rounded">
+                <div>
+                    <h6 class="mb-0">${r.Name}</h6>
+                    <small class="text-muted">ราคา: ${r.Coin_Cost} | สต๊อก: ${r.Stock}</small>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editReward('${r.Reward_ID}')"><i class="bi bi-pencil"></i> แก้ไข</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteReward('${r.Reward_ID}')"><i class="bi bi-trash"></i></button>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+window.editReward = function(id) {
+    const r = appData.rewards.find(x => x.Reward_ID == id);
+    if (!r) return;
+    
+    document.getElementById('editRewardTitle').textContent = 'แก้ไขของรางวัล';
+    document.getElementById('editRewardId').value = r.Reward_ID;
+    document.getElementById('editRewardName').value = r.Name;
+    document.getElementById('editRewardCost').value = r.Coin_Cost;
+    document.getElementById('editRewardStock').value = r.Stock;
+    document.getElementById('editRewardDesc').value = r.Description || '';
+    document.getElementById('editRewardMsg').value = r.Success_Message || '';
+    document.getElementById('editRewardImageUrl').value = r.Image_URL || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('editRewardModal'));
+    modal.show();
+};
+
+window.deleteReward = async function(id) {
+    if (!confirm('ยืนยันการลบรางวัลนี้?')) return;
+    try {
+        await apiPost('deleteReward', { Reward_ID: id }, true);
+        showToast('ลบสำเร็จ', 'success');
+        await fetchInitialData();
+    } catch (e) {}
+};
+
+// ==========================================
+// 13. Admin: Members
+// ==========================================
+
+function setupAdminMembers() {
+    const sInp = document.getElementById('adminMemSearch');
+    const gInp = document.getElementById('adminMemGrade');
+    const rInp = document.getElementById('adminMemRoom');
+    const proBtn = document.getElementById('promoteGradeBtn');
+
+    if (sInp) sInp.addEventListener('input', renderAdminMembersTable);
+    if (gInp) gInp.addEventListener('change', renderAdminMembersTable);
+    if (rInp) rInp.addEventListener('change', renderAdminMembersTable);
+
+    if (proBtn) {
+        proBtn.addEventListener('click', async () => {
+            if (!confirm('คำเตือน: การเลื่อนชั้นจะเปลี่ยน ป.1 เป็น ป.2, ม.1 เป็น ม.2, และตั้งสถานะผู้ที่เรียนจบเป็น Inactive\n\nต้องการดำเนินการต่อหรือไม่?')) return;
+            try {
+                await apiPost('promoteGrade', {}, true);
+                showToast('เลื่อนชั้นสำเร็จ', 'success');
+                await fetchInitialData();
+            } catch (e) {}
+        });
+    }
+}
+
+function renderAdminMembersTable() {
+    const tbody = document.getElementById('adminMembersTable');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const search = (document.getElementById('adminMemSearch')?.value || '').toLowerCase();
+    const fGrade = document.getElementById('adminMemGrade')?.value || '';
+    const fRoom = document.getElementById('adminMemRoom')?.value || '';
+
+    let filtered = appData.members.filter(m => {
+        if (search && !m.Student_ID.toLowerCase().includes(search) && !m.Full_Name.toLowerCase().includes(search)) return false;
+        if (fGrade && m.Grade != fGrade) return false;
+        if (fRoom && m.Room != fRoom) return false;
+        return true;
+    });
+
+    filtered.forEach(m => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${m.Student_ID}</td>
+            <td>${m.Full_Name}</td>
+            <td>${m.Grade}/${m.Room}</td>
+            <td class="text-end">${m.Coins_Balance || 0}</td>
+            <td>
+                <span class="badge bg-${m.Status === 'Active' ? 'success' : 'secondary'}">${m.Status}</span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// ==========================================
+// 14. Initialization
+// ==========================================
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Setup Navigation
+    document.querySelectorAll('.nav-link[data-target]').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateTo(link.getAttribute('data-target'));
+        });
+    });
+
+    document.querySelectorAll('.admin-tab[data-target]').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            openAdminSection(tab.getAttribute('data-target'));
+        });
+    });
+
+    // Mobile menu toggle
+    const mBtn = document.getElementById('mobileMenuBtn');
+    const mMenu = document.getElementById('mobileMenu');
+    if (mBtn && mMenu) {
+        mBtn.addEventListener('click', () => {
+            mMenu.classList.toggle('d-none');
+        });
+    }
+
+    // Initialize subsystems
+    setupSubmitTrash();
+    setupStatusPage();
+    setupShopPage();
+    setupLeaderboard();
+    setupAdminPin();
+    setupManageRewards();
+    setupAdminMembers();
+
+    // Try to load cached data first for immediate display
     const cachedData = getCachedInitialData();
     if (cachedData) {
         appData = cachedData;
@@ -196,1022 +1203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDashboard();
         renderLeaderboard();
     }
-    fetchInitialData({ showLoading: !cachedData, showSuccess: !cachedData });
-});
 
-// ==========================================
-// SPA Navigation & Mobile Menu
-// ==========================================
-const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-const mobileMenu = document.getElementById('mobileMenu');
-const navLinks = document.querySelectorAll('.nav-link');
-const pageSections = document.querySelectorAll('.page-section');
-
-mobileMenuBtn.addEventListener('click', () => {
-    mobileMenu.classList.toggle('hidden');
-    mobileMenuBtn.setAttribute('aria-expanded', (!mobileMenu.classList.contains('hidden')).toString());
-});
-
-function navigateTo(targetId) {
-    pageSections.forEach(section => {
-        section.classList.add('hidden');
-        section.classList.remove('block');
-    });
-    
-    const targetPage = document.getElementById(targetId);
-    if(targetPage) {
-        targetPage.classList.remove('hidden');
-        targetPage.classList.add('block');
-    }
-    
-    navLinks.forEach(link => {
-        if(link.getAttribute('data-target') === targetId) {
-            link.classList.add('active-nav', 'bg-green-700');
-        } else {
-            link.classList.remove('active-nav', 'bg-green-700');
-        }
-    });
-    
-    mobileMenu.classList.add('hidden');
-    mobileMenuBtn.setAttribute('aria-expanded', 'false');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    if (targetId === 'page-dashboard') renderDashboard();
-    if (targetId === 'page-leaderboard') renderLeaderboard();
-}
-
-navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-        const targetId = e.currentTarget.getAttribute('data-target');
-        navigateTo(targetId);
-    });
-});
-
-navigateTo('page-dashboard');
-
-
-// ==========================================
-// 1. Dashboard Logic
-// ==========================================
-function renderDashboard() {
-    const filter = document.getElementById('dateFilter').value;
-    const customDateRange = document.getElementById('customDateRange');
-    
-    if (filter === 'custom') {
-        customDateRange.classList.remove('hidden');
-    } else {
-        customDateRange.classList.add('hidden');
-    }
-
-    let startDate, endDate;
-    const now = new Date();
-    
-    switch (filter) {
-        case 'today':
-            startDate = new Date(now.setHours(0,0,0,0));
-            endDate = new Date(now.setHours(23,59,59,999));
-            break;
-        case 'this_week':
-            const firstDay = new Date(now.setDate(now.getDate() - now.getDay()));
-            startDate = new Date(firstDay.setHours(0,0,0,0));
-            endDate = new Date();
-            break;
-        case 'this_month':
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-            break;
-        case 'three_months':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-            endDate = new Date();
-            break;
-        case 'this_year':
-            startDate = new Date(now.getFullYear(), 0, 1);
-            endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-            break;
-        case 'all':
-            startDate = new Date(2000, 0, 1);
-            endDate = new Date(2100, 0, 1);
-            break;
-        case 'custom':
-            const startInput = document.getElementById('startDate').value;
-            const endInput = document.getElementById('endDate').value;
-            if (startInput && endInput) {
-                startDate = new Date(startInput + 'T00:00:00');
-                endDate = new Date(endInput + 'T23:59:59');
-            } else {
-                startDate = new Date(2000, 0, 1);
-                endDate = new Date(2100, 0, 1);
-            }
-            break;
-    }
-
-    let totalBottle = 0;
-    let totalCan = 0;
-    let totalMoney = 0;
-    let totalPayout = 0;
-
-    appData.transactions.forEach(tx => {
-        const txDate = new Date(tx.Datetime);
-        if (txDate >= startDate && txDate <= endDate) {
-            if (tx.Waste_Type === 'ขวด') totalBottle += parseFloat(tx.Weight_kg || 0);
-            if (tx.Waste_Type === 'กระป๋อง') totalCan += parseFloat(tx.Weight_kg || 0);
-            totalMoney += parseFloat(tx.Amount || 0);
-        }
-    });
-
-    appData.payouts.forEach(po => {
-        const poDate = new Date(po.Datetime);
-        if (poDate >= startDate && poDate <= endDate) {
-            totalPayout += parseFloat(po.Amount_Paid || 0);
-        }
-    });
-
-    const netBalance = totalMoney - totalPayout;
-
-    document.getElementById('totalBottleWeight').innerText = formatWeight(totalBottle);
-    document.getElementById('totalCanWeight').innerText = formatWeight(totalCan);
-    document.getElementById('totalMoney').innerText = formatMoney(totalMoney);
-    document.getElementById('totalPayout').innerText = formatMoney(totalPayout);
-    document.getElementById('netBalance').innerText = formatMoney(netBalance);
-    document.getElementById('bottlePriceHint').innerText = `ขวดพลาสติก ${formatMoney(appData.config.price_bottle || 0)} บาท/กก.`;
-    document.getElementById('canPriceHint').innerText = `กระป๋อง ${formatMoney(appData.config.price_can || 0)} บาท/กก.`;
-}
-
-document.getElementById('dateFilter').addEventListener('change', renderDashboard);
-document.getElementById('applyCustomDateBtn').addEventListener('click', renderDashboard);
-
-
-// ==========================================
-// 2. Register Logic (API Connected)
-// ==========================================
-const regForm = document.getElementById('registerForm');
-const regStudentId = document.getElementById('regStudentId');
-const regErrorId = document.getElementById('regErrorId');
-
-regStudentId.addEventListener('input', () => {
-    const id = regStudentId.value.trim();
-    if (appData.members.some(m => m.Student_ID.toString() === id)) {
-        regErrorId.classList.remove('hidden');
-        regStudentId.classList.add('border-red-500', 'focus:ring-red-500');
-    } else {
-        regErrorId.classList.add('hidden');
-        regStudentId.classList.remove('border-red-500', 'focus:ring-red-500');
-    }
-});
-
-regForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = regStudentId.value.trim();
-    
-    if (appData.members.some(m => m.Student_ID.toString() === id)) {
-        showToast('รหัสนักเรียนนี้ซ้ำกับในระบบ', 'error');
-        regStudentId.focus();
-        return;
-    }
-
-    const payload = {
-        Student_ID: id,
-        Full_Name: document.getElementById('regFullName').value.trim(),
-        Grade: document.getElementById('regGrade').value,
-        Room: document.getElementById('regRoom').value || '',
-        Seat_No: document.getElementById('regSeat').value || ''
-    };
-
-    const res = await apiPost('registerMember', payload);
-    
-    if (res.success) {
-        showToast(`✅ ลงทะเบียนสำเร็จ! ยินดีต้อนรับ ${payload.Full_Name}`);
-        
-        // Update local state without refreshing everything
-        payload.Status = 'Active';
-        appData.members.push(payload);
-        
-        regForm.reset();
-        
-        navigateTo('page-lookup');
-        document.getElementById('searchStudentId').value = id;
-        performSearch();
-    } else {
-        showToast('เซิร์ฟเวอร์: ' + res.message, 'error');
-    }
-});
-
-
-// ==========================================
-// 2.5 Sell Waste (Self Service) (API Connected)
-// ==========================================
-const selfSellForm = document.getElementById('selfSellForm');
-const selfStudentId = document.getElementById('selfStudentId');
-const selfStudentNameBox = document.getElementById('selfStudentNameBox');
-const selfErrorId = document.getElementById('selfErrorId');
-const selfRegisterCta = document.getElementById('selfRegisterCta');
-const selfWasteType = document.getElementById('selfWasteType');
-const selfWeight = document.getElementById('selfWeight');
-const selfCalculatedAmount = document.getElementById('selfCalculatedAmount');
-const selfSubmitBtn = document.getElementById('selfSubmitBtn');
-
-let isSelfStudentValid = false;
-let isSelfSubmitting = false;
-
-selfStudentId.addEventListener('input', (e) => {
-    const id = e.target.value.trim();
-    const member = appData.members.find(m => m.Student_ID.toString() === id);
-    if (member) {
-        selfStudentNameBox.innerHTML = `<i class="fa-solid fa-user-check mr-1"></i> พบชื่อผู้ฝาก: <strong>${member.Full_Name}</strong> (${member.Grade})`;
-        selfStudentNameBox.classList.remove('hidden');
-        selfErrorId.classList.add('hidden');
-        selfRegisterCta.classList.add('hidden');
-        selfStudentId.classList.remove('border-red-500', 'focus:ring-red-500');
-        selfStudentId.classList.add('border-green-500', 'focus:ring-green-500');
-        isSelfStudentValid = true;
-        
-        if(parseFloat(selfWeight.value) > 0) {
-            enableSelfSubmitBtn();
-        }
-    } else {
-        selfStudentNameBox.classList.add('hidden');
-        if (id.length > 0) {
-            selfErrorId.classList.remove('hidden');
-            selfRegisterCta.classList.remove('hidden');
-            selfStudentId.classList.add('border-red-500', 'focus:ring-red-500');
-            selfStudentId.classList.remove('border-green-500', 'focus:ring-green-500');
-        } else {
-            selfErrorId.classList.add('hidden');
-            selfRegisterCta.classList.add('hidden');
-            selfStudentId.classList.remove('border-red-500', 'focus:ring-red-500', 'border-green-500', 'focus:ring-green-500');
-        }
-        isSelfStudentValid = false;
-        disableSelfSubmitBtn();
-    }
-});
-
-function calculateSelfAmount() {
-    const type = selfWasteType.value;
-    const weight = parseFloat(selfWeight.value) || 0;
-    const price = type === 'ขวด' ? parseFloat(appData.config.price_bottle || 0) : parseFloat(appData.config.price_can || 0);
-    const amount = weight * price;
-    selfCalculatedAmount.innerHTML = `${formatMoney(amount)} <span class="text-xl font-normal text-gray-500">฿</span>`;
-    document.getElementById('selfUnitPriceHint').innerText = `เรทราคาปัจจุบัน: ${formatMoney(price)} บาท/กก.`;
-    
-    if(weight > 0 && isSelfStudentValid) {
-        enableSelfSubmitBtn();
-    } else {
-        disableSelfSubmitBtn();
-    }
-}
-
-function enableSelfSubmitBtn() {
-    if (isSelfSubmitting) return;
-    selfSubmitBtn.disabled = false;
-    selfSubmitBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-    selfSubmitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-}
-
-function disableSelfSubmitBtn() {
-    selfSubmitBtn.disabled = true;
-    selfSubmitBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
-    selfSubmitBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-}
-
-selfWasteType.addEventListener('change', calculateSelfAmount);
-selfWeight.addEventListener('input', calculateSelfAmount);
-
-selfSellForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if(!isSelfStudentValid || isSelfSubmitting) return;
-
-    const id = selfStudentId.value.trim();
-    const member = appData.members.find(m => m.Student_ID.toString() === id);
-    const type = selfWasteType.value;
-    const weight = parseFloat(selfWeight.value);
-    const price = type === 'ขวด' ? parseFloat(appData.config.price_bottle || 0) : parseFloat(appData.config.price_can || 0);
-    const amount = weight * price;
-
-    const payload = {
-        Student_ID: id,
-        Waste_Type: type,
-        Weight_kg: weight,
-        Unit_Price: price,
-        Amount: amount
-    };
-
-    isSelfSubmitting = true;
-    selfSubmitBtn.disabled = true;
-    selfSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังบันทึก...';
-    const res = await apiPost('addTransaction', payload);
-    isSelfSubmitting = false;
-    selfSubmitBtn.innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> ยืนยันการฝากขยะ';
-
-    if (res.success) {
-        const confirmedAmount = Number(res.data.Amount);
-        const confirmedPrice = Number(res.data.Unit_Price);
-        
-        // Update local state
-        appData.transactions.push({
-            Tx_ID: res.data.Tx_ID,
-            Datetime: res.data.Datetime,
-            ...payload,
-            Unit_Price: confirmedPrice,
-            Amount: confirmedAmount
-        });
-
-        // Reset Form
-        selfSellForm.reset();
-        selfStudentNameBox.classList.add('hidden');
-        selfStudentId.classList.remove('border-green-500', 'focus:ring-green-500');
-        selfCalculatedAmount.innerHTML = `0.00 <span class="text-xl font-normal text-gray-500">฿</span>`;
-        isSelfStudentValid = false;
-        disableSelfSubmitBtn();
-        showTransactionSuccess(member, type, weight, confirmedAmount, id);
-    } else {
-        showToast(res.message, 'error');
-        calculateSelfAmount();
-    }
-});
-
-function showTransactionSuccess(member, type, weight, amount, studentId) {
-    const balance = getStudentBalanceData(studentId).balance;
-    document.getElementById('successTransactionDetail').innerText = `${member.Full_Name} • ${type} ${formatWeight(weight)} กก.`;
-    document.getElementById('successTransactionAmount').innerText = `+${formatMoney(amount)} ฿`;
-    document.getElementById('successTransactionBalance').innerText = `ยอดเงินคงเหลือของคุณ: ${formatMoney(balance)} ฿`;
-
-    const modal = document.getElementById('transactionSuccessModal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-
-    document.getElementById('successDepositMoreBtn').onclick = () => {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        navigateTo('page-sell');
-        selfStudentId.focus();
-    };
-    document.getElementById('successViewHistoryBtn').onclick = () => {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        navigateTo('page-lookup');
-        document.getElementById('searchStudentId').value = studentId;
-        performSearch();
-    };
-}
-
-
-// ==========================================
-// 3. Member Lookup Logic
-// ==========================================
-const searchForm = document.getElementById('searchStudentForm');
-
-searchForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    performSearch();
-});
-
-function performSearch() {
-    const id = document.getElementById('searchStudentId').value.trim();
-    if (!id) return;
-
-    const member = appData.members.find(m => m.Student_ID.toString() === id);
-    const resultDiv = document.getElementById('studentInfoResult');
-    const notFoundDiv = document.getElementById('studentNotFound');
-
-    if (member) {
-        notFoundDiv.classList.add('hidden');
-        resultDiv.classList.remove('hidden');
-
-        document.getElementById('studentName').innerText = member.Full_Name;
-        document.getElementById('studentIdDisplay').innerText = member.Student_ID;
-        document.getElementById('studentGradeDisplay').innerText = member.Grade;
-        document.getElementById('studentRoomDisplay').innerText = member.Room ? member.Room : '-';
-        document.getElementById('studentSeatDisplay').innerText = member.Seat_No ? member.Seat_No : '-';
-        
-        const badge = document.getElementById('studentStatusBadge');
-        badge.innerText = member.Status;
-        if (member.Status === 'Active') {
-            badge.className = 'inline-block px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700';
-        } else if (member.Status === 'Graduated') {
-            badge.className = 'inline-block px-3 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-700';
-        } else {
-            badge.className = 'inline-block px-3 py-1 rounded-full text-sm font-bold bg-orange-100 text-orange-700';
-        }
-
-        const balData = getStudentBalanceData(id);
-        document.getElementById('studentTotalEarned').innerHTML = `${formatMoney(balData.earned)} <span class="text-base text-gray-500 font-normal">฿</span>`;
-        document.getElementById('studentTotalPaid').innerHTML = `${formatMoney(balData.paid)} <span class="text-base text-gray-500 font-normal">฿</span>`;
-        document.getElementById('studentBalance').innerHTML = `${formatMoney(balData.balance)} <span class="text-base text-green-700 font-normal">฿</span>`;
-
-        const historyTbody = document.getElementById('studentHistoryTable');
-        const historyCards = document.getElementById('studentHistoryCards');
-        const allHistory = [
-            ...appData.transactions.filter(tx => tx.Student_ID.toString() === id).map(tx => ({ type: 'earn', date: tx.Datetime, item: `ฝากขยะ (${tx.Waste_Type}) ${tx.Weight_kg}kg`, amount: tx.Amount })),
-            ...appData.payouts.filter(po => po.Student_ID.toString() === id).map(po => ({ type: 'pay', date: po.Datetime, item: `ถอนเงิน (${po.Admin_Note})`, amount: po.Amount_Paid }))
-        ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
-
-        historyTbody.innerHTML = '';
-        historyCards.innerHTML = '';
-        if (allHistory.length === 0) {
-            historyTbody.innerHTML = '<tr><td colspan="3" class="px-5 py-8 text-center text-gray-500 italic bg-gray-50/50">ยังไม่มีประวัติการทำรายการ</td></tr>';
-            historyCards.innerHTML = '<p class="px-5 py-8 text-center text-sm text-gray-500 italic">ยังไม่มีประวัติการทำรายการ</p>';
-        } else {
-            allHistory.forEach(row => {
-                const isEarn = row.type === 'earn';
-                historyTbody.innerHTML += `
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-600">${formatDate(row.date)}</td>
-                        <td class="px-5 py-3 whitespace-nowrap text-sm font-medium ${isEarn ? 'text-gray-800' : 'text-blue-600'}">${row.item}</td>
-                        <td class="px-5 py-3 whitespace-nowrap text-sm text-right font-bold ${isEarn ? 'text-green-600' : 'text-red-500'}">
-                            ${isEarn ? '+' : '-'}${formatMoney(row.amount)}
-                        </td>
-                    </tr>
-                `;
-                historyCards.innerHTML += `
-                    <article class="p-4 flex items-center justify-between gap-3">
-                        <div>
-                            <p class="font-semibold text-sm ${isEarn ? 'text-gray-800' : 'text-blue-600'}">${row.item}</p>
-                            <p class="text-xs text-gray-500 mt-1">${formatDate(row.date)}</p>
-                        </div>
-                        <p class="font-bold whitespace-nowrap ${isEarn ? 'text-green-600' : 'text-red-500'}">${isEarn ? '+' : '-'}${formatMoney(row.amount)} ฿</p>
-                    </article>
-                `;
-            });
-        }
-    } else {
-        resultDiv.classList.add('hidden');
-        notFoundDiv.classList.remove('hidden');
-    }
-}
-
-
-// ==========================================
-// 4. Leaderboard Logic
-// ==========================================
-document.getElementById('refreshLeaderboardBtn').addEventListener('click', async () => {
-    // ดึงข้อมูลใหม่จาก Server เลยเพื่อความ Real-time
-    await fetchInitialData();
-});
-
-document.getElementById('lbFilterGrade').addEventListener('change', renderLeaderboard);
-document.getElementById('lbFilterRoom').addEventListener('change', renderLeaderboard);
-
-function renderLeaderboard() {
-    const filterGrade = document.getElementById('lbFilterGrade').value;
-    const filterRoom = document.getElementById('lbFilterRoom').value;
-
-    const memberStats = {};
-    
-    appData.transactions.forEach(tx => {
-        const member = appData.members.find(m => m.Student_ID.toString() === tx.Student_ID.toString());
-        if (!member) return;
-        
-        if (filterGrade !== 'all' && member.Grade !== filterGrade) return;
-        if (filterRoom !== 'all' && String(member.Room) !== filterRoom) return;
-
-        if (!memberStats[tx.Student_ID]) {
-            memberStats[tx.Student_ID] = 0;
-        }
-        memberStats[tx.Student_ID] += parseFloat(tx.Weight_kg || 0);
-    });
-
-    const leaderboard = Object.keys(memberStats)
-        .map(id => {
-            const member = appData.members.find(m => m.Student_ID.toString() === id.toString());
-            return {
-                id,
-                name: member ? member.Full_Name : 'ไม่ทราบชื่อ',
-                grade: member ? `${member.Grade} ${member.Room ? '/ ' + member.Room : ''}` : '-',
-                weight: memberStats[id]
-            };
-        })
-        .sort((a, b) => b.weight - a.weight)
-        .slice(0, 10);
-
-    const tbody = document.getElementById('leaderboardTable');
-    tbody.innerHTML = '';
-
-    if (leaderboard.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500 italic">ยังไม่มีข้อมูลการฝากขยะในระบบ</td></tr>';
-        return;
-    }
-
-    leaderboard.forEach((entry, index) => {
-        let rankBadge = `<span class="text-gray-500 font-bold">${index + 1}</span>`;
-        let rowClass = 'hover:bg-gray-50 transition-colors';
-        
-        if (index === 0) {
-            rankBadge = `<div class="bg-yellow-100 text-yellow-600 w-8 h-8 rounded-full flex items-center justify-center mx-auto border-2 border-yellow-300 shadow-sm"><i class="fa-solid fa-trophy"></i></div>`;
-            rowClass = 'bg-yellow-50/30 hover:bg-yellow-50 transition-colors';
-        } else if (index === 1) {
-            rankBadge = `<div class="bg-gray-100 text-gray-400 w-8 h-8 rounded-full flex items-center justify-center mx-auto border-2 border-gray-300 shadow-sm font-bold">2</div>`;
-        } else if (index === 2) {
-            rankBadge = `<div class="bg-orange-100 text-orange-500 w-8 h-8 rounded-full flex items-center justify-center mx-auto border-2 border-orange-300 shadow-sm font-bold">3</div>`;
-        }
-
-        tbody.innerHTML += `
-            <tr class="${rowClass}">
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-center">${rankBadge}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">${entry.name}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">${entry.grade}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-black text-green-600">${formatWeight(entry.weight)} <span class="text-xs text-gray-500 font-normal">กก.</span></td>
-            </tr>
-        `;
-    });
-}
-
-
-// ==========================================
-// 5. Admin Authentication & UI
-// ==========================================
-const adminNavBtn = document.getElementById('adminNavBtn');
-const adminMobileBtn = document.getElementById('adminMobileBtn');
-const adminPinModal = document.getElementById('adminPinModal');
-const closePinModal = document.getElementById('closePinModal');
-const verifyPinBtn = document.getElementById('verifyPinBtn');
-const adminPinInput = document.getElementById('adminPinInput');
-const pinErrorMsg = document.getElementById('pinErrorMsg');
-
-function showPinModal() {
-    adminPinModal.classList.remove('hidden');
-    adminPinModal.classList.add('flex');
-    adminPinInput.value = '';
-    pinErrorMsg.classList.add('hidden');
-    mobileMenu.classList.add('hidden');
-    
-    setTimeout(() => adminPinInput.focus(), 100);
-}
-
-function hidePinModal() {
-    adminPinModal.classList.add('hidden');
-    adminPinModal.classList.remove('flex');
-}
-
-adminNavBtn.addEventListener('click', showPinModal);
-adminMobileBtn.addEventListener('click', showPinModal);
-closePinModal.addEventListener('click', hidePinModal);
-
-async function verifyPin() {
-    const pin = adminPinInput.value;
-    const res = await apiPost('verifyAdminPin', { pin });
-
-    if (res.success) {
-        adminSessionToken = res.data.token;
-        hidePinModal();
-        navigateTo('page-admin');
-        openAdminSection('admin-waste'); // Default tab
-        updateAdminDisplay();
-    } else {
-        pinErrorMsg.innerText = res.message || 'PIN ไม่ถูกต้อง ลองอีกครั้ง';
-        pinErrorMsg.classList.remove('hidden');
-        adminPinInput.value = '';
-        adminPinInput.focus();
-    }
-}
-
-verifyPinBtn.addEventListener('click', verifyPin);
-adminPinInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') verifyPin();
-});
-
-document.getElementById('exitAdminBtn').addEventListener('click', () => {
-    adminSessionToken = null;
-    navigateTo('page-dashboard');
-    showToast('ออกจากระบบจัดการแล้ว', 'success');
-});
-
-// Admin Sub-tabs
-const adminTabs = document.querySelectorAll('.admin-tab');
-const adminTabContents = document.querySelectorAll('.admin-tab-content');
-
-function openAdminSection(targetId) {
-    adminTabContents.forEach(c => c.classList.add('hidden', 'block'));
-    adminTabContents.forEach(c => c.classList.remove('block'));
-    document.getElementById(targetId).classList.add('block');
-    document.getElementById(targetId).classList.remove('hidden');
-
-    adminTabs.forEach(t => {
-        if(t.getAttribute('data-target') === targetId) {
-            t.classList.add('border-red-500', 'text-red-600', 'active');
-            t.classList.remove('border-transparent', 'text-gray-500');
-        } else {
-            t.classList.remove('border-red-500', 'text-red-600', 'active');
-            t.classList.add('border-transparent', 'text-gray-500');
-        }
-    });
-
-    if (targetId === 'admin-members') renderAdminMembersTable();
-}
-
-adminTabs.forEach(tab => {
-    tab.addEventListener('click', (e) => {
-        openAdminSection(e.currentTarget.getAttribute('data-target'));
-    });
-});
-
-function updateAdminDisplay() {
-    document.getElementById('priceBottleDisplay').innerText = appData.config.price_bottle || 0;
-    document.getElementById('priceCanDisplay').innerText = appData.config.price_can || 0;
-    document.getElementById('setPriceBottle').value = appData.config.price_bottle || 0;
-    document.getElementById('setPriceCan').value = appData.config.price_can || 0;
-}
-
-
-// ==========================================
-// 5.1 Admin: Record Waste (API Connected)
-// ==========================================
-const rwStudentId = document.getElementById('rwStudentId');
-const rwStudentName = document.getElementById('rwStudentName');
-const rwWasteType = document.getElementById('rwWasteType');
-const rwWeight = document.getElementById('rwWeight');
-const rwCalculatedAmount = document.getElementById('rwCalculatedAmount');
-
-rwStudentId.addEventListener('input', (e) => {
-    const id = e.target.value.trim();
-    const member = appData.members.find(m => m.Student_ID.toString() === id);
-    if (member) {
-        rwStudentName.innerText = `พบชื่อ: ${member.Full_Name} (${member.Grade})`;
-        rwStudentName.classList.remove('text-red-500');
-        rwStudentName.classList.add('text-green-600');
-    } else {
-        rwStudentName.innerText = id.length > 0 ? 'ไม่พบข้อมูลนักเรียน' : '';
-        rwStudentName.classList.remove('text-green-600');
-        rwStudentName.classList.add('text-red-500');
-    }
-});
-
-function calculateWasteAmount() {
-    const type = rwWasteType.value;
-    const weight = parseFloat(rwWeight.value) || 0;
-    const price = type === 'ขวด' ? parseFloat(appData.config.price_bottle) : parseFloat(appData.config.price_can);
-    const amount = weight * price;
-    rwCalculatedAmount.innerHTML = `${formatMoney(amount)} <span class="text-lg font-normal text-gray-500">฿</span>`;
-}
-
-rwWasteType.addEventListener('change', calculateWasteAmount);
-rwWeight.addEventListener('input', calculateWasteAmount);
-
-document.getElementById('recordWasteForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = rwStudentId.value.trim();
-    const member = appData.members.find(m => m.Student_ID.toString() === id);
-    
-    if (!member) {
-        showToast('ไม่พบรหัสนักเรียนนี้', 'error');
-        return;
-    }
-
-    const type = rwWasteType.value;
-    const weight = parseFloat(rwWeight.value);
-    const price = type === 'ขวด' ? parseFloat(appData.config.price_bottle) : parseFloat(appData.config.price_can);
-    const amount = weight * price;
-
-    const payload = {
-        Student_ID: id,
-        Waste_Type: type,
-        Weight_kg: weight,
-        Unit_Price: price,
-        Amount: amount
-    };
-
-    const res = await apiPost('addTransaction', payload);
-
-    if (res.success) {
-        showToast(`บันทึกขยะสำเร็จ (+${formatMoney(amount)}฿)`);
-        
-        // Update local state
-        appData.transactions.push({
-            Tx_ID: res.data.Tx_ID,
-            Datetime: res.data.Datetime,
-            ...payload
-        });
-
-        const recentList = document.getElementById('rwRecentList');
-        if (document.getElementById('rwEmptyState')) {
-            recentList.innerHTML = '';
-        }
-        
-        const li = document.createElement('li');
-        li.className = 'p-3 border-b flex justify-between items-center hover:bg-gray-100 transition-colors';
-        li.innerHTML = `
-            <div>
-                <p class="font-bold text-sm text-gray-800">${member.Full_Name}</p>
-                <p class="text-xs text-gray-500">${type} ${weight} กก.</p>
-            </div>
-            <div class="font-black text-green-600">+${formatMoney(amount)}฿</div>
-        `;
-        recentList.prepend(li);
-
-        rwStudentId.value = '';
-        rwStudentName.innerText = '';
-        rwWeight.value = '';
-        rwCalculatedAmount.innerHTML = `0.00 <span class="text-lg font-normal text-gray-500">฿</span>`;
-        rwStudentId.focus();
-    } else {
-        showToast(res.message, 'error');
-    }
-});
-
-
-// ==========================================
-// 5.2 Admin: Payout (API Connected)
-// ==========================================
-const poStudentId = document.getElementById('poStudentId');
-const poStudentDetails = document.getElementById('poStudentDetails');
-const poErrorMsg = document.getElementById('poErrorMsg');
-
-poStudentId.addEventListener('input', (e) => {
-    const id = e.target.value.trim();
-    const member = appData.members.find(m => m.Student_ID.toString() === id);
-    if (member) {
-        poErrorMsg.classList.add('hidden');
-        poStudentDetails.classList.remove('hidden');
-        document.getElementById('poName').innerText = member.Full_Name;
-        
-        const balData = getStudentBalanceData(id);
-        document.getElementById('poBalance').innerText = formatMoney(balData.balance);
-    } else {
-        poStudentDetails.classList.add('hidden');
-        if (id.length > 0) poErrorMsg.classList.remove('hidden');
-        else poErrorMsg.classList.add('hidden');
-    }
-});
-
-document.getElementById('recordPayoutForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = poStudentId.value.trim();
-    const amount = parseFloat(document.getElementById('poAmount').value);
-    const note = document.getElementById('poNote').value.trim() || 'ถอนเงิน';
-    
-    const member = appData.members.find(m => m.Student_ID.toString() === id);
-    if (!member) {
-        showToast('ไม่พบรหัสนักเรียน', 'error');
-        return;
-    }
-
-    const balData = getStudentBalanceData(id);
-    if (amount > balData.balance) {
-        showToast('ยอดเงินคงเหลือไม่พอให้ถอน', 'error');
-        return;
-    }
-
-    const payload = {
-        Student_ID: id,
-        Amount_Paid: amount,
-        Admin_Note: note
-    };
-
-    const res = await apiPost('recordPayout', payload, true);
-
-    if (res.success) {
-        showToast(`จ่ายเงินให้ ${member.Full_Name} สำเร็จ (-${formatMoney(amount)}฿)`);
-        
-        // Update local state
-        appData.payouts.push({
-            Payout_ID: res.data.Payout_ID,
-            Datetime: res.data.Datetime,
-            ...payload
-        });
-
-        poStudentId.value = '';
-        document.getElementById('poAmount').value = '';
-        document.getElementById('poNote').value = '';
-        poStudentDetails.classList.add('hidden');
-    } else {
-        showToast(res.message, 'error');
-    }
-});
-
-
-// ==========================================
-// 5.3 Admin: Manage Members & Promote (API Connected)
-// ==========================================
-function renderAdminMembersTable() {
-    const tbody = document.getElementById('adminMembersTable');
-    tbody.innerHTML = '';
-    
-    const searchVal = document.getElementById('adminMemSearch').value.toLowerCase().trim();
-    const gradeVal = document.getElementById('adminMemGrade').value;
-    const roomVal = document.getElementById('adminMemRoom').value;
-
-    const filteredMembers = appData.members.filter(m => {
-        if (searchVal && !String(m.Student_ID).includes(searchVal) && !m.Full_Name.toLowerCase().includes(searchVal)) return false;
-        if (gradeVal !== 'all' && m.Grade !== gradeVal) return false;
-        if (roomVal !== 'all' && String(m.Room) !== roomVal) return false;
-        return true;
-    });
-
-    if (filteredMembers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">ไม่พบข้อมูลนักเรียน</td></tr>';
-        return;
-    }
-    
-    filteredMembers.forEach(m => {
-        let statusHtml = '';
-        if (m.Status === 'Active') statusHtml = `<span class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Active</span>`;
-        else if (m.Status === 'Pending_Class') statusHtml = `<span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full font-bold">Pending</span>`;
-        else statusHtml = `<span class="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full font-bold">Graduated</span>`;
-
-        tbody.innerHTML += `
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-medium">${m.Student_ID}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-bold">${m.Full_Name}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 text-center">${m.Grade} ${m.Room ? '/ '+m.Room : ''}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-center">${statusHtml}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-center">
-                    <button onclick="openAdminStudentHistory('${m.Student_ID}')" class="text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded transition text-sm font-bold">
-                        <i class="fa-solid fa-list-check"></i> จัดการ
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-}
-
-document.getElementById('adminMemSearch').addEventListener('input', renderAdminMembersTable);
-document.getElementById('adminMemGrade').addEventListener('change', renderAdminMembersTable);
-document.getElementById('adminMemRoom').addEventListener('change', renderAdminMembersTable);
-
-document.getElementById('promoteGradeBtn').addEventListener('click', async () => {
-    if(!confirm('⚠️ ยืนยันการเลื่อนชั้นประจำปี?\n- ม.1-ม.5 จะถูกเลื่อนขึ้น 1 ชั้น\n- ม.3 ขึ้น ม.4 จะถูกตั้งเป็น Pending รอระบุห้อง\n- ม.6 จะถูกปรับสถานะเป็น จบการศึกษา')) {
-        return;
-    }
-
-    const res = await apiPost('promoteGrade', {}, true);
-    
-    if (res.success) {
-        showToast('ดำเนินการเลื่อนชั้นประจำปีในฐานข้อมูลเสร็จสิ้น', 'success');
-        // Reload all data to get fresh grades
-        await fetchInitialData();
-    } else {
-        showToast(res.message, 'error');
-    }
-});
-
-// Admin Student History Modal & Management
-const ashModal = document.getElementById('adminStudentHistoryModal');
-document.getElementById('closeAshModal').addEventListener('click', () => {
-    ashModal.classList.add('hidden');
-    ashModal.classList.remove('flex');
-});
-
-window.openAdminStudentHistory = function(studentId) {
-    const member = appData.members.find(m => m.Student_ID.toString() === studentId.toString());
-    if (!member) return;
-
-    document.getElementById('ashStudentName').innerText = member.Full_Name;
-    document.getElementById('ashStudentId').innerText = member.Student_ID;
-    
-    const balData = getStudentBalanceData(studentId);
-    document.getElementById('ashStudentBalance').innerText = formatMoney(balData.balance);
-
-    const historyTbody = document.getElementById('ashHistoryTable');
-    
-    const allHistory = [
-        ...appData.transactions.filter(tx => tx.Student_ID.toString() === studentId.toString()).map(tx => ({ type: 'tx', id: tx.Tx_ID, date: tx.Datetime, item: `ฝากขยะ (${tx.Waste_Type}) ${tx.Weight_kg}kg`, amount: tx.Amount })),
-        ...appData.payouts.filter(po => po.Student_ID.toString() === studentId.toString()).map(po => ({ type: 'po', id: po.Payout_ID, date: po.Datetime, item: `ถอนเงิน (${po.Admin_Note})`, amount: po.Amount_Paid }))
-    ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    historyTbody.innerHTML = '';
-    if (allHistory.length === 0) {
-        historyTbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500 italic">ไม่มีประวัติการทำรายการ</td></tr>';
-    } else {
-        allHistory.forEach(row => {
-            const isEarn = row.type === 'tx';
-            historyTbody.innerHTML += `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatDate(row.date)}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium ${isEarn ? 'text-gray-800' : 'text-blue-600'}">${row.item}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold ${isEarn ? 'text-green-600' : 'text-red-500'}">
-                        ${isEarn ? '+' : '-'}${formatMoney(row.amount)}
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-center space-x-1">
-                        <button onclick="editRecord('${row.type}', '${row.id}', '${studentId}')" class="text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition text-xs font-bold">
-                            <i class="fa-solid fa-pen"></i> แก้ไข
-                        </button>
-                        <button onclick="deleteRecord('${row.type}', '${row.id}', '${studentId}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition text-xs font-bold">
-                            <i class="fa-solid fa-trash-can"></i> ลบ
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-    }
-
-    ashModal.classList.remove('hidden');
-    ashModal.classList.add('flex');
-};
-
-const editModal = document.getElementById('adminEditRecordModal');
-document.getElementById('closeEditModal').addEventListener('click', () => {
-    editModal.classList.add('hidden');
-    editModal.classList.remove('flex');
-});
-
-window.editRecord = function(type, id, studentId) {
-    document.getElementById('editRecordType').value = type;
-    document.getElementById('editRecordId').value = id;
-    document.getElementById('editStudentId').value = studentId;
-
-    const txFields = document.getElementById('editTxFields');
-    const poFields = document.getElementById('editPoFields');
-    
-    if (type === 'tx') {
-        const tx = appData.transactions.find(t => t.Tx_ID === id);
-        if (!tx) return;
-        document.getElementById('editWasteType').value = tx.Waste_Type;
-        document.getElementById('editWeight').value = tx.Weight_kg;
-        txFields.classList.remove('hidden');
-        poFields.classList.add('hidden');
-        document.getElementById('editWeight').required = true;
-        document.getElementById('editAmount').required = false;
-    } else {
-        const po = appData.payouts.find(p => p.Payout_ID === id);
-        if (!po) return;
-        document.getElementById('editAmount').value = po.Amount_Paid;
-        document.getElementById('editNote').value = po.Admin_Note || '';
-        poFields.classList.remove('hidden');
-        txFields.classList.add('hidden');
-        document.getElementById('editAmount').required = true;
-        document.getElementById('editWeight').required = false;
-    }
-
-    editModal.classList.remove('hidden');
-    editModal.classList.add('flex');
-};
-
-document.getElementById('editRecordForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const type = document.getElementById('editRecordType').value;
-    const id = document.getElementById('editRecordId').value;
-    const studentId = document.getElementById('editStudentId').value;
-
-    let action, payload;
-    if (type === 'tx') {
-        action = 'updateTransaction';
-        payload = {
-            Tx_ID: id,
-            Waste_Type: document.getElementById('editWasteType').value,
-            Weight_kg: parseFloat(document.getElementById('editWeight').value)
-        };
-    } else {
-        action = 'updatePayout';
-        payload = {
-            Payout_ID: id,
-            Amount_Paid: parseFloat(document.getElementById('editAmount').value),
-            Admin_Note: document.getElementById('editNote').value
-        };
-    }
-
-    const res = await apiPost(action, payload, true);
-    if (res.success) {
-        showToast('แก้ไขรายการสำเร็จ', 'success');
-        editModal.classList.add('hidden');
-        editModal.classList.remove('flex');
-        await fetchInitialData({showLoading: false, showSuccess: false});
-        openAdminStudentHistory(studentId); // Refresh modal
-    } else {
-        showToast(res.message, 'error');
-    }
-});
-
-window.deleteRecord = async function(type, id, studentId) {
-    if (!confirm(`⚠️ ยืนยันการลบรายการนี้ใช่หรือไม่?\nการลบจะไม่สามารถกู้คืนได้ และยอดเงินจะถูกคำนวณใหม่`)) return;
-
-    const action = type === 'tx' ? 'deleteTransaction' : 'deletePayout';
-    const payload = type === 'tx' ? { Tx_ID: id } : { Payout_ID: id };
-
-    const res = await apiPost(action, payload, true);
-    if (res.success) {
-        showToast('ลบรายการสำเร็จ', 'success');
-        await fetchInitialData({showLoading: false, showSuccess: false});
-        openAdminStudentHistory(studentId); // Refresh modal
-    } else {
-        showToast(res.message, 'error');
-    }
-};
-
-
-// ==========================================
-// 5.4 Admin: Settings (API Connected)
-// ==========================================
-document.getElementById('updatePricesForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const pBottle = parseFloat(document.getElementById('setPriceBottle').value);
-    const pCan = parseFloat(document.getElementById('setPriceCan').value);
-
-    const payload = {
-        price_bottle: pBottle,
-        price_can: pCan
-    };
-
-    const res = await apiPost('updatePrices', payload, true);
-
-    if (res.success) {
-        appData.config.price_bottle = pBottle;
-        appData.config.price_can = pCan;
-
-        updateAdminDisplay();
-        showToast('บันทึกเรทราคาใหม่สำเร็จ', 'success');
-        
-        if (rwWeight.value) calculateWasteAmount();
-        if (selfWeight.value) calculateSelfAmount();
-    } else {
-        showToast(res.message, 'error');
-    }
+    // Fetch fresh data in background
+    fetchInitialData();
 });
