@@ -469,3 +469,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const imgInput = document.getElementById('submitImageInput');
     if(imgInput) imgInput.addEventListener('change', handleImageInput);
 });
+// Added missing event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Nav buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.currentTarget.dataset.target;
+            if(target) navigateTo(target);
+            // Hide mobile menu on click
+            const mobileMenu = document.getElementById('mobileMenu');
+            if(mobileMenu) mobileMenu.classList.add('hidden');
+        });
+    });
+
+    // Mobile menu toggle
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    if(mobileMenuBtn && mobileMenu) {
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    }
+    
+    // Admin button
+    const adminNavBtn = document.getElementById('adminNavBtn');
+    if(adminNavBtn) {
+        adminNavBtn.addEventListener('click', () => {
+            if (adminPin) {
+                navigateTo('view-admin');
+                if (typeof renderAdminApprove === 'function') renderAdminApprove();
+            } else {
+                const modal = document.getElementById('adminPinModal');
+                if(modal) modal.classList.remove('hidden');
+            }
+        });
+    }
+
+    // Generic Modal Close handling for buttons with specific text or onclick=hide
+    const modals = document.querySelectorAll('.fixed.inset-0');
+    modals.forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if(e.target === modal) modal.classList.add('hidden'); // click outside to close
+        });
+        const closeBtns = modal.querySelectorAll('.close-modal');
+        closeBtns.forEach(btn => btn.addEventListener('click', () => modal.classList.add('hidden')));
+    });
+});
+
