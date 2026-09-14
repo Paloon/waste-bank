@@ -3,15 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบธนาคารขยะ (Waste Bank)</title>
+    <title>ธนาคารขยะ - Waste Bank</title>
     
-    <!-- Google Fonts -->
+    <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome 6.4.0 -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,325 +17,401 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['"Noto Sans Thai"', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif'],
                     },
                     colors: {
-                        primary: {
-                            50: '#f0fdf4',
-                            100: '#dcfce7',
-                            500: '#22c55e',
-                            600: '#16a34a',
-                            700: '#15803d',
-                        }
+                        primary: '#0891B2',    // cyan-600
+                        secondary: '#22D3EE',  // cyan-400
+                        cta: '#22C55E',        // green-500
+                        bglight: '#ECFEFF',    // cyan-50
+                        textdark: '#164E63',   // cyan-900
+                        admin: '#DC2626',      // red-600
                     }
                 }
             }
         }
     </script>
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .nav-btn { transition: background-color 0.2s ease, color 0.2s ease; }
+        .nav-btn:hover { background-color: rgba(255, 255, 255, 0.1); }
+        .nav-btn.active { background-color: rgba(255, 255, 255, 0.2); font-weight: 600; }
+        .btn-transition { transition: all 0.2s ease-in-out; }
+        .btn-transition:hover { transform: translateY(-1px); }
+        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        /* Hide scrollbar for cleaner kiosk look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #ECFEFF; }
+        ::-webkit-scrollbar-thumb { background: #0891B2; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
+    </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col pb-20 sm:pb-0">
-    <!-- Desktop Navbar -->
-    <nav class="bg-green-600 text-white shadow-md sticky top-0 z-40">
+<body class="bg-bglight text-textdark min-h-screen flex flex-col antialiased">
+
+    <!-- Top Navbar -->
+    <nav class="bg-primary text-white shadow-md sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
+            <div class="flex items-center justify-between h-16">
                 <!-- Logo -->
-                <div class="flex items-center">
-                    <a href="#" class="nav-link text-xl font-bold flex items-center gap-2" data-target="page-dashboard">
-                        <i class="fa-solid fa-building-columns"></i>
-                        <span>Waste Bank</span>
-                    </a>
+                <div class="flex items-center cursor-pointer nav-btn px-2 py-1 rounded" data-target="view-home">
+                    <svg class="h-8 w-8 mr-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="font-bold text-xl tracking-tight">Waste Bank</span>
                 </div>
                 
-                <!-- Desktop Links -->
-                <div class="hidden sm:flex sm:items-center sm:space-x-4">
-                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-dashboard">หน้าแรก</button>
-                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-submit">ส่งรูปขยะ</button>
-                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-status">เช็คแต้ม</button>
-                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-shop">ร้านค้า</button>
-                    <button class="nav-link px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition" data-target="page-leaderboard">อันดับ</button>
-                    <button id="adminNavBtn" class="px-3 py-2 rounded-md text-sm font-medium bg-red-600 hover:bg-red-700 transition"><i class="fa-solid fa-lock mr-1"></i>จัดการระบบ</button>
+                <!-- Desktop Menu -->
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-2">
+                        <button class="nav-btn px-3 py-2 rounded-md text-sm font-medium" data-target="view-home">หน้าหลัก</button>
+                        <button class="nav-btn px-3 py-2 rounded-md text-sm font-medium" data-target="view-submit">ส่งรูปขยะ</button>
+                        <button class="nav-btn px-3 py-2 rounded-md text-sm font-medium" data-target="view-status">เช็คแต้ม/ประวัติ</button>
+                        <button class="nav-btn px-3 py-2 rounded-md text-sm font-medium" data-target="view-shop">ร้านค้า</button>
+                        <button class="nav-btn px-3 py-2 rounded-md text-sm font-medium" data-target="view-leaderboard">กระดานอันดับ</button>
+                    </div>
                 </div>
-                
-                <!-- Mobile menu button -->
-                <div class="flex items-center sm:hidden">
-                    <button id="mobileMenuBtn" class="text-white hover:text-green-200 focus:outline-none p-2">
-                        <i class="fa-solid fa-bars text-2xl"></i>
+
+                <!-- Admin & Mobile Toggle -->
+                <div class="flex items-center space-x-2">
+                    <button id="adminNavBtn" class="hidden md:flex items-center px-3 py-2 rounded-md text-sm font-medium bg-cyan-700 hover:bg-cyan-800 transition-colors cursor-pointer text-white">
+                        <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        สำหรับเจ้าหน้าที่
                     </button>
+                    
+                    <!-- Mobile Menu Button -->
+                    <div class="md:hidden flex items-center">
+                        <button id="mobileMenuBtn" class="inline-flex items-center justify-center p-2 rounded-md text-white hover:bg-cyan-700 focus:outline-none cursor-pointer">
+                            <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <!-- Mobile Menu Dropdown -->
-        <div id="mobileMenu" class="hidden sm:hidden bg-green-700 shadow-inner">
-            <div class="px-2 pt-2 pb-3 space-y-1">
-                <button class="nav-link block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-800 transition" data-target="page-dashboard">หน้าแรก</button>
-                <button class="nav-link block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-800 transition" data-target="page-submit">ส่งรูปขยะ</button>
-                <button class="nav-link block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-800 transition" data-target="page-status">เช็คแต้ม</button>
-                <button class="nav-link block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-800 transition" data-target="page-shop">ร้านค้า</button>
-                <button class="nav-link block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-green-800 transition" data-target="page-leaderboard">อันดับ</button>
-                <button id="adminMobileBtn" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium bg-red-600 hover:bg-red-700 transition mt-2"><i class="fa-solid fa-lock mr-2"></i>จัดการระบบ</button>
+
+        <!-- Mobile Menu (Hidden by default) -->
+        <div id="mobileMenu" class="md:hidden hidden bg-cyan-700 pb-3 pt-2">
+            <div class="px-2 space-y-1 sm:px-3 flex flex-col">
+                <button class="nav-btn block px-3 py-2 rounded-md text-base font-medium text-left text-white" data-target="view-home">หน้าหลัก</button>
+                <button class="nav-btn block px-3 py-2 rounded-md text-base font-medium text-left text-white" data-target="view-submit">ส่งรูปขยะ</button>
+                <button class="nav-btn block px-3 py-2 rounded-md text-base font-medium text-left text-white" data-target="view-status">เช็คแต้ม/ประวัติ</button>
+                <button class="nav-btn block px-3 py-2 rounded-md text-base font-medium text-left text-white" data-target="view-shop">ร้านค้า</button>
+                <button class="nav-btn block px-3 py-2 rounded-md text-base font-medium text-left text-white" data-target="view-leaderboard">กระดานอันดับ</button>
+                <button id="mobileAdminNavBtn" class="flex items-center px-3 py-2 rounded-md text-base font-medium text-left text-cyan-200 hover:text-white hover:bg-cyan-800 mt-2 border-t border-cyan-600 cursor-pointer">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    สำหรับเจ้าหน้าที่
+                </button>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content Area -->
-    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-        
-        <!-- Page 1: Dashboard -->
-        <section id="page-dashboard" class="page-section block">
-            <!-- Hero Banner -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center mb-8 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 to-green-600"></div>
-                <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">เปลี่ยนขยะเป็นรางวัล 🎁</h1>
-                <p class="text-gray-600 text-lg mb-8 max-w-2xl mx-auto">ระบบธนาคารขยะโรงเรียน: สะสม Coin จากการแยกขยะแล้วนำมาแลกของรางวัลมากมาย เริ่มต้นง่ายๆ เพียงส่งรูปถ่ายขยะที่คุณแยกไว้!</p>
-                <div class="flex flex-col sm:flex-row justify-center gap-4">
-                    <button class="nav-link px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-md transition flex items-center justify-center gap-2" data-target="page-submit">
-                        <i class="fa-solid fa-camera"></i> ส่งรูปขยะ
-                    </button>
-                    <button class="nav-link px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium shadow-md transition flex items-center justify-center gap-2" data-target="page-status">
-                        <i class="fa-solid fa-coins"></i> เช็คแต้ม
-                    </button>
+    <!-- Main Content Container -->
+    <main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- ==================== VIEW: HOME ==================== -->
+        <section id="view-home" class="spa-view block">
+            <!-- Hero -->
+            <div class="text-center py-12 mb-10 bg-white rounded-3xl shadow-sm border border-cyan-100">
+                <h1 class="text-4xl md:text-5xl font-extrabold text-primary mb-4 tracking-tight">ธนาคารขยะโรงเรียน</h1>
+                <p class="text-lg md:text-xl text-cyan-700 max-w-2xl mx-auto px-4">
+                    เปลี่ยนขยะให้เป็นแต้ม สะสมแต้มแลกของรางวัล มาร่วมกันสร้างโรงเรียนที่สะอาดและน่าอยู่ของเรา!
+                </p>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-cyan-100 flex items-center">
+                    <div class="p-3 rounded-full bg-cyan-100 text-primary mr-4">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-cyan-600 font-medium">นักเรียนทั้งหมด</p>
+                        <p class="text-2xl font-bold text-textdark" id="stat-students">---</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-cyan-100 flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-cyan-600 font-medium">Coin ที่แจกไปแล้ว</p>
+                        <p class="text-2xl font-bold text-textdark" id="stat-coins">---</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-cyan-100 flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-cyan-600 font-medium">ขยะที่ส่งแล้ว (ครั้ง)</p>
+                        <p class="text-2xl font-bold text-textdark" id="stat-trash">---</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-white rounded-xl shadow-sm border-l-4 border-amber-400 p-5 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium mb-1">📸 รูปรอตรวจ</p>
-                        <h3 id="statPendingImages" class="text-2xl font-bold text-gray-800">0</h3>
+            <!-- Action Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="nav-btn card-hover bg-white rounded-2xl p-8 text-center cursor-pointer border border-cyan-100 shadow-sm flex flex-col items-center" data-target="view-submit">
+                    <div class="bg-blue-100 p-4 rounded-full mb-4 text-blue-600">
+                        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
                     </div>
-                    <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-500 text-xl">
-                        <i class="fa-solid fa-image"></i>
-                    </div>
+                    <h3 class="text-xl font-bold text-textdark mb-2">ส่งรูปขยะ</h3>
+                    <p class="text-sm text-gray-500">ถ่ายรูปขยะที่คัดแยกแล้วเพื่อสะสมแต้ม</p>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border-l-4 border-green-500 p-5 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium mb-1">🪙 Coin แจกไปแล้ว</p>
-                        <h3 id="statTotalCoins" class="text-2xl font-bold text-gray-800">0</h3>
+                
+                <div class="nav-btn card-hover bg-white rounded-2xl p-8 text-center cursor-pointer border border-cyan-100 shadow-sm flex flex-col items-center" data-target="view-status">
+                    <div class="bg-indigo-100 p-4 rounded-full mb-4 text-indigo-600">
+                        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
                     </div>
-                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xl">
-                        <i class="fa-solid fa-coins"></i>
-                    </div>
+                    <h3 class="text-xl font-bold text-textdark mb-2">เช็คแต้ม & ประวัติ</h3>
+                    <p class="text-sm text-gray-500">ตรวจสอบยอด Coin และประวัติการทำรายการ</p>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border-l-4 border-purple-500 p-5 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium mb-1">🎁 รางวัลที่แลกไป</p>
-                        <h3 id="statTotalRedeemed" class="text-2xl font-bold text-gray-800">0</h3>
+
+                <div class="nav-btn card-hover bg-white rounded-2xl p-8 text-center cursor-pointer border border-cyan-100 shadow-sm flex flex-col items-center" data-target="view-shop">
+                    <div class="bg-emerald-100 p-4 rounded-full mb-4 text-emerald-600">
+                        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
                     </div>
-                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-500 text-xl">
-                        <i class="fa-solid fa-gift"></i>
-                    </div>
+                    <h3 class="text-xl font-bold text-textdark mb-2">ร้านค้าแลกรางวัล</h3>
+                    <p class="text-sm text-gray-500">ใช้ Coin สะสมเพื่อแลกของรางวัลมากมาย</p>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-5 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium mb-1">👥 สมาชิกทั้งหมด</p>
-                        <h3 id="statTotalMembers" class="text-2xl font-bold text-gray-800">0</h3>
+
+                <div class="nav-btn card-hover bg-white rounded-2xl p-8 text-center cursor-pointer border border-cyan-100 shadow-sm flex flex-col items-center" data-target="view-leaderboard">
+                    <div class="bg-orange-100 p-4 rounded-full mb-4 text-orange-600">
+                        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
                     </div>
-                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-xl">
-                        <i class="fa-solid fa-users"></i>
-                    </div>
+                    <h3 class="text-xl font-bold text-textdark mb-2">อันดับสูงสุด</h3>
+                    <p class="text-sm text-gray-500">ดูรายชื่อนักเรียนที่สะสมแต้มได้มากที่สุด</p>
                 </div>
             </div>
         </section>
 
-        <!-- Page 2: Submit Trash -->
-        <section id="page-submit" class="page-section hidden max-w-2xl mx-auto">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-4"><i class="fa-solid fa-camera text-green-600 mr-2"></i>ส่งรูปขยะ</h2>
-                
+        <!-- ==================== VIEW: SUBMIT TRASH ==================== -->
+        <section id="view-submit" class="spa-view hidden max-w-2xl mx-auto">
+            <div class="bg-white rounded-3xl shadow-md border border-cyan-100 p-8">
+                <div class="text-center mb-8">
+                    <h2 class="text-3xl font-bold text-primary mb-2">ส่งรูปขยะสะสมแต้ม</h2>
+                    <p class="text-gray-500">กรอกรหัสนักเรียนและอัปโหลดรูปขยะของคุณ</p>
+                </div>
+
                 <form id="submitTrashForm" class="space-y-6">
                     <div>
-                        <label for="submitStudentId" class="block text-sm font-medium text-gray-700 mb-2">รหัสนักเรียน</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <i class="fa-solid fa-id-card text-gray-400"></i>
-                            </div>
-                            <input type="text" id="submitStudentId" autocomplete="off" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 transition shadow-sm text-lg" placeholder="กรอกรหัสนักเรียน 5 หลัก">
-                        </div>
-                        <p id="submitStudentError" class="mt-2 text-sm text-red-600 hidden"></p>
-                        <div id="submitStudentName" class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 font-medium hidden flex items-center gap-2">
-                            <i class="fa-solid fa-check-circle"></i> <span></span>
+                        <label for="submitStudentId" class="block text-sm font-medium text-gray-700 mb-1">รหัสนักเรียน</label>
+                        <input type="text" id="submitStudentId" placeholder="กรอกรหัสนักเรียน 5 หลัก" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-lg" required>
+                        <!-- Badge for name preview -->
+                        <div id="submitStudentName" class="mt-2 hidden inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            <!-- Name injects here -->
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">อัปโหลดรูปภาพขยะ</label>
-                        <div class="relative">
-                            <input type="file" id="submitImageInput" accept="image/*" capture="environment" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" disabled>
-                            <div id="imageDropZone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50 hover:bg-gray-100 transition duration-200 ease-in-out cursor-pointer relative overflow-hidden">
-                                <div id="imagePlaceholder">
-                                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-400 mb-3"></i>
-                                    <p class="text-gray-600 font-medium">แตะเพื่อถ่ายรูปหรือเลือกรูปภาพ</p>
-                                    <p class="text-gray-400 text-sm mt-1">รองรับ JPG, PNG</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">รูปถ่ายขยะที่คัดแยกแล้ว</label>
+                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-primary transition-colors cursor-pointer bg-gray-50 relative" id="dropzoneArea">
+                            <div class="space-y-1 text-center" id="dropzoneContent">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <div class="flex text-sm text-gray-600 justify-center">
+                                    <label for="submitImage" class="relative cursor-pointer rounded-md font-medium text-primary hover:text-cyan-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+                                        <span>อัปโหลดรูปภาพ</span>
+                                        <input id="submitImage" name="submitImage" type="file" class="sr-only" accept="image/*" capture="environment">
+                                    </label>
+                                    <p class="pl-1">หรือ ถ่ายรูป</p>
                                 </div>
-                                <div id="submitImagePreviewContainer" class="hidden absolute inset-0 w-full h-full bg-black">
-                                    <img id="submitImagePreview" src="" alt="Preview" class="w-full h-full object-contain">
-                                    <div class="absolute bottom-2 right-2 bg-black/60 text-white px-3 py-1 rounded text-sm pointer-events-none">
-                                        แตะเพื่อเปลี่ยนรูป
-                                    </div>
-                                </div>
+                                <p class="text-xs text-gray-500">PNG, JPG ไม่เกิน 5MB</p>
                             </div>
+                            <img id="imagePreview" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full object-contain p-2 rounded-xl">
+                            <button type="button" id="removeImageBtn" class="hidden absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
 
-                    <button type="submit" id="submitTrashBtn" disabled class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-200 flex items-center justify-center gap-2 text-lg">
-                        <i class="fa-solid fa-paper-plane"></i> 📤 ส่งรูปขยะเพื่อรับ Coin
+                    <button type="submit" id="submitTrashBtn" class="w-full btn-transition bg-cta hover:bg-green-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg flex justify-center items-center text-lg">
+                        <svg class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        ส่งรูปขยะ
                     </button>
                 </form>
             </div>
         </section>
 
-        <!-- Page 3: Status -->
-        <section id="page-status" class="page-section hidden max-w-4xl mx-auto">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4"><i class="fa-solid fa-magnifying-glass-chart text-amber-500 mr-2"></i>เช็คแต้มและประวัติ</h2>
-                
-                <form id="searchStudentForm" class="flex gap-2">
-                    <div class="relative flex-grow">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="fa-solid fa-id-card text-gray-400"></i>
-                        </div>
-                        <input type="text" id="searchStudentId" autocomplete="off" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 transition shadow-sm" placeholder="กรอกรหัสนักเรียน">
-                    </div>
-                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-medium shadow-sm transition">ค้นหา</button>
-                </form>
-            </div>
-
-            <div id="studentStatusResult" class="hidden space-y-6">
-                <!-- Profile & Balance -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div class="flex items-center gap-4">
-                        <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl shadow-inner">
-                            <i class="fa-solid fa-user"></i>
-                        </div>
-                        <div>
-                            <h3 id="statusStudentName" class="text-2xl font-bold text-gray-800">ชื่อ-สกุล</h3>
-                            <p id="statusStudentId" class="text-gray-500 font-medium">รหัส: 00000</p>
-                        </div>
-                    </div>
-                    <div class="bg-gradient-to-br from-amber-400 to-amber-600 p-1 rounded-2xl shadow-lg w-full md:w-auto">
-                        <div class="bg-white rounded-xl px-8 py-4 flex flex-col items-center justify-center w-full h-full">
-                            <p class="text-sm font-bold text-gray-500 mb-1 uppercase tracking-wider">Coin สะสม</p>
-                            <div class="flex items-center gap-2">
-                                <i class="fa-solid fa-coins text-3xl text-amber-500"></i>
-                                <span id="statusCoinBalance" class="text-4xl font-black text-gray-800">0</span>
-                            </div>
-                        </div>
-                    </div>
+        <!-- ==================== VIEW: STATUS & HISTORY ==================== -->
+        <section id="view-status" class="spa-view hidden">
+            <div class="max-w-4xl mx-auto">
+                <!-- Search Box -->
+                <div class="bg-white rounded-2xl shadow-sm border border-cyan-100 p-6 mb-8 text-center">
+                    <h2 class="text-2xl font-bold text-textdark mb-4">ตรวจสอบสถานะและประวัติ</h2>
+                    <form id="statusSearchForm" class="flex max-w-md mx-auto relative">
+                        <input type="text" id="statusStudentId" placeholder="กรอกรหัสนักเรียน..." class="w-full pl-4 pr-12 py-3 rounded-l-xl border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary outline-none" required>
+                        <button type="submit" class="bg-primary hover:bg-cyan-700 text-white px-6 py-3 rounded-r-xl btn-transition flex items-center font-medium">
+                            ค้นหา
+                        </button>
+                    </form>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Pending Images -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div class="bg-yellow-50 border-b border-yellow-100 p-4 flex justify-between items-center">
-                            <h4 class="font-bold text-yellow-800 flex items-center gap-2">
-                                <i class="fa-solid fa-image"></i> รูปขยะที่รอตรวจ (<span id="statusPendingCount">0</span>)
-                            </h4>
-                            <button id="cancelAllPendingBtn" class="text-sm text-red-600 hover:text-red-800 font-medium hidden"><i class="fa-solid fa-trash-can mr-1"></i>ยกเลิกทั้งหมด</button>
-                        </div>
-                        <div class="p-4">
-                            <div id="statusPendingList" class="space-y-3 max-h-80 overflow-y-auto pr-2">
-                                <!-- JS inserts pending images here -->
-                                <p class="text-gray-500 text-center py-4 italic">ไม่มีรูปภาพที่รอตรวจ</p>
+                <!-- Results Container (Hidden until searched) -->
+                <div id="statusResultContainer" class="hidden space-y-6">
+                    <!-- Student Card -->
+                    <div class="bg-gradient-to-r from-primary to-cyan-500 rounded-3xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between">
+                        <div class="flex items-center mb-4 md:mb-0">
+                            <div class="h-16 w-16 bg-white rounded-full flex items-center justify-center text-primary text-2xl font-bold shadow-inner mr-4">
+                                <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
                             </div>
+                            <div>
+                                <h3 class="text-2xl font-bold" id="statusName">ชื่อ-นามสกุล</h3>
+                                <p class="text-cyan-100" id="statusGradeRoom">ชั้น / ห้อง / เลขที่</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="bg-white/20 px-4 py-2 rounded-xl backdrop-blur-sm mb-2 text-center w-full md:w-auto">
+                                <span class="text-sm text-cyan-100 block">ยอด Coin สะสม</span>
+                                <span class="text-3xl font-extrabold text-yellow-300" id="statusCoins">0</span>
+                                <span class="text-sm"> 🪙</span>
+                            </div>
+                            <button id="btnEditProfile" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded transition-colors cursor-pointer">
+                                ✎ แก้ไขข้อมูล
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Pending Rewards -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div class="bg-purple-50 border-b border-purple-100 p-4">
-                            <h4 class="font-bold text-purple-800 flex items-center gap-2">
-                                <i class="fa-solid fa-gift"></i> ของรางวัลที่รอรับ
+                    <!-- Pending Items Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Pending Trash -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-cyan-100 p-6">
+                            <h4 class="font-bold text-lg text-textdark mb-4 flex items-center border-b pb-2">
+                                <svg class="h-5 w-5 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                รอตรวจรูปขยะ
                             </h4>
+                            <ul id="pendingTrashList" class="space-y-3">
+                                <!-- JS Populated -->
+                                <li class="text-sm text-gray-500 text-center py-4">ไม่มีรายการรอตรวจ</li>
+                            </ul>
                         </div>
-                        <div class="p-4">
-                            <div id="statusPendingRewardsList" class="space-y-3 max-h-80 overflow-y-auto pr-2">
-                                <!-- JS inserts pending rewards here -->
-                                <p class="text-gray-500 text-center py-4 italic">ไม่มีของรางวัลที่รอรับ</p>
-                            </div>
+                        
+                        <!-- Pending Rewards -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-cyan-100 p-6">
+                            <h4 class="font-bold text-lg text-textdark mb-4 flex items-center border-b pb-2">
+                                <svg class="h-5 w-5 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                รอรับของรางวัล
+                            </h4>
+                            <ul id="pendingRewardList" class="space-y-3">
+                                <!-- JS Populated -->
+                                <li class="text-sm text-gray-500 text-center py-4">ไม่มีรายการรอรับของ</li>
+                            </ul>
                         </div>
                     </div>
-                </div>
 
-                <!-- History Table -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="bg-gray-50 border-b border-gray-200 p-4">
-                        <h4 class="font-bold text-gray-800 flex items-center gap-2">
-                            <i class="fa-solid fa-clock-rotate-left"></i> ประวัติทั้งหมด
+                    <!-- History Table -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-cyan-100 p-6 overflow-hidden">
+                        <h4 class="font-bold text-lg text-textdark mb-4 flex items-center">
+                            <svg class="h-5 w-5 mr-2 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            ประวัติการทำรายการ
                         </h4>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วัน/เวลา</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รายการ</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Coin</th>
-                                    <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="statusHistoryTable" class="bg-white divide-y divide-gray-200">
-                                <!-- JS inserts history here -->
-                                <tr><td colspan="4" class="px-6 py-4 text-center text-gray-500 italic">ไม่พบประวัติ</td></tr>
-                            </tbody>
-                        </table>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่/เวลา</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ประเภท</th>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Coin</th>
+                                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- JS Populated -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Page 4: Shop -->
-        <section id="page-shop" class="page-section hidden">
-            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-store text-purple-600 mr-2"></i>🏪 ร้านค้าแลกของรางวัล</h2>
-                    <p class="text-gray-500 mt-1">กรอกรหัสนักเรียนเพื่อตรวจสอบยอด Coin และแลกของรางวัล</p>
-                </div>
-                
-                <div class="flex gap-2 w-full md:w-auto">
-                    <input type="text" id="shopStudentId" autocomplete="off" class="block w-full md:w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500" placeholder="รหัสนักเรียน">
-                    <button id="shopVerifyBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition whitespace-nowrap">ยืนยัน</button>
-                </div>
+        <!-- ==================== VIEW: SHOP ==================== -->
+        <section id="view-shop" class="spa-view hidden">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-primary mb-2">ร้านค้าแลกรางวัล</h2>
+                <p class="text-gray-500">ใช้ Coin สะสมของคุณแลกของรางวัลมากมาย</p>
             </div>
 
-            <!-- Shop Student Info (Hidden default) -->
-            <div id="shopStudentInfo" class="hidden mb-8 bg-gradient-to-r from-purple-50 to-white border border-purple-100 p-4 rounded-xl flex justify-between items-center shadow-sm">
-                <div class="flex items-center gap-3">
-                    <i class="fa-solid fa-circle-check text-green-500 text-xl"></i>
-                    <span class="font-bold text-gray-800 text-lg"></span>
+            <!-- Verify Section -->
+            <div class="max-w-md mx-auto bg-white rounded-2xl shadow-sm border border-cyan-100 p-6 mb-10">
+                <label class="block text-sm font-medium text-gray-700 mb-2">ยืนยันตัวตนเพื่อแลกรางวัล</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="shopStudentId" placeholder="รหัสนักเรียน..." class="flex-1 px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                    <button id="shopVerifyBtn" class="bg-primary hover:bg-cyan-700 text-white px-4 py-2 rounded-xl btn-transition">ยืนยัน</button>
                 </div>
-                <div class="bg-white px-4 py-2 rounded-lg shadow-sm border border-amber-200 flex items-center gap-2">
-                    <span class="text-gray-500 text-sm">ยอดคงเหลือ:</span>
-                    <i class="fa-solid fa-coins text-amber-500"></i>
-                    <span id="shopCoinBalance" class="font-bold text-xl text-gray-800">0</span>
+                <!-- Verified User Info -->
+                <div id="shopUserInfo" class="hidden mt-4 p-4 bg-cyan-50 rounded-xl border border-cyan-200 flex justify-between items-center">
+                    <div>
+                        <p class="font-bold text-textdark text-sm" id="shopUserName">ชื่อ-นามสกุล</p>
+                        <p class="text-xs text-gray-500" id="shopUserGrade">ชั้น/ห้อง</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">Coin คงเหลือ</p>
+                        <p class="font-bold text-lg text-yellow-600"><span id="shopUserCoins">0</span> 🪙</p>
+                    </div>
                 </div>
             </div>
 
             <!-- Rewards Grid -->
-            <div id="rewardsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                <!-- JS inserts reward cards here -->
-                <p class="text-gray-500 col-span-full text-center py-10">กำลังโหลดของรางวัล...</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="rewardsGrid">
+                <!-- Cards generated by JS -->
             </div>
         </section>
 
-        <!-- Page 5: Leaderboard -->
-        <section id="page-leaderboard" class="page-section hidden max-w-5xl mx-auto">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-trophy text-amber-500 mr-2"></i>🏆 อันดับผู้สะสม Coin สูงสุด (Top 10)</h2>
-                    <button id="refreshLeaderboardBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition flex items-center gap-2 w-full md:w-auto justify-center">
-                        <i class="fa-solid fa-rotate-right"></i> รีเฟรช
-                    </button>
-                </div>
+        <!-- ==================== VIEW: LEADERBOARD ==================== -->
+        <section id="view-leaderboard" class="spa-view hidden">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-primary mb-2">กระดานอันดับ (Leaderboard)</h2>
+                <p class="text-gray-500">ยอดนักสะสมแต้มของโรงเรียน</p>
+            </div>
 
-                <div class="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div class="flex-grow">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">ระดับชั้น</label>
-                        <select id="lbFilterGrade" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-amber-500 focus:ring-amber-500 py-2 px-3 bg-white">
+            <div class="max-w-5xl mx-auto">
+                <!-- Top 3 Podium (Optional visually, integrate into table for now or make nice UI) -->
+                
+                <!-- Filters -->
+                <div class="bg-white rounded-t-2xl shadow-sm border-t border-l border-r border-cyan-100 p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div class="relative w-full md:w-64">
+                        <input type="text" id="lbSearch" placeholder="ค้นหาชื่อ..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary outline-none">
+                        <svg class="h-5 w-5 text-gray-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <div class="flex space-x-2 w-full md:w-auto">
+                        <select id="lbGradeFilter" class="flex-1 md:flex-none border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary">
                             <option value="">ทุกระดับชั้น</option>
                             <option value="ม.1">ม.1</option>
                             <option value="ม.2">ม.2</option>
@@ -347,271 +420,443 @@
                             <option value="ม.5">ม.5</option>
                             <option value="ม.6">ม.6</option>
                         </select>
-                    </div>
-                    <div class="flex-grow">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">ห้อง</label>
-                        <select id="lbFilterRoom" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-amber-500 focus:ring-amber-500 py-2 px-3 bg-white">
+                        <select id="lbRoomFilter" class="flex-1 md:flex-none border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary">
                             <option value="">ทุกห้อง</option>
-                            <!-- JS populate based on grade -->
+                            <!-- Populated dynamically based on grade -->
                         </select>
                     </div>
                 </div>
 
-                <!-- Desktop Table View -->
-                <div class="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-20">อันดับ</th>
-                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">ชื่อ-สกุล</th>
-                                <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">ชั้น/ห้อง</th>
-                                <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Coin สะสมตลอดชีพ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leaderboardTable" class="bg-white divide-y divide-gray-200">
-                            <!-- JS inserts rows -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mobile Cards View -->
-                <div id="leaderboardCards" class="sm:hidden space-y-4">
-                    <!-- JS inserts cards -->
+                <!-- Leaderboard Table -->
+                <div class="bg-white rounded-b-2xl shadow-sm border border-cyan-100 overflow-hidden">
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-cyan-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider w-20">อันดับ</th>
+                                    <th scope="col" class="px-6 py-4 text-left text-sm font-bold text-primary uppercase tracking-wider">ชื่อ-นามสกุล</th>
+                                    <th scope="col" class="px-6 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider">ชั้น/ห้อง</th>
+                                    <th scope="col" class="px-6 py-4 text-right text-sm font-bold text-primary uppercase tracking-wider">Coin รวม</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lbTableBody" class="bg-white divide-y divide-gray-100">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Mobile List View -->
+                    <div class="md:hidden" id="lbMobileList">
+                        <!-- JS Populated -->
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Page 6: Admin -->
-        <section id="page-admin" class="page-section hidden">
-            <!-- Admin Header -->
-            <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-                        <i class="fa-solid fa-user-shield"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-red-800">ระบบจัดการ (Admin)</h2>
-                        <p class="text-sm text-red-600">จัดการข้อมูลและคำขอต่างๆ</p>
-                    </div>
+        <!-- ==================== VIEW: ADMIN ==================== -->
+        <section id="view-admin" class="spa-view hidden">
+            <div class="bg-admin text-white rounded-t-2xl p-4 md:p-6 flex flex-col md:flex-row justify-between items-center shadow-md">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <svg class="h-8 w-8 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <h2 class="text-2xl font-bold">ระบบจัดการ (Admin)</h2>
                 </div>
-                <button id="exitAdminBtn" class="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 px-4 py-2 rounded-lg transition text-sm font-medium shadow-sm w-full sm:w-auto">
-                    <i class="fa-solid fa-right-from-bracket mr-1"></i> ออกจากระบบจัดการ
+                <button id="exitAdminBtn" class="bg-white text-admin hover:bg-gray-100 px-4 py-2 rounded-lg font-medium btn-transition flex items-center cursor-pointer">
+                    <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    ออกจากระบบ
                 </button>
             </div>
 
-            <!-- Admin Tabs Navigation -->
-            <div class="flex overflow-x-auto border-b border-gray-200 mb-6 bg-white rounded-t-lg hide-scrollbar">
-                <button class="admin-tab active whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors border-red-500 text-red-600" data-target="admin-approve">
-                    <i class="fa-solid fa-image mr-2"></i> ตรวจรูปขยะ
-                </button>
-                <button class="admin-tab whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-target="admin-handover">
-                    <i class="fa-solid fa-hand-holding-hand mr-2"></i> มอบของรางวัล
-                </button>
-                <button class="admin-tab whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-target="admin-rewards">
-                    <i class="fa-solid fa-box-open mr-2"></i> จัดการรางวัล
-                </button>
-                <button class="admin-tab whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-target="admin-members">
-                    <i class="fa-solid fa-users mr-2"></i> สมาชิก
-                </button>
-            </div>
-
-            <!-- Tab Content: Approve Images -->
-            <div id="admin-approve" class="admin-content block">
-                <h3 class="text-lg font-bold mb-4 text-gray-800">รูปขยะที่รอตรวจสอบ</h3>
-                <div id="approvalList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- JS inserts approval cards -->
-                </div>
-            </div>
-
-            <!-- Tab Content: Handover Rewards -->
-            <div id="admin-handover" class="admin-content hidden">
-                <h3 class="text-lg font-bold mb-4 text-gray-800">รายการของรางวัลที่รอมอบ</h3>
-                <div id="handoverList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- JS inserts handover cards -->
-                </div>
-            </div>
-
-            <!-- Tab Content: Manage Rewards -->
-            <div id="admin-rewards" class="admin-content hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-gray-800">จัดการของรางวัล</h3>
-                    <button id="addRewardBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
-                        <i class="fa-solid fa-plus mr-1"></i> เพิ่มของรางวัล
+            <!-- Admin Tabs -->
+            <div class="bg-white shadow-sm border-b border-l border-r border-gray-200">
+                <nav class="flex overflow-x-auto" aria-label="Tabs">
+                    <button id="tab-approve" class="admin-tab text-admin border-admin border-b-2 whitespace-nowrap py-4 px-6 font-medium text-sm focus:outline-none cursor-pointer" data-target="admin-approve">
+                        ตรวจรูปขยะ
                     </button>
-                </div>
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รูป/ชื่อรางวัล</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Coin ที่ใช้</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">คงเหลือ</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="rewardsManageList" class="bg-white divide-y divide-gray-200">
-                            <!-- JS inserts reward rows -->
-                        </tbody>
-                    </table>
-                </div>
+                    <button id="tab-handover" class="admin-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 whitespace-nowrap py-4 px-6 font-medium text-sm focus:outline-none cursor-pointer" data-target="admin-handover">
+                        ส่งมอบรางวัล
+                    </button>
+                    <button id="tab-rewards" class="admin-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 whitespace-nowrap py-4 px-6 font-medium text-sm focus:outline-none cursor-pointer" data-target="admin-rewards">
+                        จัดการของรางวัล
+                    </button>
+                    <button id="tab-members" class="admin-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 whitespace-nowrap py-4 px-6 font-medium text-sm focus:outline-none cursor-pointer" data-target="admin-members">
+                        จัดการสมาชิก
+                    </button>
+                </nav>
             </div>
 
-            <!-- Tab Content: Members -->
-            <div id="admin-members" class="admin-content hidden">
-                <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-                    <h3 class="text-lg font-bold text-gray-800">รายชื่อสมาชิกทั้งหมด</h3>
-                    <button id="promoteGradeBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm w-full sm:w-auto">
-                        <i class="fa-solid fa-arrow-up-right-dots mr-1"></i> เลื่อนชั้นปีการศึกษา
-                    </button>
-                </div>
+            <div class="bg-white p-6 border-l border-r border-b border-gray-200 rounded-b-2xl shadow-sm min-h-[500px]">
                 
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4 flex flex-col sm:flex-row gap-4">
-                    <div class="flex-grow relative">
-                        <i class="fa-solid fa-search absolute left-3 top-3 text-gray-400"></i>
-                        <input type="text" id="adminMemSearch" autocomplete="off" placeholder="ค้นหา รหัส, ชื่อ..." class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                <!-- Admin View: Approve Trash -->
+                <div id="admin-approve" class="admin-view block">
+                    <h3 class="text-xl font-bold mb-6 text-gray-800">รายการรอตรวจรูปขยะ</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="adminApproveList">
+                        <!-- JS Populated Cards -->
                     </div>
-                    <select id="adminMemGrade" class="border-gray-300 rounded-lg py-2 px-3 w-full sm:w-32 focus:ring-red-500 focus:border-red-500">
-                        <option value="">ทุกระดับชั้น</option>
-                        <option value="ม.1">ม.1</option>
-                        <option value="ม.2">ม.2</option>
-                        <option value="ม.3">ม.3</option>
-                        <option value="ม.4">ม.4</option>
-                        <option value="ม.5">ม.5</option>
-                        <option value="ม.6">ม.6</option>
-                    </select>
-                    <select id="adminMemRoom" class="border-gray-300 rounded-lg py-2 px-3 w-full sm:w-32 focus:ring-red-500 focus:border-red-500">
-                        <option value="">ทุกห้อง</option>
-                        <!-- JS populated -->
-                    </select>
                 </div>
 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รหัส</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อ-สกุล</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">ชั้น/ห้อง</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Coin</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="adminMembersTable" class="bg-white divide-y divide-gray-200">
-                            <!-- JS inserts member rows -->
-                        </tbody>
-                    </table>
+                <!-- Admin View: Handover Rewards -->
+                <div id="admin-handover" class="admin-view hidden">
+                    <h3 class="text-xl font-bold mb-6 text-gray-800">รายการรอส่งมอบของรางวัล</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รหัส-ชื่อนักเรียน</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ของรางวัล</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Coin ที่ใช้</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminHandoverList" class="bg-white divide-y divide-gray-200">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+
+                <!-- Admin View: Manage Rewards -->
+                <div id="admin-rewards" class="admin-view hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-gray-800">จัดการของรางวัล</h3>
+                        <button id="addRewardBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium btn-transition flex items-center cursor-pointer">
+                            <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            เพิ่มของรางวัล
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รูป/ชื่อรางวัล</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">ราคา (Coin)</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">คงเหลือ</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminRewardsTable" class="bg-white divide-y divide-gray-200">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Admin View: Manage Members -->
+                <div id="admin-members" class="admin-view hidden">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h3 class="text-xl font-bold text-gray-800">จัดการสมาชิก</h3>
+                        
+                        <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                            <input type="text" id="adminMemberSearch" placeholder="ค้นหารหัส/ชื่อ..." class="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-admin">
+                            <select id="adminMemberGrade" class="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-admin">
+                                <option value="">ทุกระดับชั้น</option>
+                                <option value="ม.1">ม.1</option>
+                                <option value="ม.2">ม.2</option>
+                                <option value="ม.3">ม.3</option>
+                                <option value="ม.4">ม.4</option>
+                                <option value="ม.5">ม.5</option>
+                                <option value="ม.6">ม.6</option>
+                            </select>
+                            <button id="promoteGradeBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium btn-transition flex items-center cursor-pointer justify-center">
+                                เลื่อนชั้นปี
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รหัส</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อ-นามสกุล</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">ชั้น/ห้อง/เลขที่</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Coin</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminMembersTable" class="bg-white divide-y divide-gray-200">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </section>
+
     </main>
 
-    <!-- Fixed Bottom Mobile Navigation -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:hidden z-40 pb-safe">
-        <div class="flex justify-around items-center h-16">
-            <button class="nav-link flex flex-col items-center justify-center w-full h-full text-gray-500 hover:text-green-600 transition" data-target="page-dashboard">
-                <i class="fa-solid fa-house text-xl mb-1"></i>
-                <span class="text-[10px] font-medium">หน้าแรก</span>
-            </button>
-            <div class="relative w-full h-full flex justify-center">
-                <button class="nav-link absolute -top-5 bg-green-600 text-white w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-lg border-4 border-white hover:bg-green-700 transition" data-target="page-submit">
-                    <i class="fa-solid fa-camera text-xl"></i>
+    <!-- Footer -->
+    <footer class="bg-white border-t border-cyan-100 py-6 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-cyan-600">
+            &copy; <span id="currentYear"></span> Waste Bank System. <br class="sm:hidden">by Pragasit Suriya.
+        </div>
+    </footer>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Registration Modal -->
+    <div id="registerModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="bg-primary px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">ลงทะเบียนสมาชิกใหม่</h3>
+                <button type="button" class="close-modal text-white hover:text-gray-200 cursor-pointer">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                 </button>
-                <span class="text-[10px] font-medium absolute bottom-1 text-gray-500">ส่งรูป</span>
             </div>
-            <button class="nav-link flex flex-col items-center justify-center w-full h-full text-gray-500 hover:text-amber-500 transition" data-target="page-status">
-                <i class="fa-solid fa-coins text-xl mb-1"></i>
-                <span class="text-[10px] font-medium">เช็คแต้ม</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Modals -->
-
-    <!-- 1. Admin PIN Modal -->
-    <div id="adminPinModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative transform transition-all">
-            <button id="closePinModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
-            <div class="text-center mb-6">
-                <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                    <i class="fa-solid fa-lock"></i>
-                </div>
-                <h3 class="text-xl font-bold text-gray-800">เข้าสู่ระบบจัดการ</h3>
-                <p class="text-sm text-gray-500 mt-1">กรุณากรอกรหัสผ่าน (PIN) เพื่อดำเนินการต่อ</p>
-            </div>
-            <div class="space-y-4">
-                <input type="password" id="adminPinInput" autocomplete="off" maxlength="10" placeholder="••••••••" class="block w-full text-center tracking-widest text-2xl py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
-                <p id="pinErrorMsg" class="text-red-500 text-sm text-center hidden">รหัสผ่านไม่ถูกต้อง</p>
-                <button id="verifyPinBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow transition">ยืนยัน</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Redeem Success Modal -->
-    <div id="redeemSuccessModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center relative transform transition-all">
-            <div class="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-5xl mx-auto mb-6 shadow-inner">
-                <i class="fa-solid fa-check"></i>
-            </div>
-            <h3 class="text-2xl font-bold text-gray-800 mb-2">แลกของรางวัลสำเร็จ! 🎉</h3>
-            <div id="redeemSuccessMessage" class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-gray-700 font-medium">
-                <!-- JS inserts success message -->
-            </div>
-            <button id="closeRedeemModal" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow transition">ตกลง</button>
-        </div>
-    </div>
-
-    <!-- 3. Edit Reward Modal -->
-    <div id="editRewardModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto">
-            <button id="closeEditRewardModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
-            <h3 id="editRewardTitle" class="text-xl font-bold text-gray-800 mb-6 border-b pb-4">เพิ่มของรางวัล</h3>
-            
-            <form id="editRewardForm" class="space-y-4">
-                <input type="hidden" id="editRewardId">
+            <form id="registerForm" class="p-6 space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อของรางวัล <span class="text-red-500">*</span></label>
-                    <input type="text" id="editRewardName" autocomplete="off" required class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">รหัสนักเรียน</label>
+                    <input type="text" id="regStudentId" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล</label>
+                    <input type="text" id="regFullName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Coin ที่ใช้ <span class="text-red-500">*</span></label>
-                        <input type="number" id="editRewardCost" autocomplete="off" required min="1" class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ระดับชั้น</label>
+                        <select id="regGrade" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
+                            <option value="">เลือก...</option>
+                            <option value="ม.1">ม.1</option>
+                            <option value="ม.2">ม.2</option>
+                            <option value="ม.3">ม.3</option>
+                            <option value="ม.4">ม.4</option>
+                            <option value="ม.5">ม.5</option>
+                            <option value="ม.6">ม.6</option>
+                        </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">จำนวนคงเหลือ <span class="text-red-500">*</span></label>
-                        <input type="number" id="editRewardStock" autocomplete="off" required min="0" class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ห้อง</label>
+                        <input type="number" id="regRoom" min="1" max="20" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียด (สั้นๆ) <span class="text-red-500">*</span></label>
-                    <textarea id="editRewardDesc" autocomplete="off" required rows="2" class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">เลขที่</label>
+                    <input type="number" id="regSeatNo" min="1" max="60" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">ข้อความแจ้งตอนแลกสำเร็จ <span class="text-red-500">*</span></label>
-                    <input type="text" id="editRewardMsg" autocomplete="off" required placeholder="เช่น ให้ไปที่ห้องวิทย์หาครูอ้อเพื่อรับของ" class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">URL รูปภาพ (ไม่บังคับ)</label>
-                    <input type="text" id="editRewardImageUrl" autocomplete="off" placeholder="URL รูปภาพ" class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                
-                <div class="pt-4 mt-2 border-t">
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition">บันทึกข้อมูล</button>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" class="close-modal px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 cursor-pointer transition-colors">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-cyan-700 cursor-pointer transition-colors font-medium">บันทึก</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Toast Container for Notifications -->
-    <div id="toastContainer" class="fixed bottom-20 sm:bottom-6 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+    <!-- Edit Profile Modal -->
+    <div id="editProfileModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="bg-primary px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">แก้ไขข้อมูลส่วนตัว</h3>
+                <button type="button" class="close-modal text-white hover:text-gray-200 cursor-pointer">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="editProfileForm" class="p-6 space-y-4">
+                <input type="hidden" id="editProfileId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล</label>
+                    <input type="text" id="editProfileName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ระดับชั้น</label>
+                        <select id="editProfileGrade" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
+                            <option value="ม.1">ม.1</option>
+                            <option value="ม.2">ม.2</option>
+                            <option value="ม.3">ม.3</option>
+                            <option value="ม.4">ม.4</option>
+                            <option value="ม.5">ม.5</option>
+                            <option value="ม.6">ม.6</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ห้อง</label>
+                        <input type="number" id="editProfileRoom" min="1" max="20" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">เลขที่</label>
+                    <input type="number" id="editProfileSeatNo" min="1" max="60" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" class="close-modal px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 cursor-pointer transition-colors">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-cyan-700 cursor-pointer transition-colors font-medium">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    <!-- Footer -->
-    <footer class="mt-auto py-6 bg-gray-50 border-t border-gray-200 text-center">
-        <p class="text-sm text-gray-500">ระบบธนาคารขยะโรงเรียน (Waste Bank System)</p>
-        <p class="text-xs text-gray-400 mt-1">by Pragasit Suriya</p>
-    </footer>
+    <!-- Admin PIN Modal -->
+    <div id="adminPinModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden transform transition-all text-center p-8">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
+                <svg class="h-8 w-8 text-admin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">ยืนยันสิทธิ์เจ้าหน้าที่</h3>
+            <p class="text-sm text-gray-500 mb-6">กรุณากรอกรหัส PIN เพื่อเข้าสู่ระบบจัดการ</p>
+            
+            <form id="adminPinForm">
+                <input type="password" id="adminPinInput" class="w-full text-center text-2xl tracking-widest px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-admin focus:border-admin outline-none mb-2" placeholder="••••••" autocomplete="off">
+                <p id="adminPinError" class="text-sm text-red-500 hidden mb-4">รหัส PIN ไม่ถูกต้อง</p>
+                
+                <div class="mt-6 flex flex-col space-y-3">
+                    <button type="submit" class="w-full px-4 py-3 bg-admin text-white rounded-xl hover:bg-red-700 cursor-pointer transition-colors font-bold text-lg shadow-sm">เข้าสู่ระบบ</button>
+                    <button type="button" class="close-modal w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 cursor-pointer transition-colors font-medium">ยกเลิก</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    <!-- App JS -->
-    <script src="app.js?v=2"></script>
+    <!-- Edit/Add Reward Modal -->
+    <div id="editRewardModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div class="bg-admin px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white" id="editRewardTitle">เพิ่มของรางวัล</h3>
+                <button type="button" class="close-modal text-white hover:text-gray-200 cursor-pointer">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="editRewardForm" class="p-6 space-y-4">
+                <input type="hidden" id="rewardId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อของรางวัล</label>
+                    <input type="text" id="rewardName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>
+                    <textarea id="rewardDesc" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ใช้ Coin</label>
+                        <input type="number" id="rewardCost" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">จำนวนคงเหลือ</label>
+                        <input type="number" id="rewardStock" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ข้อความเมื่อแลกสำเร็จ (Success Message)</label>
+                    <input type="text" id="rewardSuccessMsg" placeholder="เช่น ติดต่อรับของที่ห้องปกครอง" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">URL รูปภาพ</label>
+                    <input type="url" id="rewardImageUrl" placeholder="https://..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none">
+                </div>
+                
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" class="close-modal px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 cursor-pointer transition-colors">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 bg-admin text-white rounded-lg hover:bg-red-700 cursor-pointer transition-colors font-medium">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Member Admin Modal -->
+    <div id="editMemberAdminModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="bg-admin px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">แก้ไขข้อมูลสมาชิก (Admin)</h3>
+                <button type="button" class="close-modal text-white hover:text-gray-200 cursor-pointer">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="editMemberAdminForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">รหัสนักเรียน</label>
+                    <input type="text" id="adminEditMemberId" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล</label>
+                    <input type="text" id="adminEditMemberName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ระดับชั้น</label>
+                        <select id="adminEditMemberGrade" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                            <option value="ม.1">ม.1</option>
+                            <option value="ม.2">ม.2</option>
+                            <option value="ม.3">ม.3</option>
+                            <option value="ม.4">ม.4</option>
+                            <option value="ม.5">ม.5</option>
+                            <option value="ม.6">ม.6</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ห้อง</label>
+                        <input type="number" id="adminEditMemberRoom" min="1" max="20" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">เลขที่</label>
+                        <input type="number" id="adminEditMemberSeatNo" min="1" max="60" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Coin คงเหลือ</label>
+                        <input type="number" id="adminEditMemberCoins" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin outline-none" required>
+                    </div>
+                </div>
+                
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" class="close-modal px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 cursor-pointer transition-colors">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 bg-admin text-white rounded-lg hover:bg-red-700 cursor-pointer transition-colors font-medium">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Redeem Success Modal -->
+    <div id="redeemSuccessModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all text-center p-8">
+            <div class="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-6">
+                <svg class="h-12 w-12 text-cta" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">แลกรางวัลสำเร็จ!</h3>
+            <p class="text-gray-600 mb-6" id="redeemSuccessMsgText">กรุณาติดต่อรับของรางวัล</p>
+            
+            <button type="button" class="close-modal w-full px-4 py-3 bg-cta text-white rounded-xl hover:bg-green-600 cursor-pointer transition-colors font-bold text-lg shadow-sm">
+                ตกลง
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== GLOBAL OVERLAYS ==================== -->
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 z-[100] hidden bg-white bg-opacity-80 backdrop-blur-sm flex flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mb-4"></div>
+        <p class="text-lg font-medium text-primary">กำลังโหลด...</p>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-[90] flex flex-col space-y-2 pointer-events-none">
+        <!-- Toasts injected here by JS -->
+    </div>
+
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    </script>
+    <script src="app.js"></script>
 </body>
 </html>
