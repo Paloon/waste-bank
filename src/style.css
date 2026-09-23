@@ -5,5 +5,5 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media(max-width:760px){.recycle-mark{width:135px;height:135px;right:-8px;bottom:32px;opacity:.3}}
 /* Keep the self-registration entry visible above the hero illustration. */
-.hero>.btn.secondary{position:relative;z-index:1;margin-left:10px}
+.hero>.btn.secondary{position:relative;z-index:1;margin-left:10px;color:#214831}
 @media(max-width:640px){.hero>.btn.secondary{display:flex;width:max-content;margin:10px 0 0}}
