@@ -9,6 +9,13 @@ Thumbs.db
 
 # Node
 node_modules/
+data/
+dist/
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
