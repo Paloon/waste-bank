@@ -55,11 +55,20 @@ npm start
 รูปใหม่จะส่งไป Drive เมื่อกำหนด OAuth และเชื่อมบัญชีแล้ว: `evidence` เก็บภาพที่รอตรวจ/ไม่ผ่าน, ภาพที่อนุมัติย้ายไป `waste picture`, `rewards` เก็บรูปรางวัล ภาพใน Drive ไม่ได้เปิด public; เว็บอ่านผ่าน API ที่ตรวจ session (รูปรางวัลอ่านได้สาธารณะ) รูปเก่าใน SQLite ยังคงอ่านได้และยังไม่ได้ย้าย
 
 1. ใน Google Cloud Console ของบัญชีที่ต้องการ เปิด **Google Drive API** และสร้าง **OAuth Client ID ประเภท Web application** ตั้ง redirect URI เป็น `http://localhost:3000/api/drive/callback` และตั้ง OAuth consent screen โดยเพิ่มบัญชีโรงเรียนเป็น test user หากแอปยังอยู่ในโหมด Testing อย่าเปิด billing หรือ Free Trial เพื่อทำขั้นตอนนี้
-2. คัดลอก `.env.example` เป็น `.env` แล้วใส่ `GOOGLE_CLIENT_ID` และ `GOOGLE_CLIENT_SECRET` ด้วยตนเอง โฟลเดอร์ทั้งสามใส่ ID ไว้แล้ว ห้าม commit `.env` หรือ `data/drive-oauth.json` ขึ้น GitHub
+2. คัดลอก `.env.example` เป็น `.env` แล้วใส่ `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` และ ID โฟลเดอร์ทั้งสาม ห้าม commit `.env` หรือ `data/drive-oauth.json` ขึ้น GitHub
 3. รีสตาร์ต `npm run dev` เข้าระบบเจ้าหน้าที่ แล้วเปิด `/api/drive/connect` ในเบราว์เซอร์เดียวกัน เลือกบัญชี Drive ที่เป็นเจ้าของโฟลเดอร์ Google จะขอสิทธิ์ **ดูและจัดการไฟล์ทั้งหมดใน Drive** เพราะโฟลเดอร์ถูกสร้างด้วยมือก่อนเชื่อมแอป; ให้ตัดสินใจเรื่องสิทธิ์นี้เอง
 4. หลังกลับมาที่เว็บ ตรวจ `/api/drive/status` (ต้องล็อกอินเจ้าหน้าที่) ว่า `configured` และ `connected` เป็น `true` แล้วทดลองส่งรูปและตรวจใน Drive
 
-**สถานะ:** โค้ดรองรับ Drive แล้ว แต่ยังไม่ทำงานกับบัญชีจริงจนกว่าจะสร้าง OAuth Client และอนุญาตบัญชี ข้อมูลรายการ/Coins ยังอยู่ใน SQLite ในเครื่อง Google Drive เก็บเฉพาะรูป จึงยังต้องมีเซิร์ฟเวอร์ Node ที่เปิดใช้งานและต้องสำรอง SQLite แยกต่างหาก
+**สถานะ:** เครื่องพัฒนาใช้ SQLite ใน `data/eco.sqlite`; Vercel ใช้ Supabase และเก็บ OAuth token ของ Google Drive ในตาราง `waste_bank_secrets` รูปอยู่ใน Google Drive เท่านั้น
+
+## ขึ้นเว็บ Vercel + Supabase
+
+1. สร้าง Supabase โปรเจกต์ แล้วรัน [supabase/schema.sql](supabase/schema.sql) ใน SQL Editor ตารางเปิด RLS และอนุญาตเฉพาะ service role
+2. สร้าง `.env.cloud.local` (Git ไม่ติดตาม) ใส่ `SUPABASE_URL`, `SUPABASE_SECRET_KEY` และ `DATA_DIR=./data`; รัน `npm run migrate:supabase` เพื่อย้าย SQLite และ Drive OAuth token จากเครื่อง **หนึ่งครั้ง** ถ้าตารางมีข้อมูลแล้ว สคริปต์ไม่เขียนทับ
+3. Import GitHub Repo นี้เข้า Vercel เลือก Vite และตั้ง Environment Variables: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SESSION_SECRET` (ค่าสุ่มยาวอย่างน้อย 32 ไบต์), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DRIVE_WASTE_FOLDER_ID`, `DRIVE_REWARDS_FOLDER_ID`, `DRIVE_EVIDENCE_FOLDER_ID`, `CRON_SECRET`, และ `PUBLIC_BASE_URL=https://<โดเมนจริง>`; ค่า secret ทั้งหมดอยู่ฝั่งเซิร์ฟเวอร์ ไม่ใส่ `VITE_` นำหน้า
+4. Deploy แล้วตรวจ `/api/public`, สมัคร/เข้าสู่ระบบ, ส่งรูป, อนุมัติ และแลกรางวัล หากต้องเชื่อม Google Drive ใหม่ ให้เพิ่ม `https://<โดเมนจริง>/api/drive/callback` ใน Authorized redirect URIs ของ Google OAuth Client เดิม
+
+Vercel ใช้ `api/index.js` สำหรับ Express Functions, ส่วนหน้าเว็บเป็นไฟล์ Vite ใน `dist` Session ลงลายเซ็นด้วย `SESSION_SECRET` และอยู่ได้ 2 นาที ข้อมูล Coins/สต็อกบันทึกแบบตรวจ version ใน PostgreSQL เพื่อไม่ให้คำขอพร้อมกันเขียนทับกัน Cron ลบหลักฐานที่หมดอายุวันละครั้ง
 
 Repo: https://github.com/Paloon/waste-bank ควรใช้ GitHub Free แบบ Private สำหรับโค้ด โดยไม่ใส่ข้อมูลนักเรียนหรือคีย์ลง repo
 
@@ -68,7 +77,8 @@ Repo: https://github.com/Paloon/waste-bank ควรใช้ GitHub Free แบ
 ## โครงสร้าง
 
 - `src/main.jsx`, `src/style.css` — React SPA และ responsive UI
-- `server/store.js` — กติกาธุรกิจ ledger / สต็อก / SQLite transaction
+- `server/store.js` — กติกาธุรกิจ ledger / สต็อก / SQLite สำหรับเครื่องพัฒนา
+- `server/cloud-store.js`, `supabase/schema.sql` — Supabase และการบันทึกแบบตรวจ version
 - `server/index.js` — API, sessions, PIN verification, retention, Vite/static hosting
 - `tests/store.test.js` — ทดสอบ invariants ของ Coins, สิทธิ์ และข้อมูล
 

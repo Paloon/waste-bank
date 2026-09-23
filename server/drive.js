@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync, existsSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive';
 const validId = value => /^[A-Za-z0-9_-]{10,}$/.test(value || '');
 
-export function createDrive(directory) {
+export function createDrive(directory,{secretStore=null,stateSecret=process.env.SESSION_SECRET}={}) {
   const FOLDERS = {
     evidence: process.env.DRIVE_EVIDENCE_FOLDER_ID,
     waste: process.env.DRIVE_WASTE_FOLDER_ID,
@@ -15,14 +15,16 @@ export function createDrive(directory) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const configured = Boolean(clientId && clientSecret && Object.values(FOLDERS).every(validId));
-  let token = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
-  const pending = new Map();
-  const redirectUri = `http://localhost:${Number(process.env.PORT) || 3000}/api/drive/callback`;
+  let token = !secretStore && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+  const redirectUri = `${(process.env.PUBLIC_BASE_URL||`http://localhost:${Number(process.env.PORT)||3000}`).replace(/\/$/,'')}/api/drive/callback`;
+  const sign=value=>createHmac('sha256',stateSecret||'local-drive').update(value).digest('base64url');
+  async function loadToken(){if(!token&&secretStore)token=await secretStore.getSecret('drive_oauth');return token;}
+  async function saveToken(){if(secretStore)await secretStore.setSecret('drive_oauth',token);else{writeFileSync(file,JSON.stringify(token),{mode:0o600});chmodSync(file,0o600);}}
 
   function authUrl(staffId) {
     if (!configured) throw new Error('ยังไม่ได้ตั้งค่า Google Drive ใน .env');
-    const state = randomBytes(32).toString('hex');
-    pending.set(state, { staffId, expires: Date.now() + 10 * 60_000 });
+    const payload=Buffer.from(JSON.stringify({staffId,expires:Date.now()+10*60_000,nonce:randomBytes(16).toString('hex')})).toString('base64url');
+    const state=payload+'.'+sign(payload);
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     url.search = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri,
       response_type: 'code', scope: SCOPE, access_type: 'offline', prompt: 'consent', state }).toString();
@@ -30,9 +32,11 @@ export function createDrive(directory) {
   }
 
   async function exchange(code, state) {
-    const attempt = pending.get(state);
-    pending.delete(state);
-    if (!attempt || attempt.expires < Date.now() || !code) throw new Error('คำขอเชื่อมต่อหมดอายุหรือไม่ถูกต้อง');
+    const [payload,signature]=state.split('.');
+    const expected=payload&&sign(payload);
+    if(!expected||!signature||signature.length!==expected.length||!timingSafeEqual(Buffer.from(signature),Buffer.from(expected))||!code)throw new Error('คำขอเชื่อมต่อหมดอายุหรือไม่ถูกต้อง');
+    const attempt=JSON.parse(Buffer.from(payload,'base64url').toString());
+    if(attempt.expires<Date.now())throw new Error('คำขอเชื่อมต่อหมดอายุหรือไม่ถูกต้อง');
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret,
@@ -41,12 +45,12 @@ export function createDrive(directory) {
     if (!response.ok || !body.refresh_token) throw new Error('Google ไม่ส่ง refresh token กรุณายกเลิกสิทธิ์แอปเดิมแล้วเชื่อมใหม่');
     token = { refresh_token: body.refresh_token, access_token: body.access_token,
       expires_at: Date.now() + body.expires_in * 1000 };
-    writeFileSync(file, JSON.stringify(token), { mode: 0o600 });
-    chmodSync(file, 0o600);
+    await saveToken();
     return attempt.staffId;
   }
 
   async function accessToken() {
+    await loadToken();
     if (!configured || !token?.refresh_token) throw new Error('ยังไม่ได้เชื่อมบัญชี Google Drive');
     if (token.access_token && token.expires_at > Date.now() + 60_000) return token.access_token;
     const response = await fetch('https://oauth2.googleapis.com/token', {
@@ -56,7 +60,7 @@ export function createDrive(directory) {
     const body = await response.json();
     if (!response.ok) throw new Error('สิทธิ์ Google Drive ใช้ไม่ได้ กรุณาเชื่อมบัญชีใหม่');
     token = { ...token, access_token: body.access_token, expires_at: Date.now() + body.expires_in * 1000 };
-    writeFileSync(file, JSON.stringify(token), { mode: 0o600 });
+    await saveToken();
     return token.access_token;
   }
 
@@ -113,6 +117,6 @@ export function createDrive(directory) {
     await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?supportsAllDrives=true`, { method: 'DELETE' });
   }
 
-  return { configured, connected: () => configured && Boolean(token?.refresh_token),
+  return { configured, connected: async () => configured && Boolean((await loadToken())?.refresh_token),
     authUrl, exchange, verifyFolders, upload, download, moveToWaste, remove };
 }
