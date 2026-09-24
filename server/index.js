@@ -66,6 +66,11 @@ app.post('/api/action',async(req,res)=>{const actor=session(req);if(!actor)retur
     if(item?.image?.startsWith('drive:'))await drive.moveToWaste(item.image.slice(6));
   }
   const result=await store.transact(s=>act(s,actor,body));
+  if(body.action==='deleteStudents'){
+    let pending;
+    try{pending=await cleanupPendingDriveDeletes();}catch(error){console.error('Drive cleanup:',error.message);pending=result.driveFiles.length;}
+    return res.json({deleted:result.deleted,imageCleanupPending:pending});
+  }
   res.json(result);
  }catch(error){if(uploaded)drive.remove(uploaded).catch(()=>{});res.status(400).json({error:error.message});}
 });
@@ -73,7 +78,15 @@ if(process.env.VERCEL)app.get('/api/cron/prune',async(req,res)=>{if(!process.env
 app.use('/api',(req,res)=>res.status(404).json({error:'ไม่พบ API'}));
 app.use((err,req,res,next)=>res.status(400).json({error:err.type==='entity.too.large'?'รูปภาพใหญ่เกินไป':err.message||'เกิดข้อผิดพลาด'}));
 const retention=Math.max(1,Number(process.env.RETENTION_DAYS)||30);
-async function prune(){for(const item of (await store.read()).submissions){if(['Rejected','Cancelled'].includes(item.status)&&item.image&&Date.now()-Date.parse(item.reviewedAt||item.at)>retention*86400000){try{if(item.image.startsWith('drive:'))await drive.remove(item.image.slice(6));await store.transact(s=>{const current=s.submissions.find(x=>x.id===item.id);if(current?.image===item.image){current.image='';current.evidenceRemovedAt=new Date().toISOString();}});}catch(error){console.error('Evidence retention:',error.message);}}}for(const [key,a] of attempts)if(a.until<Date.now())attempts.delete(key);}
+async function cleanupPendingDriveDeletes(){
+ const pending=(await store.read()).pendingDriveDeletes||[];
+ if(!pending.length||!await drive.connected())return pending.length;
+ const batch=pending.slice(0,25),outcomes=await Promise.allSettled(batch.map(id=>drive.remove(id)));
+ const removed=new Set(batch.filter((_,i)=>outcomes[i].status==='fulfilled'));
+ if(removed.size)await store.transact(s=>{s.pendingDriveDeletes=(s.pendingDriveDeletes||[]).filter(id=>!removed.has(id));});
+ return (await store.read()).pendingDriveDeletes?.length||0;
+}
+async function prune(){await cleanupPendingDriveDeletes();for(const item of (await store.read()).submissions){if(['Rejected','Cancelled'].includes(item.status)&&item.image&&Date.now()-Date.parse(item.reviewedAt||item.at)>retention*86400000){try{if(item.image.startsWith('drive:'))await drive.remove(item.image.slice(6));await store.transact(s=>{const current=s.submissions.find(x=>x.id===item.id);if(current?.image===item.image){current.image='';current.evidenceRemovedAt=new Date().toISOString();}});}catch(error){console.error('Evidence retention:',error.message);}}}for(const [key,a] of attempts)if(a.until<Date.now())attempts.delete(key);}
 if(!process.env.VERCEL){prune().catch(console.error);setInterval(()=>prune().catch(console.error),3600000).unref();}
 if(!process.env.VERCEL){
  if(process.argv.includes('--production')){app.use(express.static(resolve('dist')));app.get('/{*path}',(req,res)=>res.sendFile(resolve('dist/index.html')));}

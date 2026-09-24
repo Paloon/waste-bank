@@ -114,7 +114,9 @@ export function createDrive(directory,{secretStore=null,stateSecret=process.env.
 
   async function remove(id) {
     if (!validId(id)) return;
-    await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?supportsAllDrives=true`, { method: 'DELETE' });
+    const response=await fetch(`https://www.googleapis.com/drive/v3/files/${id}?supportsAllDrives=true`,
+      { method:'DELETE', headers:{Authorization:`Bearer ${await accessToken()}`} });
+    if(!response.ok&&response.status!==404)throw new Error(`Google Drive ตอบกลับ ${response.status}`);
   }
 
   return { configured, connected: async () => configured && Boolean((await loadToken())?.refresh_token),

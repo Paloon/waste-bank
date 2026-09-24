@@ -7,3 +7,4 @@
 /* Keep the self-registration entry visible above the hero illustration. */
 .hero>.btn.secondary{position:relative;z-index:1;margin-left:10px;color:#214831}
 @media(max-width:640px){.hero>.btn.secondary{display:flex;width:max-content;margin:10px 0 0}}
+.student-tools{display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}.student-tools .search-input{flex:1;min-width:210px;margin:0}.student-tools .btn{white-space:nowrap}.delete-student-list{display:flex;flex-direction:column;gap:5px;max-height:190px;overflow:auto;padding:12px;margin:14px 0;border:1px solid var(--line);border-radius:10px;font-size:.85rem}.table-wrap input[type="checkbox"]{width:18px;height:18px;accent-color:var(--green)}

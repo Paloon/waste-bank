@@ -75,6 +75,23 @@ export function act(s,actor,body){
   requireStaff();const item=s.redemptions.find(x=>x.id===p.id);fail(item?.status==='Pending Pickup','รายการนี้ดำเนินการแล้ว');if(action==='handover'){fail(p.verified===true,'กรุณาตรวจสอบตัวตนนักเรียน');item.status='Completed';item.completedAt=now();}else{fail(clean(p.reason).length>=3,'กรุณาระบุเหตุผล');tx(item.student,item.cost,'refund','คืน Coins: '+clean(p.reason),item.id);s.rewards.find(x=>x.id===item.reward).stock++;item.status='Cancelled';item.reason=clean(p.reason);}item.staff=staff.id;log(item.id,'Pending Pickup',item.status,clean(p.reason));
  }else if(action==='adjust'){
   requireStaff();fail(s.students.some(x=>x.id===p.id),'ไม่พบนักเรียน');const amount=integer(p.amount,-100000,100000);fail(amount!==0&&clean(p.reason).length>=3,'ระบุจำนวนและเหตุผล');if(Math.abs(amount)>=1000)fail(p.confirmLarge===true,'กรุณายืนยันการปรับ Coins จำนวนมาก');let before=balance(s,p.id);tx(p.id,amount,'adjustment',clean(p.reason));log(p.id,before,balance(s,p.id),clean(p.reason));
+ }else if(action==='deleteStudents'){
+  requireStaff();fail(p.confirm===true,'กรุณายืนยันการลบนักเรียน');fail(Array.isArray(p.ids)&&p.ids.length>0&&p.ids.length<=5000,'เลือกนักเรียน 1–5,000 คน');
+  const ids=new Set(p.ids);fail(ids.size===p.ids.length&&[...ids].every(id=>typeof id==='string'&&s.students.some(x=>x.id===id)),'รายชื่อนักเรียนเปลี่ยน กรุณาโหลดข้อมูลใหม่');
+  const submissions=s.submissions.filter(x=>ids.has(x.student));
+  const redemptions=s.redemptions.filter(x=>ids.has(x.student));
+  const related=new Set([...submissions,...redemptions].map(x=>x.id));
+  const driveFiles=[...new Set(submissions.map(x=>x.image).filter(x=>x?.startsWith('drive:')).map(x=>x.slice(6)))];
+  s.pendingDriveDeletes=[...new Set([...(s.pendingDriveDeletes||[]),...driveFiles])];
+  for(const item of redemptions.filter(x=>x.status==='Pending Pickup')){const reward=s.rewards.find(x=>x.id===item.reward);if(reward)reward.stock++;}
+  s.students=s.students.filter(x=>!ids.has(x.id));
+  s.submissions=s.submissions.filter(x=>!ids.has(x.student));
+  s.redemptions=s.redemptions.filter(x=>!ids.has(x.student));
+  s.ledger=s.ledger.filter(x=>!ids.has(x.student));
+  s.audit=s.audit.filter(x=>!ids.has(x.target)&&!related.has(x.target));
+  for(const request of Object.keys(s.requests))if([...ids].some(id=>request.startsWith(`student:${id}:`)))delete s.requests[request];
+  log('students',null,{deleted:ids.size},'ลบบัญชีและข้อมูลที่เกี่ยวข้อง');
+  result={deleted:ids.size,driveFiles};
  }else if(action==='reward'){
   requireStaff();fail(clean(p.name).length>=2,'กรอกชื่อรางวัล');let existing=s.rewards.find(x=>x.id===p.id);const before=existing?{...existing}:null;const item={id:existing?.id||randomUUID(),name:clean(p.name,80),description:clean(p.description),price:integer(p.price,1),stock:integer(p.stock),enabled:!!p.enabled,icon:p.icon||'badge',color:'#e2ecd9',image:image(p.image)};if(existing)Object.assign(existing,item);else s.rewards.push(item);log(item.id,before?{name:before.name,stock:before.stock,price:before.price}:null,{name:item.name,stock:item.stock,price:item.price});
  }else if(action==='promote'){
