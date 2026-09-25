@@ -16,7 +16,8 @@ app.use((req,res,next)=>{res.set('X-Content-Type-Options','nosniff');res.set('Re
 app.use(express.json({limit:'3mb'}));
 const publicStudent=p=>({id:p.id,name:p.name,number:p.number,grade:p.grade,room:p.room,status:p.status});
 const media=(value,type,id)=>value?.startsWith('drive:')?`/api/media/${type}/${encodeURIComponent(id)}`:value;
-const rewardView=r=>({...r,image:media(r.image,'reward',r.id)});
+const rewardImages=r=>r.images?.length?r.images:r.image?[{src:r.image,zoom:1,x:0,y:0}]:[];
+const rewardView=r=>{const images=rewardImages(r).map((item,index)=>({...item,src:item.src?.startsWith('drive:')?`/api/media/reward/${encodeURIComponent(r.id)}?index=${index}`:item.src}));return {...r,image:images[0]?.src||'',images};};
 const submissionView=s=>({...s,image:media(s.image,'submission',s.id)});
 const studentMedia=p=>({...p,submissions:p.submissions.map(submissionView)});
 function signed(value){return createHmac('sha256',sessionSecret).update(value).digest('base64url');}
@@ -35,30 +36,37 @@ app.get('/api/rank',async(req,res)=>{limited(req,'rank');const s=await store.rea
 app.get('/api/drive/status',async(req,res)=>{if(session(req)?.role!=='staff')return res.status(401).json({error:'กรุณาเข้าสู่ระบบเจ้าหน้าที่'});res.json({configured:drive.configured,connected:await drive.connected()});});
 app.get('/api/drive/connect',async(req,res)=>{const actor=session(req);if(actor?.role!=='staff')return res.status(401).json({error:'กรุณาเข้าสู่ระบบเจ้าหน้าที่'});try{res.redirect(drive.authUrl(actor.id));}catch(error){res.status(400).json({error:error.message});}});
 app.get('/api/drive/callback',async(req,res)=>{try{if(req.query.error)throw new Error('ไม่ได้อนุญาต Google Drive');await drive.exchange(String(req.query.code||''),String(req.query.state||''));await drive.verifyFolders();res.redirect('/?drive=connected');}catch(error){res.status(400).type('text/plain').send(`เชื่อม Google Drive ไม่สำเร็จ: ${error.message}`);}});
-app.get('/api/media/:type/:id',async(req,res)=>{try{const s=await store.read();let ref;if(req.params.type==='reward')ref=s.rewards.find(x=>x.id===req.params.id&&x.enabled)?.image;else if(req.params.type==='submission'){const actor=session(req);const item=s.submissions.find(x=>x.id===req.params.id);if(!actor||!item||(actor.role!=='staff'&&item.student!==actor.id))return res.sendStatus(403);ref=item.image;}else return res.sendStatus(404);if(!ref?.startsWith('drive:'))return res.sendStatus(404);const response=await drive.download(ref.slice(6));res.set('Content-Type',response.headers.get('content-type')||'image/jpeg');res.set('Cache-Control','private, no-store');res.send(Buffer.from(await response.arrayBuffer()));}catch(error){res.status(502).json({error:error.message});}});
+app.get('/api/media/:type/:id',async(req,res)=>{try{const s=await store.read();let ref;if(req.params.type==='reward'){const reward=s.rewards.find(x=>x.id===req.params.id);if(!reward||(!reward.enabled&&session(req)?.role!=='staff'))return res.sendStatus(404);const index=Number(req.query.index??0);if(!Number.isSafeInteger(index)||index<0||index>=5)return res.sendStatus(404);ref=rewardImages(reward)[index]?.src;}else if(req.params.type==='submission'){const actor=session(req);const item=s.submissions.find(x=>x.id===req.params.id);if(!actor||!item||(actor.role!=='staff'&&item.student!==actor.id))return res.sendStatus(403);ref=item.image;}else return res.sendStatus(404);if(!ref?.startsWith('drive:'))return res.sendStatus(404);const response=await drive.download(ref.slice(6));res.set('Content-Type',response.headers.get('content-type')||'image/jpeg');res.set('Cache-Control','private, no-store');res.send(Buffer.from(await response.arrayBuffer()));}catch(error){res.status(502).json({error:error.message});}});
 app.post('/api/action',async(req,res)=>{const actor=session(req);if(!actor)return res.status(401).json({error:'หมดเวลาใช้งาน กรุณาระบุตัวตนใหม่'});if(req.body.payload?.pin)limited(req,'confirmation');
- let uploaded=null;
+ const uploaded=[];
  try{
   const body=structuredClone(req.body),p=body.payload||{};
   delete p.digest;
   if(typeof body.key==='string'){const prior=(await store.read()).requests[`${actor.role}:${actor.id}:${body.key}`];if(prior)return res.json(prior);}
   if(body.action==='reward'){
     const existing=(await store.read()).rewards.find(x=>x.id===p.id);
-    if(existing&&p.image===`/api/media/reward/${encodeURIComponent(p.id)}`)p.image=existing.image;
+    const old=existing?rewardImages(existing):[];
+    p.images=(p.images??(p.image?[{src:p.image}]:[])).map(item=>{
+      const index=old.findIndex((prior,i)=>item.src===`/api/media/reward/${encodeURIComponent(p.id)}?index=${i}`||item.src===`/api/media/reward/${encodeURIComponent(p.id)}`&&i===0);
+      const src=index>=0?old[index].src:item.src;
+      if(typeof src==='string'&&src.startsWith('drive:')&&!old.some(prior=>prior.src===src))throw new Error('รูปภาพไม่ถูกต้อง');
+      return {...item,src};
+    });
+    delete p.image;
   }
-  if(typeof p.image==='string'&&p.image.startsWith('drive:')){
-    const existing=body.action==='reward'?(await store.read()).rewards.find(x=>x.id===p.id):null;
-    if(!existing||existing.image!==p.image)throw new Error('รูปภาพไม่ถูกต้อง');
-  }
+  if(typeof p.image==='string'&&p.image.startsWith('drive:'))throw new Error('รูปภาพไม่ถูกต้อง');
   act(structuredClone(await store.read()),actor,body);
-  if(drive.configured&&['submit','reward'].includes(body.action)){
+  if(drive.configured&&(body.action==='submit'||body.action==='reward'&&p.images.some(item=>item.src.startsWith('data:')))){
     if(!await drive.connected())throw new Error('ยังไม่ได้เชื่อม Google Drive กรุณาให้เจ้าหน้าที่เชื่อมก่อน');
-    if(p.image?.startsWith('data:')){
+    if(body.action==='reward'){
+      for(const item of p.images)if(item.src.startsWith('data:')){
+        const id=await drive.upload('rewards',item.src,`reward-${Date.now()}-${randomBytes(6).toString('hex')}.jpg`);
+        uploaded.push(id);item.src=`drive:${id}`;
+      }
+    }else if(p.image?.startsWith('data:')){
       const original=p.image;
-      const kind=body.action==='reward'?'rewards':'evidence';
-      uploaded=await drive.upload(kind,original,`${body.action}-${Date.now()}-${randomBytes(6).toString('hex')}.jpg`);
-      p.image=`drive:${uploaded}`;
-      if(body.action==='submit')p.digest=createHash('sha256').update(original).digest('hex');
+      const id=await drive.upload('evidence',original,`submit-${Date.now()}-${randomBytes(6).toString('hex')}.jpg`);
+      uploaded.push(id);p.image=`drive:${id}`;p.digest=createHash('sha256').update(original).digest('hex');
     }
   }
   if(drive.configured&&body.action==='review'&&p.status==='Approved'){
@@ -71,8 +79,9 @@ app.post('/api/action',async(req,res)=>{const actor=session(req);if(!actor)retur
     try{pending=await cleanupPendingDriveDeletes();}catch(error){console.error('Drive cleanup:',error.message);pending=result.driveFiles.length;}
     return res.json({deleted:result.deleted,imageCleanupPending:pending});
   }
+  if(body.action==='reward')try{await cleanupPendingDriveDeletes();}catch(error){console.error('Drive cleanup:',error.message);}
   res.json(result);
- }catch(error){if(uploaded)drive.remove(uploaded).catch(()=>{});res.status(400).json({error:error.message});}
+ }catch(error){for(const id of uploaded)drive.remove(id).catch(()=>{});res.status(400).json({error:error.message});}
 });
 if(process.env.VERCEL)app.get('/api/cron/prune',async(req,res)=>{if(!process.env.CRON_SECRET||req.headers.authorization!==`Bearer ${process.env.CRON_SECRET}`)return res.sendStatus(401);await prune();res.json({ok:true});});
 app.use('/api',(req,res)=>res.status(404).json({error:'ไม่พบ API'}));
