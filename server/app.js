@@ -84,7 +84,9 @@ export function createApp({
         until: Date.now() + 15000,
         data: {
           categories,
-          rewards: s.rewards.filter((r) => r.enabled).map(rewardView),
+          rewards: s.rewards
+            .filter((r) => r.enabled && !r.deletedAt)
+            .map(rewardView),
           leaderboard: ranked(s.students).map((p) => ({
             name:
               p.name.split(" ")[0] +
@@ -260,7 +262,7 @@ export function createApp({
         tab === "students"
           ? filtered.slice(page * policy.pageSize, (page + 1) * policy.pageSize)
           : students,
-      rewards: s.rewards.map(rewardView),
+      rewards: s.rewards.filter((r) => !r.deletedAt).map(rewardView),
       submissions: detail.submissions.map(submissionView),
       redemptions: detail.redemptions,
       ledger: detail.ledger,

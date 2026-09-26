@@ -17,6 +17,11 @@ const schemas = {
   submit: z.object({ category: text, image, note: text.optional() }),
   cancelSubmission: z.object({ id }),
   redeem: z.object({ id }),
+  deleteReward: z.object({
+    id,
+    version: z.number().int().nonnegative(),
+    confirm: z.literal(true),
+  }),
   profile: z.object(profile),
   review: z.object({
     id,

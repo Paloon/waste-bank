@@ -1795,6 +1795,14 @@ function App() {
                               >
                                 แก้ไขรางวัล
                               </button>
+                              <button
+                                className="btn secondary"
+                                onClick={() =>
+                                  openModal({ type: "deleteReward", item: r })
+                                }
+                              >
+                                <Trash2 size={17} /> ลบรางวัล
+                              </button>
                             </div>
                           </article>
                         ))}
@@ -2641,6 +2649,33 @@ function App() {
                   </label>
                   <Button>ยืนยันและบันทึกในบัญชี</Button>
                 </form>
+              </>
+            )}
+            {modal.type === "deleteReward" && (
+              <>
+                <h2 id="modal-title">ลบรางวัลนี้?</h2>
+                <p>{modal.item.name}</p>
+                <p>
+                  รางวัลจะหายจากร้านและหน้าจัดการ ประวัติการแลกยังอยู่
+                  รายการที่รอรับของยังส่งมอบหรือยกเลิกคืน Coins ได้
+                </p>
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      await action("deleteReward", {
+                        id: modal.item.id,
+                        version: modal.item.version,
+                        confirm: true,
+                      });
+                      await refreshAdmin();
+                      setModal(null);
+                      setNotice("ลบรางวัลแล้ว ประวัติการแลกเดิมยังอยู่");
+                    })
+                  }
+                >
+                  ยืนยันลบรางวัล
+                </Button>
               </>
             )}
             {modal.type === "reward" && (

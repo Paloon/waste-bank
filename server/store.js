@@ -504,7 +504,10 @@ export function act(s, actor, body) {
   } else if (action === "redeem") {
     requireStudent();
     const reward = s.rewards.find((x) => x.id === p.id);
-    fail(reward?.enabled && reward.stock > 0, "ของรางวัลหมดหรือไม่เปิดให้แลก");
+    fail(
+      reward?.enabled && !reward.deletedAt && reward.stock > 0,
+      "ของรางวัลหมดหรือไม่เปิดให้แลก",
+    );
     const id = randomUUID();
     tx(actor.id, -reward.price, "redemption", "แลก " + reward.name, id);
     reward.stock--;
@@ -698,12 +701,48 @@ export function act(s, actor, body) {
       "ลบบัญชีและข้อมูลที่เกี่ยวข้อง",
     );
     result = { deleted: ids.size, driveFiles };
+  } else if (action === "deleteReward") {
+    requireStaff();
+    const item = s.rewards.find((x) => x.id === p.id);
+    fail(item && !item.deletedAt, "ไม่พบรางวัลหรือรางวัลถูกลบแล้ว", 409);
+    fail(p.confirm === true, "กรุณายืนยันการลบรางวัล");
+    fail(
+      p.version === rewardVersion(item),
+      "รางวัลหรือสต็อกเปลี่ยนแล้ว กรุณาโหลดข้อมูลใหม่ก่อนลบ",
+      409,
+    );
+    const before = {
+      name: item.name,
+      enabled: item.enabled,
+      stock: item.stock,
+    };
+    const images = item.images?.length
+      ? item.images.map((x) => x.src)
+      : [item.image];
+    s.pendingDriveDeletes = [
+      ...new Set([
+        ...(s.pendingDriveDeletes || []),
+        ...images.filter((x) => x?.startsWith("drive:")).map((x) => x.slice(6)),
+      ]),
+    ];
+    item.deletedAt = now();
+    item.enabled = false;
+    item.version = rewardVersion(item) + 1;
+    item.image = "";
+    item.images = [];
+    log(
+      item.id,
+      before,
+      { deletedAt: item.deletedAt },
+      "ลบรางวัลออกจากรายการ เก็บประวัติการแลกเดิม",
+    );
   } else if (action === "reward") {
     requireStaff();
     fail(clean(p.name).length >= 2, "กรอกชื่อรางวัล");
     let existing = s.rewards.find((x) => x.id === p.id);
     const before = existing ? { ...existing } : null;
     fail(!p.id || existing, "ไม่พบรางวัล กรุณาโหลดข้อมูลใหม่", 409);
+    fail(!existing?.deletedAt, "รางวัลนี้ถูกลบแล้ว กรุณาโหลดข้อมูลใหม่", 409);
     fail(
       !existing || p.version === rewardVersion(existing),
       "รางวัลหรือสต็อกเปลี่ยนแล้ว กรุณาปิดหน้าต่างและโหลดข้อมูลใหม่",

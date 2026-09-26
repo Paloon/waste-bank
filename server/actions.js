@@ -21,7 +21,7 @@ export async function actionScope(store, actor, body) {
     scope.submissions = { ids: [p.id] };
   if (["handover", "cancelReward"].includes(action))
     scope.redemptions = { ids: [p.id] };
-  if (["redeem", "reward"].includes(action))
+  if (["redeem", "reward", "deleteReward"].includes(action))
     scope.rewards = { ids: p.id ? [p.id] : [] };
   if (action === "redeem") scope.ledger = { students: [actor.id] };
   if (action === "adjust") {
@@ -34,7 +34,7 @@ export async function actionScope(store, actor, body) {
     scope.ledger = { students: item ? [item.student] : [] };
     if (item?.reward) scope.rewards = { ids: [item.reward] };
   }
-  if (["reward", "deleteStudents"].includes(action))
+  if (["reward", "deleteReward", "deleteStudents"].includes(action))
     scope.meta = { ids: ["pendingDriveDeletes"] };
   if (action === "promote") scope.meta = { ids: ["promotedYears"] };
   if (action === "deleteStudents")
