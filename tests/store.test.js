@@ -1,22 +1,297 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {randomUUID} from 'node:crypto';
-import {seed,act,balance,earned,createStore,verify,registerStudent} from '../server/store.js';
-const staff={role:'staff',id:'teacher.mali'},student={role:'student',id:'65001'};
-const request=(action,payload,key=randomUUID())=>({action,payload,key});
-test('approval creates exactly one ledger entry; stale decisions are rejected',()=>{let {s}=seed();let item=s.submissions.find(x=>x.student==='65001');let before=balance(s,'65001');let r=request('review',{id:item.id,status:'Approved',coins:50,weight:.5});act(s,staff,r);act(s,staff,r);assert.equal(balance(s,'65001'),before+50);assert.equal(s.ledger.filter(x=>x.related===item.id).length,1);assert.throws(()=>act(s,staff,request('review',r.payload)));});
-test('redemption reserves stock, refund restores both and cannot repeat',()=>{let {s}=seed();let before=balance(s,'65001'),stock=s.rewards[1].stock;let r=request('redeem',{id:'r2',pin:'310001'});let first=act(s,student,r);assert.deepEqual(act(s,student,r),first);assert.equal(balance(s,'65001'),before-300);assert.equal(s.rewards[1].stock,stock-1);let item=s.redemptions.at(-1);act(s,staff,request('cancelReward',{id:item.id,reason:'นักเรียนเปลี่ยนใจ'}));assert.equal(balance(s,'65001'),before);assert.equal(s.rewards[1].stock,stock);assert.throws(()=>act(s,staff,request('cancelReward',{id:item.id,reason:'ซ้ำอีกครั้ง'})));});
-test('staff authorization, insufficient funds and negative stock enforced',()=>{let {s}=seed();assert.throws(()=>act(s,student,request('adjust',{id:'65001',amount:500,reason:'try'})));assert.throws(()=>act(s,staff,request('reward',{name:'test',price:1,stock:-1})));s.rewards[1].price=99999;assert.throws(()=>act(s,student,request('redeem',{id:'r2'})));assert.equal(s.rewards[1].stock,8);});
-test('handover requires verified identity and cannot refund completed rewards',()=>{let {s}=seed();let item=s.redemptions.find(x=>x.status==='Pending Pickup');assert.throws(()=>act(s,staff,request('handover',{id:item.id})));act(s,staff,request('handover',{id:item.id,verified:true}));assert.equal(item.status,'Completed');assert.ok(item.completedAt);assert.throws(()=>act(s,staff,request('cancelReward',{id:item.id,reason:'test'})));});
-test('promotion retains ledger and supports repeat year and room exceptions',()=>{let {s}=seed();let before=JSON.stringify(s.ledger);let r=request('promote',{year:2026,confirm:true,students:[{id:'65001',grade:1,room:5,status:'Active'},{id:'65006',grade:6,room:1,status:'Alumni'}]});act(s,staff,r);assert.equal(JSON.stringify(s.ledger),before);assert.equal(s.students[0].grade,'1');assert.equal(s.students[0].room,'5');assert.equal(s.students[5].status,'Alumni');assert.throws(()=>act(s,staff,request('promote',r.payload)));});
-test('duplicate image blocked and student can cancel pending submission without PIN',()=>{let {s}=seed();let r=request('submit',{category:'กระดาษ',image:'data:image/png;base64,aGVsbG8=',note:'test'});let {id}=act(s,student,r);assert.throws(()=>act(s,student,request('submit',r.payload)));act(s,student,request('cancelSubmission',{id}));assert.equal(s.submissions.at(-1).status,'Cancelled');});
-test('image size is enforced by the server even if the browser is bypassed',()=>{let {s}=seed();const oversized='data:image/png;base64,'+Buffer.alloc(400*1024+1).toString('base64');assert.throws(()=>act(s,student,request('submit',{category:'กระดาษ',image:oversized})),/400 KiB/);});
-test('monthly ranking never changes wallet; staff PIN remains hashed',()=>{const {s,staffPin}=seed();const before=balance(s,'65001');earned(s,'65001',true);assert.equal(balance(s,'65001'),before);assert.notEqual(s.staff[0].pin,staffPin);assert.ok(verify(staffPin,s.staff[0].pin));assert.ok(!('pin' in s.students[0]));});
-test('self-registration stores grade and room separately and rejects duplicates',()=>{const {s}=seed();const p={id:'70001',name:'ดารา ใจดี',number:14,grade:'2',room:'3'};const created=registerStudent(s,p);assert.equal(created.grade,'2');assert.equal(created.room,'3');assert.equal(created.number,14);assert.ok(!('pin' in created));assert.throws(()=>registerStudent(s,p),/มีบัญชีแล้ว/);assert.throws(()=>registerStudent(s,{...p,id:'70002'}),/เลขที่นี้ถูกใช้แล้ว/);assert.throws(()=>registerStudent(s,{...p,id:'70003',grade:'7'}));assert.equal(balance(s,created.id),0);});
-test('staff can bulk delete students and related data without leaving orphan records',()=>{const {s}=seed();const ids=['65001','65002'];const pending=s.redemptions.find(x=>x.student==='65001'&&x.status==='Pending Pickup');const reward=s.rewards.find(x=>x.id===pending.reward),stock=reward.stock;const submission=s.submissions.find(x=>x.student==='65001');submission.image='drive:test_file_id';s.audit.push({target:submission.id,action:'review',staff:'ครูมะลิ'});const req=request('deleteStudents',{ids,confirm:true});const result=act(s,staff,req);assert.equal(result.deleted,2);assert.deepEqual(result.driveFiles,['test_file_id']);assert.deepEqual(s.pendingDriveDeletes,['test_file_id']);assert.equal(reward.stock,stock+1);for(const collection of ['students','submissions','redemptions','ledger'])assert.ok(!s[collection].some(x=>ids.includes(x.id)||ids.includes(x.student)));assert.ok(!s.audit.some(x=>x.target==='65001'||x.target===submission.id));assert.deepEqual(act(s,staff,req),result);assert.ok(s.students.some(x=>x.id==='65003'));});
-test('bulk deletion requires staff, confirmation and existing unique IDs',()=>{const {s}=seed();const before=s.students.length;for(const [actor,payload] of [[student,{ids:['65001'],confirm:true}],[staff,{ids:['65001']}],[staff,{ids:['65001','65001'],confirm:true}],[staff,{ids:['99999'],confirm:true}]])assert.throws(()=>act(s,actor,request('deleteStudents',payload)));assert.equal(s.students.length,before);});
-test('reward gallery keeps crop settings and queues removed Drive photos',()=>{const {s}=seed();s.rewards[0].image='drive:oldRewardPhoto123';const photo={src:'data:image/jpeg;base64,cGhvdG8=',zoom:1.5,x:12,y:-8};act(s,staff,request('reward',{id:'r1',name:'สมุดรักษ์โลก',price:150,stock:24,enabled:true,images:[photo]}));assert.equal(s.rewards[0].images[0].zoom,1.5);assert.equal(s.rewards[0].image,photo.src);assert.deepEqual(s.pendingDriveDeletes,['oldRewardPhoto123']);assert.throws(()=>act(s,staff,request('reward',{id:'r1',name:'สมุด',price:1,stock:1,images:[{...photo,zoom:5}]})));assert.throws(()=>act(s,staff,request('reward',{id:'r1',name:'สมุด',price:1,stock:1,images:Array(6).fill(photo)})));});
-test('SQLite rolls back partial mutation and persists valid transactions',()=>{let dir=mkdtempSync(join(tmpdir(),'eco-test-'));let store=createStore(dir);try{let before=store.read();assert.throws(()=>store.transact(s=>{s.rewards[0].stock=-100;throw Error('interruption');}));assert.equal(store.read().rewards[0].stock,before.rewards[0].stock);store.transact(s=>act(s,staff,request('adjust',{id:'65001',amount:100,reason:'กิจกรรมโรงเรียน'})));store.close();store=createStore(dir);assert.equal(balance(store.read(),'65001'),balance(before,'65001')+100);}finally{store.close();rmSync(dir,{recursive:true,force:true});}});
+import { promotionVersion, schoolYear } from "../server/state.js";
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import {
+  seed,
+  act,
+  balance,
+  earned,
+  createStore,
+  verify,
+  registerStudent,
+} from "../server/store.js";
+const staff = { role: "staff", id: "teacher.mali" },
+  student = { role: "student", id: "65001" };
+const request = (action, payload, key = randomUUID()) => ({
+  action,
+  payload,
+  key,
+});
+test("approval creates exactly one ledger entry; stale decisions are rejected", () => {
+  let { s } = seed();
+  let item = s.submissions.find((x) => x.student === "65001");
+  let before = balance(s, "65001");
+  let r = request("review", {
+    id: item.id,
+    status: "Approved",
+    coins: 50,
+    weight: 0.5,
+  });
+  act(s, staff, r);
+  act(s, staff, r);
+  assert.equal(balance(s, "65001"), before + 50);
+  assert.equal(s.ledger.filter((x) => x.related === item.id).length, 1);
+  assert.throws(() => act(s, staff, request("review", r.payload)));
+});
+test("redemption reserves stock, refund restores both and cannot repeat", () => {
+  let { s } = seed();
+  let before = balance(s, "65001"),
+    stock = s.rewards[1].stock;
+  let r = request("redeem", { id: "r2", pin: "310001" });
+  let first = act(s, student, r);
+  assert.deepEqual(act(s, student, r), first);
+  assert.equal(balance(s, "65001"), before - 300);
+  assert.equal(s.rewards[1].stock, stock - 1);
+  let item = s.redemptions.at(-1);
+  act(
+    s,
+    staff,
+    request("cancelReward", { id: item.id, reason: "นักเรียนเปลี่ยนใจ" }),
+  );
+  assert.equal(balance(s, "65001"), before);
+  assert.equal(s.rewards[1].stock, stock);
+  assert.throws(() =>
+    act(
+      s,
+      staff,
+      request("cancelReward", { id: item.id, reason: "ซ้ำอีกครั้ง" }),
+    ),
+  );
+});
+test("staff authorization, insufficient funds and negative stock enforced", () => {
+  let { s } = seed();
+  assert.throws(() =>
+    act(
+      s,
+      student,
+      request("adjust", { id: "65001", amount: 500, reason: "try" }),
+    ),
+  );
+  assert.throws(() =>
+    act(s, staff, request("reward", { name: "test", price: 1, stock: -1 })),
+  );
+  s.rewards[1].price = 99999;
+  assert.throws(() => act(s, student, request("redeem", { id: "r2" })));
+  assert.equal(s.rewards[1].stock, 8);
+});
+test("handover requires verified identity and cannot refund completed rewards", () => {
+  let { s } = seed();
+  let item = s.redemptions.find((x) => x.status === "Pending Pickup");
+  assert.throws(() => act(s, staff, request("handover", { id: item.id })));
+  act(s, staff, request("handover", { id: item.id, verified: true }));
+  assert.equal(item.status, "Completed");
+  assert.ok(item.completedAt);
+  assert.throws(() =>
+    act(s, staff, request("cancelReward", { id: item.id, reason: "test" })),
+  );
+});
+test("promotion retains ledger and supports repeat year and room exceptions", () => {
+  let { s } = seed();
+  let before = JSON.stringify(s.ledger);
+  let r = request("promote", {
+    year: schoolYear(),
+    previewVersion: promotionVersion(s),
+    confirm: true,
+    students: [
+      ...s.students
+        .filter((x) => !["65001", "65006"].includes(x.id))
+        .map((x) => ({ ...x })),
+      { id: "65001", grade: 1, room: 5, status: "Active" },
+      { id: "65006", grade: 6, room: 1, status: "Alumni" },
+    ],
+  });
+  act(s, staff, r);
+  assert.equal(JSON.stringify(s.ledger), before);
+  assert.equal(s.students[0].grade, "1");
+  assert.equal(s.students[0].room, "5");
+  assert.equal(s.students[5].status, "Alumni");
+  assert.throws(() => act(s, staff, request("promote", r.payload)));
+});
+test("duplicate image blocked and student can cancel pending submission without PIN", () => {
+  let { s } = seed();
+  let r = request("submit", {
+    category: "กระดาษ",
+    image: "data:image/png;base64,aGVsbG8=",
+    note: "test",
+  });
+  let { id } = act(s, student, r);
+  assert.throws(() => act(s, student, request("submit", r.payload)));
+  act(s, student, request("cancelSubmission", { id }));
+  assert.equal(s.submissions.at(-1).status, "Cancelled");
+});
+test("image size is enforced by the server even if the browser is bypassed", () => {
+  let { s } = seed();
+  const oversized =
+    "data:image/png;base64," + Buffer.alloc(400 * 1024 + 1).toString("base64");
+  assert.throws(
+    () =>
+      act(
+        s,
+        student,
+        request("submit", { category: "กระดาษ", image: oversized }),
+      ),
+    /400 KiB/,
+  );
+});
+test("monthly ranking never changes wallet; staff PIN remains hashed", () => {
+  const { s, staffPin } = seed();
+  const before = balance(s, "65001");
+  earned(s, "65001", true);
+  assert.equal(balance(s, "65001"), before);
+  assert.notEqual(s.staff[0].pin, staffPin);
+  assert.ok(verify(staffPin, s.staff[0].pin));
+  assert.ok(!("pin" in s.students[0]));
+});
+test("self-registration stores grade and room separately and rejects duplicates", () => {
+  const { s } = seed();
+  const p = {
+    id: "70001",
+    name: "ดารา ใจดี",
+    number: 14,
+    grade: "2",
+    room: "3",
+  };
+  const created = registerStudent(s, p);
+  assert.equal(created.grade, "2");
+  assert.equal(created.room, "3");
+  assert.equal(created.number, 14);
+  assert.ok(!("pin" in created));
+  assert.throws(() => registerStudent(s, p), /มีบัญชีแล้ว/);
+  assert.throws(
+    () => registerStudent(s, { ...p, id: "70002" }),
+    /เลขที่นี้ถูกใช้แล้ว/,
+  );
+  assert.throws(() => registerStudent(s, { ...p, id: "70003", grade: "7" }));
+  assert.equal(balance(s, created.id), 0);
+});
+test("staff can bulk delete students and related data without leaving orphan records", () => {
+  const { s } = seed();
+  const ids = ["65001", "65002"];
+  const pending = s.redemptions.find(
+    (x) => x.student === "65001" && x.status === "Pending Pickup",
+  );
+  const reward = s.rewards.find((x) => x.id === pending.reward),
+    stock = reward.stock;
+  const submission = s.submissions.find((x) => x.student === "65001");
+  submission.image = "drive:test_file_id";
+  s.audit.push({ target: submission.id, action: "review", staff: "ครูมะลิ" });
+  const req = request("deleteStudents", { ids, confirm: true });
+  const result = act(s, staff, req);
+  assert.equal(result.deleted, 2);
+  assert.deepEqual(result.driveFiles, ["test_file_id"]);
+  assert.deepEqual(s.pendingDriveDeletes, ["test_file_id"]);
+  assert.equal(reward.stock, stock + 1);
+  for (const collection of ["students", "submissions", "redemptions", "ledger"])
+    assert.ok(
+      !s[collection].some((x) => ids.includes(x.id) || ids.includes(x.student)),
+    );
+  assert.ok(
+    !s.audit.some((x) => x.target === "65001" || x.target === submission.id),
+  );
+  assert.deepEqual(act(s, staff, req), result);
+  assert.ok(s.students.some((x) => x.id === "65003"));
+});
+test("bulk deletion requires staff, confirmation and existing unique IDs", () => {
+  const { s } = seed();
+  const before = s.students.length;
+  for (const [actor, payload] of [
+    [student, { ids: ["65001"], confirm: true }],
+    [staff, { ids: ["65001"] }],
+    [staff, { ids: ["65001", "65001"], confirm: true }],
+    [staff, { ids: ["99999"], confirm: true }],
+  ])
+    assert.throws(() => act(s, actor, request("deleteStudents", payload)));
+  assert.equal(s.students.length, before);
+});
+test("reward gallery keeps crop settings and queues removed Drive photos", () => {
+  const { s } = seed();
+  s.rewards[0].image = "drive:oldRewardPhoto123";
+  const photo = {
+    src: "data:image/jpeg;base64,cGhvdG8=",
+    zoom: 1.5,
+    x: 12,
+    y: -8,
+  };
+  act(
+    s,
+    staff,
+    request("reward", {
+      id: "r1",
+      version: s.rewards[0].version || 0,
+      name: "สมุดรักษ์โลก",
+      price: 150,
+      stock: 24,
+      enabled: true,
+      images: [photo],
+    }),
+  );
+  assert.equal(s.rewards[0].images[0].zoom, 1.5);
+  assert.equal(s.rewards[0].image, photo.src);
+  assert.deepEqual(s.pendingDriveDeletes, ["oldRewardPhoto123"]);
+  assert.throws(() =>
+    act(
+      s,
+      staff,
+      request("reward", {
+        id: "r1",
+        version: s.rewards[0].version || 0,
+        name: "สมุด",
+        price: 1,
+        stock: 1,
+        images: [{ ...photo, zoom: 5 }],
+      }),
+    ),
+  );
+  assert.throws(() =>
+    act(
+      s,
+      staff,
+      request("reward", {
+        id: "r1",
+        version: s.rewards[0].version || 0,
+        name: "สมุด",
+        price: 1,
+        stock: 1,
+        images: Array(6).fill(photo),
+      }),
+    ),
+  );
+});
+test("SQLite rolls back partial mutation and persists valid transactions", () => {
+  let dir = mkdtempSync(join(tmpdir(), "eco-test-"));
+  let store = createStore(dir);
+  try {
+    let before = store.read();
+    assert.throws(() =>
+      store.transact((s) => {
+        s.rewards[0].stock = -100;
+        throw Error("interruption");
+      }),
+    );
+    assert.equal(store.read().rewards[0].stock, before.rewards[0].stock);
+    store.transact((s) =>
+      act(
+        s,
+        staff,
+        request("adjust", {
+          id: "65001",
+          amount: 100,
+          reason: "กิจกรรมโรงเรียน",
+        }),
+      ),
+    );
+    store.close();
+    store = createStore(dir);
+    assert.equal(
+      balance(store.read(), "65001"),
+      balance(before, "65001") + 100,
+    );
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

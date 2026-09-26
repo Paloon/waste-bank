@@ -1,105 +1,73 @@
-import express from 'express';
-import { randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { resolve } from 'node:path';
-import { createStore, act, balance, earned, verify, studentView, registerStudent, categories } from './store.js';
-import { createDrive } from './drive.js';
-import { createCloudStore } from './cloud-store.js';
+import express from "express";
+import { resolve } from "node:path";
+import { randomBytes } from "node:crypto";
+import { createStore } from "./store.js";
+import { createCloudStore } from "./cloud-store.js";
+import { createDrive } from "./drive.js";
+import { createApp } from "./app.js";
+import { maintenance } from "./maintenance.js";
+import { report } from "./monitor.js";
+import { validateConfig } from "./config.js";
+validateConfig();
 
-const directory=resolve(process.env.DATA_DIR||'data');
-const cloud=Boolean(process.env.SUPABASE_URL);
-if(cloud&&!process.env.SESSION_SECRET)throw new Error('ตั้งค่า SESSION_SECRET ก่อนเปิดเว็บ');
-const sessionSecret=process.env.SESSION_SECRET||randomBytes(32).toString('hex');
-const app=express(),store=cloud?createCloudStore():createStore(directory),drive=createDrive(directory,{secretStore:cloud?store:null,stateSecret:sessionSecret}),attempts=new Map();
-if(cloud)app.set('trust proxy',1);
-app.disable('x-powered-by');
-app.use((req,res,next)=>{res.set('X-Content-Type-Options','nosniff');res.set('Referrer-Policy','same-origin');if(req.path.startsWith('/api')){res.set('Cache-Control','no-store');if(req.method==='POST'&&req.headers.origin&&req.headers.origin!==`${req.protocol}://${req.get('host')}`)return res.status(403).json({error:'แหล่งที่มาของคำขอไม่ถูกต้อง'});}next();});
-app.use(express.json({limit:'3mb'}));
-const publicStudent=p=>({id:p.id,name:p.name,number:p.number,grade:p.grade,room:p.room,status:p.status});
-const media=(value,type,id)=>value?.startsWith('drive:')?`/api/media/${type}/${encodeURIComponent(id)}`:value;
-const rewardImages=r=>r.images?.length?r.images:r.image?[{src:r.image,zoom:1,x:0,y:0}]:[];
-const rewardView=r=>{const images=rewardImages(r).map((item,index)=>({...item,src:item.src?.startsWith('drive:')?`/api/media/reward/${encodeURIComponent(r.id)}?index=${index}`:item.src}));return {...r,image:images[0]?.src||'',images};};
-const submissionView=s=>({...s,image:media(s.image,'submission',s.id)});
-const studentMedia=p=>({...p,submissions:p.submissions.map(submissionView)});
-function signed(value){return createHmac('sha256',sessionSecret).update(value).digest('base64url');}
-function session(req){const cookie=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('eco_session='))?.slice(12);if(!cookie)return null;const [value,mac]=cookie.split('.');if(!value||!mac)return null;const expected=signed(value);if(mac.length!==expected.length||!timingSafeEqual(Buffer.from(mac),Buffer.from(expected)))return null;try{const actor=JSON.parse(Buffer.from(value,'base64url').toString());return actor.expires>Date.now()?actor:null;}catch{return null;}}
-function login(res,actor){const value=Buffer.from(JSON.stringify({...actor,expires:Date.now()+120000})).toString('base64url');res.cookie('eco_session',value+'.'+signed(value),{httpOnly:true,sameSite:'strict',secure:Boolean(process.env.VERCEL)||process.env.SECURE_COOKIE==='1',maxAge:120000,path:'/'});}
-function limited(req,key){const id=req.ip+':'+key;let a=attempts.get(id);if(!a||a.until<Date.now()){a={count:0,until:Date.now()+60000};attempts.set(id,a);}a.count++;if(a.count>10)throw new Error('ลองหลายครั้งเกินไป กรุณารอ 1 นาที');}
-app.get('/api/public',async(req,res)=>{const s=await store.read();const leaderboard=s.students.filter(x=>x.status==='Active').map(p=>({name:p.name.split(' ')[0]+' '+p.name.split(' ')[1]?.slice(0,1)+'.',grade:p.grade,room:p.room,earned:earned(s,p.id),monthly:earned(s,p.id,true)})).sort((a,b)=>b.earned-a.earned);res.json({categories,rewards:s.rewards.filter(x=>x.enabled).map(rewardView),leaderboard,stats:{weight:s.submissions.reduce((n,x)=>n+(x.weight||0),0),coins:s.ledger.filter(x=>x.type==='recycle').reduce((n,x)=>n+x.amount,0),students:s.students.filter(x=>x.status==='Active').length,submissions:s.submissions.filter(x=>x.status==='Approved').length}});});
-app.post('/api/identify',async(req,res)=>{limited(req,'identify');const p=(await store.read()).students.find(x=>x.id===String(req.body.id));if(!p||p.status!=='Active')return res.status(404).json({error:'ไม่พบรหัสนักเรียน หรือบัญชีไม่พร้อมใช้งาน'});login(res,{role:'student',id:p.id});res.json(publicStudent(p));});
-app.post('/api/register',async(req,res)=>{limited(req,'register');const p=await store.transact(s=>registerStudent(s,req.body||{}));login(res,{role:'student',id:p.id});res.status(201).json(publicStudent(p));});
-app.post('/api/login',async(req,res)=>{limited(req,'staff');const p=(await store.read()).staff.find(x=>x.id===req.body.id);if(!p||!verify(req.body.pin,p.pin))return res.status(401).json({error:'ชื่อบัญชีหรือ PIN ไม่ถูกต้อง'});login(res,{role:'staff',id:p.id,name:p.name});res.json({name:p.name});});
-app.post('/api/logout',(req,res)=>{res.clearCookie('eco_session',{path:'/'});res.json({ok:true});});
-app.post('/api/session',(req,res)=>{const actor=session(req);if(!actor)return res.status(401).json({error:'หมดเวลาใช้งาน'});login(res,{role:actor.role,id:actor.id,name:actor.name});res.json({ok:true});});
-app.get('/api/student',async(req,res)=>{const actor=session(req);if(!actor)return res.status(401).json({error:'หมดเวลาใช้งาน กรุณาระบุตัวตนใหม่'});res.json(studentMedia(studentView(await store.read(),actor.role==='staff'?req.query.id:actor.id)));});
-app.get('/api/admin',async(req,res)=>{const actor=session(req);if(actor?.role!=='staff')return res.status(401).json({error:'กรุณาเข้าสู่ระบบเจ้าหน้าที่'});const s=await store.read();res.json({...s,staff:undefined,requests:undefined,rewards:s.rewards.map(rewardView),submissions:s.submissions.map(submissionView),students:s.students.map(p=>({...publicStudent(p),balance:balance(s,p.id)})),name:actor.name,drive:{configured:drive.configured,connected:await drive.connected()}});});
-app.get('/api/rank',async(req,res)=>{limited(req,'rank');const s=await store.read();const q=String(req.query.q||'').trim();const monthly=req.query.period==='month';let list=s.students.filter(x=>x.status==='Active'&&(!req.query.grade||x.grade===req.query.grade)&&(!req.query.room||x.room===req.query.room)).sort((a,b)=>earned(s,b.id,monthly)-earned(s,a.id,monthly));res.json(list.map((x,i)=>({name:x.name.split(' ')[0],grade:x.grade,room:x.room,earned:earned(s,x.id,monthly),rank:i+1,match:x.id===q||x.name.includes(q)})).filter(x=>q&&x.match).map(({match,...p})=>p));});
-app.get('/api/drive/status',async(req,res)=>{if(session(req)?.role!=='staff')return res.status(401).json({error:'กรุณาเข้าสู่ระบบเจ้าหน้าที่'});res.json({configured:drive.configured,connected:await drive.connected()});});
-app.get('/api/drive/connect',async(req,res)=>{const actor=session(req);if(actor?.role!=='staff')return res.status(401).json({error:'กรุณาเข้าสู่ระบบเจ้าหน้าที่'});try{res.redirect(drive.authUrl(actor.id));}catch(error){res.status(400).json({error:error.message});}});
-app.get('/api/drive/callback',async(req,res)=>{try{if(req.query.error)throw new Error('ไม่ได้อนุญาต Google Drive');await drive.exchange(String(req.query.code||''),String(req.query.state||''));await drive.verifyFolders();res.redirect('/?drive=connected');}catch(error){res.status(400).type('text/plain').send(`เชื่อม Google Drive ไม่สำเร็จ: ${error.message}`);}});
-app.get('/api/media/:type/:id',async(req,res)=>{try{const s=await store.read();let ref;if(req.params.type==='reward'){const reward=s.rewards.find(x=>x.id===req.params.id);if(!reward||(!reward.enabled&&session(req)?.role!=='staff'))return res.sendStatus(404);const index=Number(req.query.index??0);if(!Number.isSafeInteger(index)||index<0||index>=5)return res.sendStatus(404);ref=rewardImages(reward)[index]?.src;}else if(req.params.type==='submission'){const actor=session(req);const item=s.submissions.find(x=>x.id===req.params.id);if(!actor||!item||(actor.role!=='staff'&&item.student!==actor.id))return res.sendStatus(403);ref=item.image;}else return res.sendStatus(404);if(!ref?.startsWith('drive:'))return res.sendStatus(404);const response=await drive.download(ref.slice(6));res.set('Content-Type',response.headers.get('content-type')||'image/jpeg');res.set('Cache-Control','private, no-store');res.send(Buffer.from(await response.arrayBuffer()));}catch(error){res.status(502).json({error:error.message});}});
-app.post('/api/action',async(req,res)=>{const actor=session(req);if(!actor)return res.status(401).json({error:'หมดเวลาใช้งาน กรุณาระบุตัวตนใหม่'});if(req.body.payload?.pin)limited(req,'confirmation');
- const uploaded=[];
- try{
-  const body=structuredClone(req.body),p=body.payload||{};
-  delete p.digest;
-  if(typeof body.key==='string'){const prior=(await store.read()).requests[`${actor.role}:${actor.id}:${body.key}`];if(prior)return res.json(prior);}
-  if(body.action==='reward'){
-    const existing=(await store.read()).rewards.find(x=>x.id===p.id);
-    const old=existing?rewardImages(existing):[];
-    p.images=(p.images??(p.image?[{src:p.image}]:[])).map(item=>{
-      const index=old.findIndex((prior,i)=>item.src===`/api/media/reward/${encodeURIComponent(p.id)}?index=${i}`||item.src===`/api/media/reward/${encodeURIComponent(p.id)}`&&i===0);
-      const src=index>=0?old[index].src:item.src;
-      if(typeof src==='string'&&src.startsWith('drive:')&&!old.some(prior=>prior.src===src))throw new Error('รูปภาพไม่ถูกต้อง');
-      return {...item,src};
-    });
-    delete p.image;
-  }
-  if(typeof p.image==='string'&&p.image.startsWith('drive:'))throw new Error('รูปภาพไม่ถูกต้อง');
-  act(structuredClone(await store.read()),actor,body);
-  if(drive.configured&&(body.action==='submit'||body.action==='reward'&&p.images.some(item=>item.src.startsWith('data:')))){
-    if(!await drive.connected())throw new Error('ยังไม่ได้เชื่อม Google Drive กรุณาให้เจ้าหน้าที่เชื่อมก่อน');
-    if(body.action==='reward'){
-      for(const item of p.images)if(item.src.startsWith('data:')){
-        const id=await drive.upload('rewards',item.src,`reward-${Date.now()}-${randomBytes(6).toString('hex')}.jpg`);
-        uploaded.push(id);item.src=`drive:${id}`;
-      }
-    }else if(p.image?.startsWith('data:')){
-      const original=p.image;
-      const id=await drive.upload('evidence',original,`submit-${Date.now()}-${randomBytes(6).toString('hex')}.jpg`);
-      uploaded.push(id);p.image=`drive:${id}`;p.digest=createHash('sha256').update(original).digest('hex');
-    }
-  }
-  if(drive.configured&&body.action==='review'&&p.status==='Approved'){
-    const item=(await store.read()).submissions.find(x=>x.id===p.id);
-    if(item?.image?.startsWith('drive:'))await drive.moveToWaste(item.image.slice(6));
-  }
-  const result=await store.transact(s=>act(s,actor,body));
-  if(body.action==='deleteStudents'){
-    let pending;
-    try{pending=await cleanupPendingDriveDeletes();}catch(error){console.error('Drive cleanup:',error.message);pending=result.driveFiles.length;}
-    return res.json({deleted:result.deleted,imageCleanupPending:pending});
-  }
-  if(body.action==='reward')try{await cleanupPendingDriveDeletes();}catch(error){console.error('Drive cleanup:',error.message);}
-  res.json(result);
- }catch(error){for(const id of uploaded)drive.remove(id).catch(()=>{});res.status(400).json({error:error.message});}
+const directory = resolve(process.env.DATA_DIR || "data");
+const production =
+  process.env.NODE_ENV !== "test" &&
+  (process.env.NODE_ENV === "production" ||
+    Boolean(process.env.VERCEL) ||
+    process.argv.includes("--production"));
+const cloud = Boolean(process.env.SUPABASE_URL);
+if (process.env.VERCEL && !cloud) throw new Error("Vercel requires Supabase");
+if (
+  production &&
+  (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)
+)
+  throw new Error("Set a random SESSION_SECRET of at least 32 bytes");
+if (production && !process.env.PUBLIC_BASE_URL?.startsWith("https://"))
+  throw new Error("Set HTTPS PUBLIC_BASE_URL");
+const store = cloud ? createCloudStore() : createStore(directory);
+const drive = createDrive(directory, {
+  secretStore: cloud ? store : null,
+  controlStore: store,
+  stateSecret: process.env.SESSION_SECRET || randomBytes(32).toString("hex"),
 });
-if(process.env.VERCEL)app.get('/api/cron/prune',async(req,res)=>{if(!process.env.CRON_SECRET||req.headers.authorization!==`Bearer ${process.env.CRON_SECRET}`)return res.sendStatus(401);await prune();res.json({ok:true});});
-app.use('/api',(req,res)=>res.status(404).json({error:'ไม่พบ API'}));
-app.use((err,req,res,next)=>res.status(400).json({error:err.type==='entity.too.large'?'รูปภาพใหญ่เกินไป':err.message||'เกิดข้อผิดพลาด'}));
-const retention=Math.max(1,Number(process.env.RETENTION_DAYS)||30);
-async function cleanupPendingDriveDeletes(){
- const pending=(await store.read()).pendingDriveDeletes||[];
- if(!pending.length||!await drive.connected())return pending.length;
- const batch=pending.slice(0,25),outcomes=await Promise.allSettled(batch.map(id=>drive.remove(id)));
- const removed=new Set(batch.filter((_,i)=>outcomes[i].status==='fulfilled'));
- if(removed.size)await store.transact(s=>{s.pendingDriveDeletes=(s.pendingDriveDeletes||[]).filter(id=>!removed.has(id));});
- return (await store.read()).pendingDriveDeletes?.length||0;
-}
-async function prune(){await cleanupPendingDriveDeletes();for(const item of (await store.read()).submissions){if(['Rejected','Cancelled'].includes(item.status)&&item.image&&Date.now()-Date.parse(item.reviewedAt||item.at)>retention*86400000){try{if(item.image.startsWith('drive:'))await drive.remove(item.image.slice(6));await store.transact(s=>{const current=s.submissions.find(x=>x.id===item.id);if(current?.image===item.image){current.image='';current.evidenceRemovedAt=new Date().toISOString();}});}catch(error){console.error('Evidence retention:',error.message);}}}for(const [key,a] of attempts)if(a.until<Date.now())attempts.delete(key);}
-if(!process.env.VERCEL){prune().catch(console.error);setInterval(()=>prune().catch(console.error),3600000).unref();}
-if(!process.env.VERCEL){
- if(process.argv.includes('--production')){app.use(express.static(resolve('dist')));app.get('/{*path}',(req,res)=>res.sendFile(resolve('dist/index.html')));}
- else{const {createServer}=await import('vite');const vite=await createServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares);}
- const port=Number(process.env.PORT)||3000;app.listen(port,process.env.HOST||'127.0.0.1',()=>console.log(`waste-bank: http://localhost:${port}`));
+const app = createApp({
+  store,
+  drive,
+  production,
+  secure: production || process.env.SECURE_COOKIE === "1",
+});
+if (!process.env.VERCEL) {
+  if (process.argv.includes("--production")) {
+    app.use(express.static(resolve("dist")));
+    app.get("/{*path}", (req, res) => res.sendFile(resolve("dist/index.html")));
+  } else {
+    const { createServer } = await import("vite");
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  }
+  const port = Number(process.env.PORT) || 3000;
+  app.listen(port, process.env.HOST || "127.0.0.1", () =>
+    console.log(`waste-bank: http://localhost:${port}`),
+  );
+  if (process.env.MAINTENANCE_DISABLED !== "1") {
+    let running = false;
+    const run = async () => {
+      if (running) return;
+      running = true;
+      try {
+        await maintenance(store, drive);
+      } catch {
+        await report(store, "MAINTENANCE_FAILED");
+      } finally {
+        running = false;
+      }
+    };
+    run();
+    setInterval(run, 3600000).unref();
+  }
 }
 export default app;

@@ -28,3 +28,7 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Encrypted backups and local operational logs
+.backups/
+*.backup.log
