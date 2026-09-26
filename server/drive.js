@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes, createHmac, timingSafeEqual } from "node:crypto";
+import { deploymentBaseUrl } from "./config.js";
 
 const SCOPE = "https://www.googleapis.com/auth/drive";
 const validId = (value) => /^[A-Za-z0-9_-]{10,}$/.test(value || "");
@@ -28,7 +29,7 @@ export function createDrive(
     !secretStore && existsSync(file)
       ? JSON.parse(readFileSync(file, "utf8"))
       : null;
-  const redirectUri = `${(process.env.PUBLIC_BASE_URL || `http://localhost:${Number(process.env.PORT) || 3000}`).replace(/\/$/, "")}/api/drive/callback`;
+  const redirectUri = `${(deploymentBaseUrl() || `http://localhost:${Number(process.env.PORT) || 3000}`).replace(/\/$/, "")}/api/drive/callback`;
   const sign = (value) =>
     createHmac("sha256", stateSecret || "local-drive")
       .update(value)

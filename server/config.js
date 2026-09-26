@@ -19,3 +19,5 @@ export function validateConfig(env = process.env) {
   )
     throw Error("SCHOOL_YEAR must be a Gregorian year from 2000 to 2200");
 }
+export const deploymentBaseUrl = () =>
+  (process.env.WASTE_BANK_BASE_URL || process.env.PUBLIC_BASE_URL || "").trim();

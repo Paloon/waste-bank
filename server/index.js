@@ -7,7 +7,7 @@ import { createDrive } from "./drive.js";
 import { createApp } from "./app.js";
 import { maintenance } from "./maintenance.js";
 import { report } from "./monitor.js";
-import { validateConfig } from "./config.js";
+import { validateConfig, deploymentBaseUrl } from "./config.js";
 validateConfig();
 
 const directory = resolve(process.env.DATA_DIR || "data");
@@ -23,8 +23,8 @@ if (
   (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)
 )
   throw new Error("Set a random SESSION_SECRET of at least 32 bytes");
-if (production && !process.env.PUBLIC_BASE_URL?.startsWith("https://"))
-  throw new Error("Set HTTPS PUBLIC_BASE_URL");
+if (production && !deploymentBaseUrl().startsWith("https://"))
+  throw new Error("Set HTTPS WASTE_BANK_BASE_URL or PUBLIC_BASE_URL");
 const store = cloud ? createCloudStore() : createStore(directory);
 const drive = createDrive(directory, {
   secretStore: cloud ? store : null,

@@ -24,13 +24,14 @@ import {
 import { promotionVersion, schoolYear } from "./state.js";
 import { audit, report } from "./monitor.js";
 import { maintenance } from "./maintenance.js";
+import { deploymentBaseUrl } from "./config.js";
 
 export function createApp({
   store,
   drive,
   production = false,
   secure = false,
-  baseUrl = process.env.PUBLIC_BASE_URL,
+  baseUrl = deploymentBaseUrl(),
 }) {
   const app = express(),
     security = createSecurity(store, { secure });
