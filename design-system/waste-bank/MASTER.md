@@ -1,203 +1,41 @@
-# Design System Master File
+# Waste Bank Design System
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
+This file describes the implemented school recycling application. Keep it aligned with `src/style.css`; product requirements and tested usability take precedence over generic skill suggestions.
 
----
+## Audience and purpose
 
-**Project:** Waste Bank
-**Generated:** 2026-09-14 21:32:31
-**Category:** Educational App
+Students submit recycling evidence, check Coins, and redeem rewards. Staff review evidence and manage pickup. Support personal mobile devices and shared school computers. Use clear Thai labels and practical instructions beside the relevant action.
 
----
+## Colors and typography
 
-## Global Rules
+| Role           | Value     | Token           |
+| -------------- | --------- | --------------- |
+| Primary        | `#185c3b` | `--green`       |
+| Accent         | `#def69b` | `--lime`        |
+| Background     | `#f6f8f4` | root background |
+| Text           | `#253c31` | root color      |
+| Secondary text | `#536456` | `--muted`       |
+| Borders        | `#e0e7de` | `--line`        |
 
-### Color Palette
+Fonts: Outfit for Latin text, Noto Sans Thai for Thai text, sans-serif fallback. Base size 16px. Mobile content and secondary information should be at least 14px; form inputs use 16px. Compact navigation may use 12px. Check contrast against each actual background; normal text should reach 4.5:1. Use tabular numerals for balances and comparisons.
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#0891B2` | `--color-primary` |
-| Secondary | `#22D3EE` | `--color-secondary` |
-| CTA/Accent | `#22C55E` | `--color-cta` |
-| Background | `#ECFEFF` | `--color-background` |
-| Text | `#164E63` | `--color-text` |
+## Layout and components
 
-**Color Notes:** Electric cyan + eco green
+- Preserve the green school recycling identity and softly rounded cards.
+- On mobile, keep the hero compact and place wallet/reward actions in readable horizontal cards. Avoid decorative English labels that crowd the tasks.
+- Staff evidence review uses one column on mobile, with large evidence images and readable metadata.
+- Use Lucide icons consistently. Decorative icons should be hidden from assistive technology.
+- Touch actions should have at least 44px targets. Provide visible keyboard focus and meaningful button labels.
+- Show labels for inputs, useful errors and progress feedback. Keep success/status announcements accessible without announcing a countdown every second.
+- Show preparation instructions above evidence upload and explain approval before submission. Do not invent pickup locations or school procedures.
+- Identification by student number selects an account; it does not verify the student's identity. Use neutral account-selection wording.
 
-### Typography
+## Shared-device privacy and success screens
 
-- **Heading Font:** Inter
-- **Body Font:** Inter
-- **Mood:** spatial, legible, glass, system, clean, neutral
-- **Google Fonts:** [Inter + Inter](https://fonts.google.com/share?selection.family=Inter:wght@300;400;500;600)
+Idle logout remains 90 seconds, with a warning and a continue action. After a completed submission or redemption, log out immediately and retain only the success details needed by the student. Clear the result after 60 seconds. Show the countdown and provide an explicit continue action that starts another 60 seconds. Allow copying the pickup code; show a manual fallback if clipboard access fails. Users may return to the home screen immediately.
 
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-```
+## Motion and verification
 
-### Spacing Variables
+Use short transitions on explicit properties, with `prefers-reduced-motion` support. Do not require animation for immediate feedback.
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
-
-### Shadow Depths
-
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
-
----
-
-## Component Specs
-
-### Buttons
-
-```css
-/* Primary Button */
-.btn-primary {
-  background: #22C55E;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #0891B2;
-  border: 2px solid #0891B2;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-```
-
-### Cards
-
-```css
-.card {
-  background: #ECFEFF;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
-
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #0891B2;
-  outline: none;
-  box-shadow: 0 0 0 3px #0891B220;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
-```
-
----
-
-## Style Guidelines
-
-**Style:** Micro-interactions
-
-**Keywords:** Small animations, gesture-based, tactile feedback, subtle animations, contextual interactions, responsive
-
-**Best For:** Mobile apps, touchscreen UIs, productivity tools, user-friendly, consumer apps, interactive components
-
-**Key Effects:** Small hover (50-100ms), loading spinners, success/error state anim, gesture-triggered (swipe/pinch), haptic
-
-### Page Pattern
-
-**Pattern Name:** Minimal Single Column
-
-- **Conversion Strategy:** Single CTA focus. Large typography. Lots of whitespace. No nav clutter. Mobile-first.
-- **CTA Placement:** Center, large CTA button
-- **Section Order:** 1. Hero headline, 2. Short description, 3. Benefit bullets (3 max), 4. CTA, 5. Footer
-
----
-
-## Anti-Patterns (Do NOT Use)
-
-- ❌ Dark modes
-- ❌ Complex jargon
-
-### Additional Forbidden Patterns
-
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
-
----
-
-## Pre-Delivery Checklist
-
-Before delivering any UI code, verify:
-
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+Check mobile widths 375/390px, tablet 768px, and desktop 1280px or wider. Verify no page overflow, readable Thai wrapping, keyboard access, evidence upload, redemption, countdown renewal, and automatic clearing. Run the existing unit/API tests, production build, and browser regression suite after changes affecting these flows.

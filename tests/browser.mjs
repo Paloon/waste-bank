@@ -77,6 +77,18 @@ try {
   console.log("Testing submission");
   await byName("ส่งขยะ").click();
   await identify();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("heading", { name: "ก่อนถ่ายรูป" }).waitFor();
+  assert.ok(
+    await page.getByRole("heading", { name: "ก่อนถ่ายรูป" }).isVisible(),
+  );
+  assert.ok(await page.locator(".submission-feedback").isVisible());
+  assert.ok(await byName("เปลี่ยนบัญชี").isVisible());
+  assert.equal(
+    await page.getByText("ยืนยันบัญชีแล้ว", { exact: true }).count(),
+    0,
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page
     .locator("input[type=file]")
     .last()
@@ -109,7 +121,30 @@ try {
   await identify();
   await byName("ยืนยันแลก 150 Coins").click();
   await page.getByRole("heading", { name: "จองรางวัลแล้ว!" }).waitFor();
-  await byName("กลับหน้าหลัก").click();
+  const pickupCode = await page.locator(".pickup-code strong").innerText();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await byName("คัดลอกรหัส").click();
+  await page.getByText("คัดลอกรหัสรับรางวัลแล้ว", { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(() => navigator.clipboard.readText()),
+    pickupCode,
+  );
+  await page.clock.fastForward(13000);
+  assert.ok(
+    await page.getByRole("heading", { name: "จองรางวัลแล้ว!" }).isVisible(),
+  );
+  await byName("ใช้งานต่อ").click();
+  await page.clock.fastForward(50000);
+  assert.ok(
+    await page.getByRole("heading", { name: "จองรางวัลแล้ว!" }).isVisible(),
+  );
+  assert.match(
+    await page.locator(".success-screen > small").innerText(),
+    /10 วินาที/,
+  );
+  await page.clock.fastForward(11000);
+  await byName("เริ่มส่งขยะ").waitFor();
+  assert.equal(await page.locator(".pickup-code").count(), 0);
   await byName("Coins ของฉัน").click();
   await identify();
   await byName("ประวัติ Coins").click();

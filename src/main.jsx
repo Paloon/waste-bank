@@ -13,7 +13,6 @@ import {
   Home,
   Camera,
   Upload,
-  Check,
   CheckCircle2,
   X,
   LogOut,
@@ -82,6 +81,8 @@ function App() {
     [year, setYear] = useState(new Date().getFullYear()),
     [image, setImage] = useState("");
   const [selectedStudents, setSelectedStudents] = useState([]);
+  const [successUntil, setSuccessUntil] = useState(0),
+    [successRemaining, setSuccessRemaining] = useState(0);
   const [idleRemaining, setIdleRemaining] = useState(null),
     [adminPage, setAdminPage] = useState(0),
     [previewVersion, setPreviewVersion] = useState("");
@@ -117,6 +118,8 @@ function App() {
     setNote("");
     setModal(null);
     setSuccess(null);
+    setSuccessUntil(0);
+    setSuccessRemaining(0);
     setImage("");
     setQuery("");
     setRanks(null);
@@ -134,6 +137,23 @@ function App() {
     api("logout", {}).catch(() => {});
     refresh().catch(() => {});
   };
+  useEffect(() => {
+    if (page !== "success" || !successUntil) return;
+    const update = () =>
+      setSuccessRemaining(
+        Math.max(0, Math.ceil((successUntil - Date.now()) / 1000)),
+      );
+    update();
+    const countdown = setInterval(update, 1000);
+    successTimer.current = setTimeout(
+      home,
+      Math.max(0, successUntil - Date.now()),
+    );
+    return () => {
+      clearInterval(countdown);
+      clearTimeout(successTimer.current);
+    };
+  }, [page, successUntil]);
   useEffect(() => {
     const activity = () => {
       lastActivity.current = Date.now();
@@ -254,7 +274,8 @@ function App() {
     setPage("success");
     api("logout", {}).catch(() => {});
     refresh().catch(() => {});
-    successTimer.current = setTimeout(home, policy.successMs);
+    setSuccessRemaining(Math.ceil(policy.successMs / 1000));
+    setSuccessUntil(Date.now() + policy.successMs);
   };
   async function refreshAdmin(
     target = adminTab,
@@ -613,7 +634,7 @@ function App() {
                 <section className="home-grid">
                   <div className="hero">
                     <div className="hero-tag">
-                      <Leaf size={16} /> SMALL ACTIONS. BIG IMPACT.
+                      <Leaf size={16} /> ธนาคารขยะโรงเรียน
                     </div>
                     <h1>
                       ขยะของเธอ
@@ -641,7 +662,7 @@ function App() {
                       สมัครสมาชิกนักเรียน
                     </button>
                     <div className="hero-bottom">
-                      <span className="mini-avatars">🌱 ♻️ 🌎</span>
+                      <Leaf size={18} aria-hidden="true" />
                       <span>ทุกชิ้นที่แยก คืออีกก้าวที่สำคัญ</span>
                     </div>
                     <div className="recycle-mark" aria-hidden="true">
@@ -663,8 +684,8 @@ function App() {
                       </span>
                       <ArrowUpRight className="corner-arrow" />
                       <div>
-                        <small>MY ECO WALLET</small>
-                        <h2>วันนี้มี Coins เท่าไหร่?</h2>
+                        <small>บัญชีของฉัน</small>
+                        <h2>ดู Coins และประวัติ</h2>
                         <p>เช็กยอดสะสมและประวัติของฉัน</p>
                       </div>
                     </button>
@@ -677,8 +698,8 @@ function App() {
                       </span>
                       <ArrowUpRight className="corner-arrow" />
                       <div>
-                        <small>A LITTLE THANK YOU</small>
-                        <h2>ความดีมีของรางวัล</h2>
+                        <small>ร้านรางวัล</small>
+                        <h2>เลือกแลกรางวัล</h2>
                         <p>เลือกของที่ชอบ แล้วใช้ Coins แลกเลย</p>
                       </div>
                     </button>
@@ -729,7 +750,11 @@ function App() {
                     </div>
                     <div className="steps">
                       {[
-                        [Camera, "แยกแล้วถ่าย", "ถ่ายรูปขยะที่แยกไว้"],
+                        [
+                          Camera,
+                          "แยกแล้วถ่าย",
+                          "ล้างขยะ แยกประเภท แล้วถ่ายรูป",
+                        ],
                         [ShieldCheck, "รอครูตรวจ", "รับ Coins เมื่ออนุมัติ"],
                         [Gift, "แลกของที่ชอบ", "รับรางวัลกับคุณครู"],
                       ].map(([Icon, title, desc], i) => (
@@ -855,6 +880,13 @@ function App() {
                       });
                     }}
                   >
+                    <div className="submission-help">
+                      <h2>ก่อนถ่ายรูป</h2>
+                      <p>
+                        เทน้ำออก ล้างให้สะอาด และแยกตามประเภท
+                        ให้ภาพเห็นชนิดขยะและจำนวนชัดเจน
+                      </p>
+                    </div>
                     <div className="upload-zone">
                       {photo ? (
                         <img
@@ -923,6 +955,10 @@ function App() {
                     >
                       ส่งขยะให้คุณครูตรวจ <ArrowRight size={19} />
                     </Button>
+                    <p className="submission-feedback">
+                      ได้รับ Coins หลังเจ้าหน้าที่ตรวจและอนุมัติแล้วเท่านั้น
+                      หากไม่ทราบจุดส่งขยะ ให้สอบถามครูผู้ดูแลธนาคารขยะ
+                    </p>
                   </form>
                 </section>
                 <aside>
@@ -933,17 +969,13 @@ function App() {
                       ม.{student.grade}/{student.room} · เลขที่{" "}
                       {student.number || "—"} · {student.id}
                     </p>
-                    <span className="badge approved">
-                      <Check size={14} /> ยืนยันบัญชีแล้ว
-                    </span>
-                  </div>
-                  <div className="tip">
-                    <Leaf />
-                    <h3>แยกนิดเดียว ช่วยโลกได้เยอะ</h3>
-                    <p>เทน้ำออก ล้างให้สะอาด และแยกตามประเภทก่อนส่งทุกครั้ง</p>
-                    <small>
-                      Coins จะได้รับหลังจากเจ้าหน้าที่ตรวจแล้วเท่านั้น
-                    </small>
+                    <span className="badge approved">กำลังใช้บัญชีนี้</span>
+                    <button
+                      className="text-button"
+                      onClick={() => identify("submit")}
+                    >
+                      เปลี่ยนบัญชี
+                    </button>
                   </div>
                 </aside>
               </div>
@@ -1260,6 +1292,24 @@ function App() {
                   <div className="pickup-code">
                     <span>รหัสรับรางวัล · แสดงให้เจ้าหน้าที่</span>
                     <strong>{success.code}</strong>
+                    <button
+                      className="btn secondary"
+                      onClick={() =>
+                        run(async () => {
+                          try {
+                            await navigator.clipboard.writeText(success.code);
+                            setNotice("คัดลอกรหัสรับรางวัลแล้ว");
+                          } catch {
+                            throw new Error(
+                              "คัดลอกไม่ได้ กรุณาจดรหัสหรือถ่ายภาพหน้าจอไว้",
+                            );
+                          }
+                        })
+                      }
+                      disabled={busy}
+                    >
+                      คัดลอกรหัส
+                    </button>
                     <p className="pickup-instructions">
                       {success.pickupInstructions ||
                         "กรุณาติดต่อเจ้าหน้าที่ที่จุดรับรางวัล"}
@@ -1270,7 +1320,19 @@ function App() {
                 <button className="btn primary" onClick={home}>
                   กลับหน้าหลัก <Home size={18} />
                 </button>
-                <small>หน้าจอนี้จะปิดอัตโนมัติภายใน 12 วินาที</small>
+                <button
+                  className="btn secondary"
+                  onClick={() => {
+                    lastActivity.current = Date.now();
+                    setSuccessRemaining(Math.ceil(policy.successMs / 1000));
+                    setSuccessUntil(Date.now() + policy.successMs);
+                  }}
+                >
+                  ใช้งานต่อ
+                </button>
+                <small>
+                  กลับหน้าหลักและล้างข้อมูลใน {successRemaining} วินาที
+                </small>
               </div>
             )}
             {page === "admin" && admin && (
