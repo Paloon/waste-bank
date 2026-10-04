@@ -25,6 +25,7 @@ import { promotionVersion, schoolYear } from "./state.js";
 import { audit, report } from "./monitor.js";
 import { maintenance } from "./maintenance.js";
 import { deploymentBaseUrl } from "./config.js";
+import { reportRange, selectReportSource, buildReport } from "./reports.js";
 
 export function createApp({
   store,
@@ -207,6 +208,30 @@ export function createApp({
         .map(submissionView),
       redemptions: history.redemptions.slice(0, policy.pageSize),
     });
+  });
+  app.get("/api/reports", async (req, res) => {
+    await security.actor(req, { staff: true });
+    await security.limit(req, "reports", { limit: 60 });
+    const range = reportRange(req.query.from, req.query.to);
+    const source = store.reportSource
+      ? await store.reportSource(range)
+      : selectReportSource(
+          await store.read({
+            students: {},
+            submissions: {},
+            redemptions: {},
+            ledger: {},
+            audit: {},
+          }),
+          range,
+        );
+    res.json(
+      buildReport(source, range, {
+        group: String(req.query.group || "overview"),
+        day: String(req.query.day || ""),
+        page: Number(req.query.page || 0),
+      }),
+    );
   });
   app.get("/api/admin", async (req, res) => {
     const actor = await security.actor(req, { staff: true }),

@@ -115,6 +115,52 @@ try {
   await page.getByLabel("น้ำหนักที่ชั่งจริง (กก.)").fill("0.75");
   await byName("ยืนยันผลการตรวจ").click();
   await page.getByText("บันทึกผลตรวจแล้ว").waitFor();
+  console.log("Testing period reports");
+  await byName("รายงานตามช่วงเวลา").click();
+  await page.locator(".report-metrics").waitFor();
+  await byName("วันนี้").click();
+  await page.locator(".report-metrics").waitFor();
+  await page
+    .locator(".report-tabs")
+    .getByRole("button", { name: "ขยะ", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "ขยะแยกประเภท", exact: true })
+    .waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+  );
+  for (const label of ["Coins", "นักเรียน", "รางวัล", "สรุป"]) {
+    await page
+      .locator(".report-tabs")
+      .getByRole("button", { name: label, exact: true })
+      .click();
+    await page.locator(".report-metrics").waitFor();
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+    );
+  }
+  await page
+    .getByRole("button", { name: /^ดูรายละเอียดวันที่/ })
+    .first()
+    .click();
+  await byName("ดูทั้งช่วง").waitFor();
+  await byName("ดูทั้งช่วง").click();
+  await page.locator(".report-metrics").waitFor();
+  await page.getByLabel("วันเริ่มรายงาน").fill("2001-01-01");
+  await page.getByLabel("วันสิ้นสุดรายงาน").fill("2001-01-01");
+  await byName("ดูรายงาน").click();
+  await page.getByText("ไม่พบรายการในช่วงที่เลือก", { exact: true }).waitFor();
+  await byName("รีเฟรช").click();
+  await page.locator(".report-metrics").waitFor();
+  await page.setViewportSize({ width: 1280, height: 900 });
   await byName("ออกจากระบบ").click();
   await byName("ร้านรางวัล").click();
   await byName("แลกรางวัล").first().click();

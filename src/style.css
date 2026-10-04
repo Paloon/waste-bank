@@ -2811,3 +2811,175 @@ td .text-button {
     margin: 10px 0;
   }
 }
+
+/* Staff reports: period totals stay separate from paginated activity details. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.report-controls {
+  margin-bottom: 20px;
+}
+.report-controls > p {
+  color: var(--muted);
+  line-height: 1.8;
+  margin-top: 0;
+}
+.report-date-form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.report-date-form .field {
+  flex: 1;
+  min-width: 180px;
+  margin: 0;
+}
+.report-date-form .btn {
+  min-height: 48px;
+}
+.report-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.report-tabs {
+  overflow-x: auto;
+}
+.report-tabs button {
+  white-space: nowrap;
+}
+.report-range {
+  font-size: 1.2rem;
+}
+.report-note {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+.report-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+.report-metric {
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 14px;
+  min-width: 0;
+}
+.report-metric > span {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.report-metric strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 1.7rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.report-metric small {
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.report-explanation {
+  margin-bottom: 20px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+.report-explanation summary,
+.report-daily summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 0;
+}
+.report-daily,
+.report-details {
+  margin-top: 20px;
+}
+.report-table table {
+  font-size: 0.875rem;
+}
+.report-table td {
+  font-variant-numeric: tabular-nums;
+}
+.report-table td:first-child {
+  white-space: nowrap;
+}
+.report-daily .table-wrap {
+  max-height: 360px;
+}
+.report-daily th {
+  position: sticky;
+  top: 0;
+  background: #edf3e8;
+  z-index: 1;
+}
+.report-daily .text-button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+.report-student-id {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.report-daily .selected-day {
+  background: #edf3e8;
+}
+.report-details .section-heading {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.report-details .pagination {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 760px) {
+  .report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .report-metric {
+    padding: 14px;
+  }
+  .report-metric strong {
+    font-size: 1.45rem;
+  }
+  .report-date-form {
+    gap: 12px;
+  }
+  .report-date-form .field {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+  .report-date-form input {
+    font-size: 1rem;
+    width: 100%;
+    min-width: 0;
+  }
+  .report-date-form .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .report-tabs button {
+    flex: none;
+    font-size: 0.875rem;
+  }
+}

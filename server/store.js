@@ -618,6 +618,7 @@ export function act(s, actor, body) {
       reward.version = rewardVersion(reward) + 1;
       item.status = "Cancelled";
       item.reason = clean(p.reason);
+      item.cancelledAt = now();
     }
     item.staff = staff.id;
     log(item.id, "Pending Pickup", item.status, clean(p.reason));

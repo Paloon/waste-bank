@@ -41,6 +41,8 @@ Browser test ใช้ Edge ใน Windows และ Chromium ใน CI โด�
 
 ## โครงสร้างหลัก
 
+รายงานในเมนูเจ้าหน้าที่เลือกช่วงวันและแยกขยะ Coins นักเรียน และรางวัลได้ ดู [วิธีนับและข้อจำกัดของรายงาน](docs/reports.md)
+
 - `server/app.js` — HTTP routes และ response ที่ปลอดภัย
 - `server/security.js`, `credentials.js`, `validation.js` — session, PIN และ schema
 - `server/store.js`, `actions.js` — กติกาธุรกิจและ transaction

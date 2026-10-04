@@ -37,6 +37,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import "./style.css";
+import Reports from "./Reports.jsx";
 import { api, invalidateRequests } from "./api.js";
 import { policy } from "../shared/policy.js";
 
@@ -81,6 +82,7 @@ function App() {
     [year, setYear] = useState(new Date().getFullYear()),
     [image, setImage] = useState("");
   const [selectedStudents, setSelectedStudents] = useState([]);
+  const [reportRefresh, setReportRefresh] = useState(0);
   const [successUntil, setSuccessUntil] = useState(0),
     [successRemaining, setSuccessRemaining] = useState(0);
   const [idleRemaining, setIdleRemaining] = useState(null),
@@ -497,6 +499,7 @@ function App() {
   ];
   const adminNav = [
     ["dashboard", Home, "ภาพรวม"],
+    ["reports", TrendingUp, "รายงานตามช่วงเวลา"],
     ["reviews", ClipboardCheck, "ตรวจขยะ"],
     ["pickups", Gift, "ส่งมอบรางวัล"],
     ["students", Users, "นักเรียน"],
@@ -1369,11 +1372,18 @@ function App() {
                     <h1>{adminNav.find((x) => x[0] === adminTab)?.[2]}</h1>
                     <button
                       className="btn secondary"
-                      onClick={() => run(refreshAdmin)}
+                      onClick={() =>
+                        adminTab === "reports"
+                          ? setReportRefresh((n) => n + 1)
+                          : run(refreshAdmin)
+                      }
                     >
                       รีเฟรช
                     </button>
                   </div>
+                  {adminTab === "reports" && (
+                    <Reports refreshKey={reportRefresh} />
+                  )}
                   {adminTab === "dashboard" && (
                     <div className="panel">
                       <h3>Google Drive</h3>
