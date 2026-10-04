@@ -2748,6 +2748,26 @@ td .text-button {
   }
   .steps {
     grid-template-columns: 1fr;
+    gap: 16px;
+    padding-top: 0;
+  }
+  .steps > div {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    column-gap: 14px;
+    row-gap: 4px;
+    align-items: center;
+  }
+  .steps .step-icon {
+    grid-row: 1 / span 2;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border-radius: 12px;
+  }
+  .steps h4,
+  .steps p {
+    margin: 0;
   }
   .impact {
     grid-template-columns: 1fr;
