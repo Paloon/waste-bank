@@ -4,7 +4,7 @@ import { policy } from "../shared/policy.js";
 const id = z.string().min(1).max(100),
   text = z.string().trim().max(150),
   number = z.union([z.number(), z.string().max(16)]),
-  image = z.string().max(550000);
+  image = z.string().max(policy.imageUriCharacters);
 const profile = {
   id: id.optional(),
   name: z.string().trim().min(2).max(80),

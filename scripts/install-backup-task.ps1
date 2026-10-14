@@ -76,7 +76,8 @@ $files = @(
   'server/backup.js', 'server/cloud-store.js', 'server/config.js', 'server/control.js',
   'server/credentials.js', 'server/drive.js', 'server/errors.js', 'server/maintenance.js',
   'server/monitor.js', 'server/operations-health.js', 'server/reconcile.js',
-  'server/reports.js', 'server/state.js', 'server/store.js',
+  'server/reports.js', 'server/state.js', 'server/store.js', 'server/domain.js',
+  'server/read-queries.js', 'server/views.js',
   'shared/policy.js', 'shared/recycling.js', 'shared/time.js'
 )
 foreach ($relative in $files) {

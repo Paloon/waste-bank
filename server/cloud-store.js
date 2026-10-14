@@ -1,3 +1,9 @@
+import {
+  adminRead,
+  publicOverview,
+  rankSearch,
+  leaderboard,
+} from "./read-queries.js";
 import { policy } from "../shared/policy.js";
 import { emptyState, delta, records } from "./state.js";
 import { AppError, assert } from "./errors.js";
@@ -51,6 +57,32 @@ export function createCloudStore({
     const s = await rpc("wb_snapshot", { scope: scope || null });
     return { ...s, value: { ...emptyState(), ...s.value } };
   };
+  async function tailoredRead(name, args, fallback) {
+    try {
+      return await rpc(name, args);
+    } catch (error) {
+      if (error.databaseCode !== "PGRST202" && error.databaseCode !== "42883")
+        throw error;
+    }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const before = (await snapshot({})).version;
+      assert(
+        before !== undefined && before !== null,
+        "ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง",
+        503,
+      );
+      const data = await fallback({
+        read: async (scope) => (await snapshot(scope)).value,
+        summary: () => rpc("wb_summary"),
+      });
+      if ((await snapshot({})).version === before) return data;
+    }
+    throw new AppError(
+      "ข้อมูลเปลี่ยนระหว่างอ่าน กรุณาลองใหม่",
+      409,
+      "HISTORY_CHANGED",
+    );
+  }
   async function reportRows(kind, range, { ids } = {}) {
     const fields = reportFields[kind];
     const params = new URLSearchParams({
@@ -110,6 +142,40 @@ export function createCloudStore({
   return {
     read: async (scope) => (await snapshot(scope)).value,
     summary: () => rpc("wb_summary"),
+    adminRead: (options) =>
+      tailoredRead(
+        "wb_admin_read",
+        {
+          selected_tab: options.tab,
+          page_number: options.page,
+          search_query: options.query,
+          page_size: policy.pageSize,
+        },
+        (store) => adminRead(store, options),
+      ),
+    publicOverview: () =>
+      tailoredRead("wb_public_overview", {}, (store) => publicOverview(store)),
+    leaderboard: (options) =>
+      tailoredRead(
+        "wb_leaderboard",
+        {
+          selected_grade: options.grade,
+          selected_room: options.room,
+          monthly: options.monthly,
+        },
+        (store) => leaderboard(store, options),
+      ),
+    rankSearch: (options) =>
+      tailoredRead(
+        "wb_rank_search",
+        {
+          search_query: options.query,
+          selected_grade: options.grade,
+          selected_room: options.room,
+          monthly: options.monthly,
+        },
+        (store) => rankSearch(store, options),
+      ),
     studentHistory: async (id, { page, submissionPage, submissionStatus }) => {
       try {
         return await rpc("wb_student_history", {

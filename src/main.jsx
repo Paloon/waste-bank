@@ -1,3 +1,7 @@
+import ProfileForm from "./components/ProfileForm.jsx";
+import ActionButton from "./components/ActionButton.jsx";
+import ReviewCount from "./features/staff/ReviewCount.jsx";
+import { compressImage } from "./images/compress.js";
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -37,12 +41,17 @@ import {
   AlertCircle,
 } from "lucide-react";
 import "./style.css";
-import Reports from "./Reports.jsx";
 import SubmissionHistory from "./SubmissionHistory.jsx";
-import OperationsStatus from "./OperationsStatus.jsx";
+import StaffWorkspace from "./features/staff/StaffWorkspace.jsx";
+import SubmitWaste from "./features/student/SubmitWaste.jsx";
+import useKioskSession, {
+  sessionRetryMessage,
+} from "./hooks/useKioskSession.js";
 import RejectionReason from "./RejectionReason.jsx";
 import RecyclingGuide, { WasteIcon, categoryLabel } from "./RecyclingGuide.jsx";
 import { api, invalidateRequests } from "./api.js";
+import { useAdminData } from "./hooks/useAdminData.js";
+import { useLeaderboard } from "./hooks/useLeaderboard.js";
 import {
   recyclingRates,
   estimateCoins,
@@ -65,79 +74,12 @@ import {
   Photo,
   RewardImageEditor,
 } from "./components.jsx";
-function ReviewCount({ item, rates }) {
-  const [category, setCategory] = useState(item.category);
-  const [count, setCount] = useState(String(item.count || ""));
-  const rate =
-    category === item.submittedCategory && item.coinRate
-      ? item.coinRate
-      : rates[category].coins;
-  const amount = estimateCoins(category, count, {
-    [category]: { coins: rate },
-  });
-  return (
-    <>
-      <p>
-        นักเรียนแจ้ง: {item.submittedCategory || item.category} ·{" "}
-        {item.submittedCount ?? "ไม่ได้ระบุจำนวน"}
-        {item.submittedCount
-          ? ` ${rates[item.submittedCategory || item.category].unit}`
-          : ""}
-      </p>
-      <Field label="ประเภทขยะที่ครูตรวจพบ">
-        <select
-          name="category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          {Object.keys(rates)
-            .filter((c) => !rates[c].legacy || c === item.category)
-            .map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-        </select>
-      </Field>
-      <Field label="จำนวนที่ครูตรวจพบ">
-        <input
-          name="count"
-          type="number"
-          inputMode="numeric"
-          min="1"
-          max={maxRecyclingCount}
-          step="1"
-          required
-          value={count}
-          onChange={(e) => setCount(e.target.value)}
-        />
-      </Field>
-      <Field label="หมายเหตุการตรวจ (ไม่บังคับ)">
-        <textarea
-          name="reason"
-          maxLength={150}
-          placeholder="เช่น ในรูปเห็นขวด 2 ขวด จึงแก้จำนวนจาก 3 เป็น 2"
-        />
-      </Field>
-      <div className="coin-estimate" aria-live="polite">
-        <strong>
-          <Coins className="gold-coin-icon" size={25} aria-hidden="true" />{" "}
-          มอบให้ {amount ?? "—"} Coins
-        </strong>
-        <p>
-          {count || "—"} {rates[category].unit} × {rate} Coins
-        </p>
-        <small>
-          {rates[category].rule} · แก้ประเภทหรือจำนวนให้ตรงกับหลักฐานก่อนยืนยัน
-        </small>
-      </div>
-    </>
-  );
-}
 function App() {
   const [page, setPage] = useState("home"),
     [data, setData] = useState(null),
     [student, setStudent] = useState(null),
     [staff, setStaff] = useState(null),
-    [admin, setAdmin] = useState(null),
+    [adminData, setAdmin] = useState(null),
     [tab, setTab] = useState("trash"),
     [adminTab, setAdminTab] = useState("dashboard");
   const [modal, setModal] = useState(null),
@@ -164,13 +106,11 @@ function App() {
   const [reportRefresh, setReportRefresh] = useState(0);
   const [successUntil, setSuccessUntil] = useState(0),
     [successRemaining, setSuccessRemaining] = useState(0);
-  const [idleRemaining, setIdleRemaining] = useState(null),
-    [adminPage, setAdminPage] = useState(0),
+  const [adminPage, setAdminPage] = useState(0),
     [previewVersion, setPreviewVersion] = useState("");
   const inFlight = useRef(false),
     uiEpoch = useRef(0),
     runVersion = useRef(0),
-    lastActivity = useRef(Date.now()),
     operationKey = useRef(null),
     modalRef = useRef(null),
     lastFocus = useRef(null),
@@ -221,22 +161,21 @@ function App() {
     api("logout", {}).catch(() => {});
     refresh().catch(() => {});
   };
-  const sessionRetryMessage =
-    "เชื่อมต่อไม่ได้ ข้อมูลที่กรอกยังอยู่ กรุณาลองอีกครั้งก่อนหมดเวลาใช้งาน";
-  const renewSession = () => {
-    const epoch = uiEpoch.current;
-    return api("session", {})
-      .then(() => {
-        if (epoch === uiEpoch.current)
-          setError((current) =>
-            current === sessionRetryMessage ? "" : current,
-          );
-      })
-      .catch((e) => {
-        if (!e.cancelled && epoch === uiEpoch.current)
-          setError(e.retryable ? sessionRetryMessage : e.message);
-      });
-  };
+  const { idleRemaining, setIdleRemaining, lastActivity, renewSession } =
+    useKioskSession({
+      active: page !== "home" || Boolean(modal),
+      accountKey: student?.id
+        ? "student:" + student.id
+        : staff
+          ? "staff:" + staff
+          : null,
+      epoch: uiEpoch,
+      api,
+      clear,
+      home,
+      setError,
+      setNotice,
+    });
   useEffect(() => {
     if (page !== "success" || !successUntil) return;
     const update = () =>
@@ -255,51 +194,18 @@ function App() {
     };
   }, [page, successUntil]);
   useEffect(() => {
-    const activity = () => {
-      lastActivity.current = Date.now();
-    };
-    ["pointerdown", "keydown", "input"].forEach((e) =>
-      window.addEventListener(e, activity),
-    );
-    const timer = setInterval(() => {
-      const remaining = policy.idleMs - (Date.now() - lastActivity.current);
-      setIdleRemaining(
-        (page !== "home" || modal) && remaining <= policy.warningMs
-          ? Math.max(0, Math.ceil(remaining / 1000))
-          : null,
-      );
-      if ((page !== "home" || modal) && remaining <= 0) {
-        home();
-        setNotice("กลับหน้าหลักและล้างข้อมูลแล้ว เนื่องจากไม่มีการใช้งาน");
-      }
-    }, 1000);
-    return () => {
-      clearInterval(timer);
-      ["pointerdown", "keydown", "input"].forEach((e) =>
-        window.removeEventListener(e, activity),
-      );
-    };
-  }, [page, modal?.type]);
-  useEffect(() => {
     if (notice) {
       let t = setTimeout(() => setNotice(""), 5000);
       return () => clearTimeout(t);
     }
   }, [notice]);
   useEffect(() => {
-    if (!student && !staff) return;
-    const timer = setInterval(() => {
-      if (Date.now() - lastActivity.current < policy.heartbeatMs + 1000)
-        renewSession();
-    }, policy.heartbeatMs);
-    return () => clearInterval(timer);
-  }, [student?.id, staff]);
-  useEffect(() => {
     if (modal?.type !== "identify" || id.length < 5 || lookup?.id === id)
       return;
     let cancelled = false;
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      api("lookup", { id })
+      api("lookup", { id }, { signal: controller.signal })
         .then((p) => {
           if (!cancelled) {
             setLookup(p);
@@ -307,19 +213,24 @@ function App() {
           }
         })
         .catch((e) => {
-          if (!cancelled) setError(e.message);
+          if (!cancelled && !e.cancelled) setError(e.message);
         });
     }, 500);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      controller.abort();
     };
   }, [id, modal?.type]);
   useEffect(() => {
     if (modal) {
       lastFocus.current = document.activeElement;
       const timer = setTimeout(
-        () => modalRef.current?.querySelector("input,button,select")?.focus(),
+        () =>
+          (
+            modalRef.current?.querySelector("input,select,textarea") ||
+            modalRef.current?.querySelector("button")
+          )?.focus(),
         30,
       );
       return () => clearTimeout(timer);
@@ -376,40 +287,45 @@ function App() {
     setSuccessRemaining(Math.ceil(policy.successMs / 1000));
     setSuccessUntil(Date.now() + policy.successMs);
   };
+  const {
+    refresh: readAdmin,
+    ready: adminReady,
+    loading: adminLoading,
+    failed: adminFailed,
+  } = useAdminData({
+    enabled: Boolean(staff) && page === "admin",
+    tab: ["reports", "promotion"].includes(adminTab) ? "dashboard" : adminTab,
+    page: adminPage,
+    query,
+    epoch: uiEpoch,
+    setData: setAdmin,
+    setError,
+  });
+  const admin = adminReady
+    ? adminData
+    : adminData
+      ? {
+          ...adminData,
+          students: [],
+          submissions: [],
+          redemptions: [],
+          ledger: [],
+          audit: [],
+          rewards: [],
+          hasMore: false,
+        }
+      : null;
   async function refreshAdmin(
     target = adminTab,
     offset = adminPage,
     search = query,
   ) {
-    setAdmin(
-      await api(
-        "admin?" +
-          new URLSearchParams({ tab: target, page: offset, q: search }),
-      ),
+    return readAdmin(
+      ["reports", "promotion"].includes(target) ? "dashboard" : target,
+      offset,
+      search,
     );
-    await refresh();
   }
-  useEffect(() => {
-    if (staff && page === "admin") {
-      let cancelled = false;
-      const timer = setTimeout(() => {
-        api(
-          "admin?" +
-            new URLSearchParams({ tab: adminTab, page: adminPage, q: query }),
-        )
-          .then((value) => {
-            if (!cancelled) setAdmin(value);
-          })
-          .catch((e) => {
-            if (!cancelled && !e.cancelled) setError(e.message);
-          });
-      }, 200);
-      return () => {
-        cancelled = true;
-        clearTimeout(timer);
-      };
-    }
-  }, [staff, page, adminTab, adminPage, query]);
   useEffect(() => {
     setAdminPage(0);
     setSelectedStudents([]);
@@ -417,46 +333,6 @@ function App() {
   useEffect(() => {
     setSelectedStudents([]);
   }, [adminPage]);
-  useEffect(() => {
-    const replaced = () => {
-      clear();
-      setNotice("บัญชีถูกเปลี่ยนจากอีกแท็บ กรุณาใช้แท็บล่าสุด");
-    };
-    const expired = () => {
-      home();
-      setNotice("หมดเวลาใช้งาน กรุณาระบุตัวตนใหม่");
-    };
-    const hide = () => {
-      invalidateRequests();
-      navigator.sendBeacon(
-        "/api/logout",
-        new Blob(["{}"], { type: "application/json" }),
-      );
-    };
-    const show = (e) => {
-      if (e.persisted) expired();
-    };
-    const visible = () => {
-      if (
-        document.visibilityState === "visible" &&
-        Date.now() - lastActivity.current >= policy.idleMs
-      )
-        expired();
-    };
-    window.addEventListener("session-expired", expired);
-    window.addEventListener("session-replaced", replaced);
-    window.addEventListener("pagehide", hide);
-    window.addEventListener("pageshow", show);
-    document.addEventListener("visibilitychange", visible);
-    return () => {
-      window.removeEventListener("session-expired", expired);
-      window.removeEventListener("session-replaced", replaced);
-      window.removeEventListener("pagehide", hide);
-      window.removeEventListener("pageshow", show);
-      document.removeEventListener("visibilitychange", visible);
-      clearTimeout(successTimer.current);
-    };
-  }, []);
   async function loadStudent() {
     const result = await api("student");
     setStudent(result);
@@ -475,6 +351,11 @@ function App() {
       setStudent(await api(studentHistoryQuery(changes)));
     });
   function identify(next, reward) {
+    uiEpoch.current++;
+    invalidateRequests();
+    operationKey.current = null;
+    setCount("");
+    setNote("");
     setPhoto("");
     setDisposalPhoto("");
     setError("");
@@ -501,67 +382,33 @@ function App() {
     setError("");
     setQuery("");
     if (target === "submit" || target === "account") identify(target);
-    else setPage(target);
+    else {
+      setPage(target);
+      if (target === "shop")
+        refresh().catch((error) => {
+          if (!error.cancelled) setError(error.message);
+        });
+    }
   }
   async function readImage(file, fn) {
     const epoch = uiEpoch.current;
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
-      throw new Error("เลือกไฟล์ JPG, PNG หรือ WebP");
-    if (file.size > 12000000) throw new Error("รูปภาพต้นฉบับต้องไม่เกิน 12 MB");
-    const bitmap = await createImageBitmap(file).catch(() => {
-      throw new Error("เปิดรูปไม่ได้ กรุณาถ่ายใหม่หรือเลือกภาพอื่น");
-    });
-    if (epoch !== uiEpoch.current) {
-      bitmap.close();
+    const result = await compressImage(file);
+    if (epoch !== uiEpoch.current)
       throw Object.assign(new Error("ยกเลิกแล้ว"), { cancelled: true });
-    }
-    if (bitmap.width * bitmap.height > policy.imagePixels) {
-      bitmap.close();
-      throw new Error("ภาพมีความละเอียดสูงเกินไป กรุณาเลือกรูปอื่น");
-    }
-    const canvas = document.createElement("canvas");
-    for (const [side, quality] of [
-      [1280, 0.78],
-      [1280, 0.68],
-      [1120, 0.68],
-      [960, 0.6],
-    ]) {
-      const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
-      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-      canvas
-        .getContext("2d")
-        .drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const result = canvas.toDataURL("image/jpeg", quality);
-      const encoded = result.slice(result.indexOf(",") + 1);
-      const bytes =
-        Math.floor((encoded.length * 3) / 4) -
-        (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
-      if (bytes <= policy.imageBytes) {
-        bitmap.close();
-        fn(result);
-        return;
-      }
-    }
-    bitmap.close();
-    throw new Error(
-      "บีบอัดรูปให้ต่ำกว่า 400 KiB ไม่ได้ กรุณาถ่ายใหม่ให้เห็นขยะชัด ๆ",
-    );
+    if (result) fn(result);
   }
-  const ranked = (data?.leaderboard || [])
-    .filter((x) => (!grade || x.grade === grade) && (!room || x.room === room))
-    .sort((a, b) =>
-      period === "month" ? b.monthly - a.monthly : b.earned - a.earned,
-    );
+  const leaderboard = useLeaderboard({
+    active: page === "leaderboard",
+    period,
+    grade,
+    room,
+  });
+  const ranked =
+    page === "leaderboard" ? leaderboard.rows : data?.leaderboard || [];
   const studentName = (id) => admin?.students.find((s) => s.id === id);
-  const visibleStudents =
-    admin?.students.filter((s) =>
-      [s.name, s.id, "ม." + s.grade + "/" + s.room, s.grade, s.room]
-        .join(" ")
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-    ) || [];
+  // The server owns filtering and pagination; filter again would hide valid rows
+  // when its matching rules differ from the presentation's display string.
+  const visibleStudents = admin?.students || [];
   const toggleStudent = (id) =>
     setSelectedStudents((current) =>
       current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
@@ -607,74 +454,11 @@ function App() {
     ["shop", Gift, "ร้านรางวัล"],
     ["leaderboard", Trophy, "อันดับ"],
   ];
-  const adminNav = [
-    ["dashboard", Home, "ภาพรวม"],
-    ["reports", TrendingUp, "รายงานตามช่วงเวลา"],
-    ["reviews", ClipboardCheck, "ตรวจขยะ"],
-    ["pickups", Gift, "ส่งมอบรางวัล"],
-    ["students", Users, "นักเรียน"],
-    ["rewards", Package, "จัดการรางวัล"],
-    ["ledger", Coins, "บัญชี Coins"],
-    ["promotion", GraduationCap, "เลื่อนชั้น"],
-    ["audit", History, "ประวัติเจ้าหน้าที่"],
-  ];
-  function ProfileForm({ p, adminMode = false }) {
-    return (
-      <>
-        <Field label="ชื่อ–นามสกุล">
-          <input name="name" required defaultValue={p.name} />
-        </Field>
-        <div className="form-grid">
-          <Field label="เลขที่">
-            <input
-              name="number"
-              type="number"
-              min="1"
-              max="60"
-              required
-              defaultValue={p.number || ""}
-            />
-          </Field>
-          <Field label="ระดับชั้น">
-            <select name="grade" defaultValue={p.grade}>
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="ห้อง">
-            <input
-              name="room"
-              type="number"
-              min="1"
-              max="30"
-              required
-              defaultValue={p.room}
-            />
-          </Field>
-        </div>
-        {adminMode && (
-          <Field label="สถานะ">
-            <select name="status" defaultValue={p.status}>
-              {["Active", "Alumni", "Transferred", "Inactive"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </Field>
-        )}
-      </>
-    );
-  }
   const submitModal = (fn) => (e) => {
     e.preventDefault();
     const values = Object.fromEntries(new FormData(e.currentTarget));
     run(() => fn(values));
   };
-  const Button = ({ children, ...props }) => (
-    <button className="btn primary" disabled={busy} {...props}>
-      {busy ? "กำลังดำเนินการ…" : children}
-    </button>
-  );
   return (
     <>
       <header>
@@ -998,235 +782,39 @@ function App() {
               </>
             )}
             {page === "submit" && student && (
-              <div className="submit-layout">
-                <section className="panel">
-                  <div className="flow-steps">
-                    <span className="complete">1 ระบุตัวตน</span>
-                    <span className="current">2 ส่งหลักฐาน</span>
-                    <span>3 เสร็จแล้ว</span>
-                  </div>
-                  <form
-                    id="submission-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      run(async () => {
-                        await action("submit", {
-                          image: photo,
-                          disposalImage: disposalPhoto,
-                          category,
-                          count,
-                          note,
-                        });
-                        done(
-                          "ส่งขยะเรียบร้อย!",
-                          "รอเจ้าหน้าที่ตรวจสอบ เมื่ออนุมัติแล้ว Coins จะเข้าในบัญชีของเธอ",
-                        );
-                      });
-                    }}
-                  >
-                    <div className="submission-help">
-                      <h2>ก่อนถ่ายรูป</h2>
-                      <p>
-                        แยกขยะตามประเภท ถ่ายให้เห็นขยะ จำนวน
-                        และถังหรือจุดทิ้งตามป้ายของโรงเรียน
-                        หากรูปเดียวเห็นไม่ครบให้เพิ่มรูปที่ 2
-                      </p>
-                    </div>
-                    <div className="upload-zone">
-                      {photo ? (
-                        <img
-                          className="upload-preview"
-                          src={photo}
-                          alt="ภาพที่เลือก"
-                        />
-                      ) : (
-                        <>
-                          <Camera size={46} />
-                          <h3>ถ่ายภาพขยะที่แยกแล้ว</h3>
-                          <p>ให้เห็นขยะ จำนวน และจุดทิ้งที่ถูกประเภท</p>
-                        </>
-                      )}
-                      <div className="upload-buttons">
-                        <label className="btn primary">
-                          <Camera size={18} />{" "}
-                          {photo ? "ถ่ายใหม่" : "เปิดกล้อง"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            capture="environment"
-                            onChange={(e) =>
-                              run(() => readImage(e.target.files[0], setPhoto))
-                            }
-                          />
-                        </label>
-                        <label className="btn secondary">
-                          <Upload size={18} /> เลือกรูป
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={(e) =>
-                              run(() => readImage(e.target.files[0], setPhoto))
-                            }
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <details
-                      className="disposal-upload"
-                      open={Boolean(disposalPhoto)}
-                    >
-                      <summary>
-                        <Trash2 size={18} aria-hidden="true" />{" "}
-                        เพิ่มรูปถังหรือจุดทิ้ง (รูปที่ 2 ไม่บังคับ)
-                      </summary>
-                      <p>
-                        ใช้เมื่อรูปแรกเห็นขยะและจุดทิ้งไม่ครบ
-                        ถ่ายตามจุดทิ้งจริงของโรงเรียน
-                      </p>
-                      {disposalPhoto && (
-                        <img
-                          className="upload-preview"
-                          src={disposalPhoto}
-                          alt="ภาพถังหรือจุดทิ้งที่เลือก"
-                        />
-                      )}
-                      <div className="upload-buttons">
-                        <label className="btn secondary">
-                          <Camera size={18} aria-hidden="true" /> ถ่ายรูปจุดทิ้ง
-                          <input
-                            aria-label="ถ่ายรูปจุดทิ้ง"
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            capture="environment"
-                            onChange={(e) =>
-                              run(() =>
-                                readImage(e.target.files[0], setDisposalPhoto),
-                              )
-                            }
-                          />
-                        </label>
-                        <label className="btn secondary">
-                          <Upload size={18} aria-hidden="true" />{" "}
-                          เลือกรูปจุดทิ้ง
-                          <input
-                            aria-label="เลือกรูปจุดทิ้ง"
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={(e) =>
-                              run(() =>
-                                readImage(e.target.files[0], setDisposalPhoto),
-                              )
-                            }
-                          />
-                        </label>
-                        {disposalPhoto && (
-                          <button
-                            type="button"
-                            className="text-button"
-                            onClick={() => setDisposalPhoto("")}
-                          >
-                            <Trash2 size={16} aria-hidden="true" /> ลบรูปที่ 2
-                          </button>
-                        )}
-                      </div>
-                    </details>
-                    <Field label="ประเภทขยะ">
-                      <div className="category-grid">
-                        {data.categories.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            aria-label={c}
-                            aria-pressed={c === category}
-                            className={c === category ? "selected" : ""}
-                            onClick={() => setCategory(c)}
-                          >
-                            <WasteIcon category={c} /> {categoryLabel(c)}
-                            <small>
-                              {(data.recyclingRates || recyclingRates)[c]
-                                .coins === null
-                                ? "รอครูกำหนดแต้ม"
-                                : `${(data.recyclingRates || recyclingRates)[c].coins} Coins / ${(data.recyclingRates || recyclingRates)[c].unit}`}
-                            </small>
-                          </button>
-                        ))}
-                      </div>
-                    </Field>
-                    <Field
-                      label={`จำนวน (${(data.recyclingRates || recyclingRates)[category].unit})`}
-                    >
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min="1"
-                        max={maxRecyclingCount}
-                        step="1"
-                        required
-                        value={count}
-                        onChange={(e) => setCount(e.target.value)}
-                        placeholder="เช่น 2"
-                      />
-                    </Field>
-                    <div className="coin-estimate" aria-live="polite">
-                      <strong>
-                        <Coins
-                          className="gold-coin-icon"
-                          size={25}
-                          aria-hidden="true"
-                        />
-                        {(data.recyclingRates || recyclingRates)[category]
-                          .coins === null
-                          ? "Coins รอครูตรวจและกำหนด"
-                          : `คาดว่าจะได้ ${estimateCoins(category, count, data.recyclingRates || recyclingRates) ?? "—"} Coins`}
-                      </strong>
-                      <p>
-                        {(data.recyclingRates || recyclingRates)[category].rule}
-                      </p>
-                      <small>
-                        ส่งครั้งละหนึ่งประเภท
-                        ครูตรวจและแก้จำนวนตามภาพก่อนอนุมัติ Coins
-                      </small>
-                    </div>
-                    <Field label="ฝากข้อความถึงคุณครู (ไม่บังคับ)">
-                      <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        maxLength={150}
-                        placeholder="เช่น ล้างขวดและแกะฉลากแล้ว"
-                      />
-                    </Field>
-                    <Button
-                      type="submit"
-                      style={{ width: "100%" }}
-                      disabled={busy || !photo || !validCount(count)}
-                    >
-                      ส่งรูปให้คุณครูตรวจ <ArrowRight size={19} />
-                    </Button>
-                    <p className="submission-feedback">
-                      ได้รับ Coins หลังครูตรวจรูปและอนุมัติ หากส่งไม่สำเร็จ
-                      รูปและจำนวนยังอยู่ กดส่งรายการเดิมอีกครั้งได้
-                      หากไม่แน่ใจจุดทิ้ง ให้สอบถามครูผู้ดูแลก่อนทิ้ง
-                    </p>
-                  </form>
-                </section>
-                <aside>
-                  <div className="student-card">
-                    <span className="avatar large">{student.name[0]}</span>
-                    <h2>{student.name}</h2>
-                    <p>
-                      ม.{student.grade}/{student.room} · เลขที่{" "}
-                      {student.number || "—"} · {student.id}
-                    </p>
-                    <span className="badge approved">กำลังใช้บัญชีนี้</span>
-                    <button
-                      className="text-button"
-                      onClick={() => identify("submit")}
-                    >
-                      เปลี่ยนบัญชี
-                    </button>
-                  </div>
-                </aside>
-              </div>
+              <SubmitWaste
+                student={student}
+                data={data}
+                photo={photo}
+                disposalPhoto={disposalPhoto}
+                category={category}
+                count={count}
+                note={note}
+                busy={busy}
+                setPhoto={setPhoto}
+                setDisposalPhoto={setDisposalPhoto}
+                setCategory={setCategory}
+                setCount={setCount}
+                setNote={setNote}
+                readImage={readImage}
+                run={run}
+                identify={identify}
+                onSubmit={() =>
+                  run(async () => {
+                    await action("submit", {
+                      image: photo,
+                      disposalImage: disposalPhoto,
+                      category,
+                      count,
+                      note,
+                    });
+                    done(
+                      "ส่งขยะเรียบร้อย!",
+                      "รอเจ้าหน้าที่ตรวจสอบ เมื่ออนุมัติแล้ว Coins จะเข้าในบัญชีของเธอ",
+                    );
+                  })
+                }
+              />
             )}
             {page === "account" && student && (
               <>
@@ -1448,6 +1036,12 @@ function App() {
                   ))}
                 </div>
                 <div className="panel">
+                  {leaderboard.loading && <p role="status">กำลังโหลดอันดับ…</p>}
+                  {leaderboard.error && (
+                    <p role="alert" className="danger">
+                      {leaderboard.error}
+                    </p>
+                  )}
                   <div className="section-heading">
                     <h2>10 อันดับรักษ์โลก</h2>
                     <span>
@@ -1575,831 +1169,52 @@ function App() {
               </div>
             )}
             {page === "admin" && admin && (
-              <div className="admin-layout">
-                <aside className="admin-sidebar">
-                  <span className="eyebrow">STAFF WORKSPACE</span>
-                  <h2>{staff}</h2>
-                  {adminNav.map(([key, Icon, label]) => (
-                    <button
-                      key={key}
-                      className={adminTab === key ? "active" : ""}
-                      onClick={() => {
-                        setQuery("");
-                        key === "promotion"
-                          ? startPromotion()
-                          : setAdminTab(key);
-                      }}
-                    >
-                      <Icon size={20} />
-                      {label}
-                      {key === "reviews" && (
-                        <span className="count">
-                          {admin.stats?.pending || 0}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                  <button className="logout" onClick={home}>
-                    <LogOut size={18} /> ออกจากระบบ
-                  </button>
-                </aside>
-                <section className="admin-content">
-                  <div className="page-heading">
-                    <h1>{adminNav.find((x) => x[0] === adminTab)?.[2]}</h1>
-                    <button
-                      className="btn secondary"
-                      onClick={() =>
-                        adminTab === "reports"
-                          ? setReportRefresh((n) => n + 1)
-                          : run(refreshAdmin)
-                      }
-                    >
-                      รีเฟรช
-                    </button>
-                  </div>
-                  {adminTab === "reports" && (
-                    <Reports refreshKey={reportRefresh} />
-                  )}
-                  <OperationsStatus health={admin.health} />
-                  {adminTab === "dashboard" && (
-                    <div className="panel">
-                      <h3>Google Drive</h3>
-                      <p>
-                        {admin.drive?.connected
-                          ? "เชื่อมแล้ว — รูปใหม่เก็บใน Drive"
-                          : admin.drive?.configured
-                            ? "ตั้งค่า OAuth แล้ว แต่ยังไม่ได้เชื่อมบัญชี"
-                            : "ยังไม่ตั้งค่า OAuth ใน .env — รูปยังเก็บใน SQLite"}
-                      </p>
-                      {admin.drive?.configured && !admin.drive?.connected && (
-                        <a className="btn secondary" href="/api/drive/connect">
-                          เชื่อมบัญชี Google Drive
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  {adminTab === "dashboard" && (
-                    <>
-                      <div className="panel">
-                        <h3>สถานะดูแลระบบ</h3>
-                        {admin.databaseBytes && (
-                          <p>
-                            ฐานข้อมูล:{" "}
-                            {fmt(Math.ceil(admin.databaseBytes / 1024 / 1024))}{" "}
-                            MiB{" "}
-                            {admin.databaseBytes > 400 * 1024 * 1024 && (
-                              <strong className="danger">
-                                ใกล้ขีดจำกัด Free Plan
-                              </strong>
-                            )}
-                          </p>
-                        )}
-                        {admin.health?.maintenance?.storage && (
-                          <p>
-                            พื้นที่บัญชี Drive ใช้แล้ว{" "}
-                            {fmt(
-                              Math.ceil(
-                                Number(admin.health.maintenance.storage.usage) /
-                                  1024 /
-                                  1024,
-                              ),
-                            )}{" "}
-                            MiB{" "}
-                            {admin.health.maintenance.storage.limit &&
-                              Number(admin.health.maintenance.storage.usage) >
-                                Number(admin.health.maintenance.storage.limit) *
-                                  0.8 && (
-                                <strong className="danger">
-                                  พื้นที่เหลือน้อย
-                                </strong>
-                              )}
-                          </p>
-                        )}
-                        {admin.health?.maintenance?.reconciliation?.ok ===
-                          false && (
-                          <p className="danger">
-                            พบยอดบัญชีหรือรายการที่ไม่สอดคล้องกัน
-                            กรุณาให้ผู้ดูแลตรวจสอบ
-                          </p>
-                        )}
-                        <p>
-                          ล้างรูปครั้งล่าสุด:{" "}
-                          {admin.health?.maintenance?.at
-                            ? date(admin.health.maintenance.at)
-                            : "ยังไม่มีผลการทำงาน"}
-                        </p>
-                        <p>
-                          งานรูปค้างเกิน 1 วัน:{" "}
-                          {admin.health?.maintenance?.overdue || 0} · ผิดพลาด:{" "}
-                          {admin.health?.maintenance?.failures || 0}
-                        </p>
-                        <p>
-                          สำรองข้อมูลครั้งล่าสุด:{" "}
-                          {admin.health?.backup?.at
-                            ? date(admin.health.backup.at)
-                            : "ยังไม่มีหลักฐานการสำรองข้อมูล"}
-                        </p>
-                        {admin.health?.error && (
-                          <p className="danger">
-                            เหตุขัดข้องล่าสุด: {admin.health.error.code} ·{" "}
-                            {date(admin.health.error.at)}
-                            {admin.health.error.eventId && (
-                              <small>
-                                รหัสเหตุการณ์: {admin.health.error.eventId}
-                              </small>
-                            )}
-                          </p>
-                        )}
-                        <button
-                          className="btn secondary"
-                          disabled={busy}
-                          onClick={() =>
-                            run(async () => {
-                              await api("maintenance", {});
-                              await refreshAdmin();
-                            })
-                          }
-                        >
-                          ตรวจและล้างรูปที่ค้าง
-                        </button>
-                      </div>
-                      <div className="dashboard-stats">
-                        {[
-                          [
-                            "รอตรวจขยะ",
-                            admin.submissions.filter(
-                              (s) => s.status === "Pending",
-                            ).length,
-                            ClipboardCheck,
-                            "reviews",
-                          ],
-                          [
-                            "รอรับรางวัล",
-                            admin.stats?.pickups || 0,
-                            Gift,
-                            "pickups",
-                          ],
-                          [
-                            "นักเรียน Active",
-                            admin.stats?.students || 0,
-                            Users,
-                            "students",
-                          ],
-                          [
-                            "ของใกล้หมด",
-                            admin.rewards.filter((r) => r.stock <= 3).length,
-                            Package,
-                            "rewards",
-                          ],
-                        ].map(([label, value, Icon, target]) => (
-                          <button
-                            className="stat-card"
-                            key={label}
-                            onClick={() => setAdminTab(target)}
-                          >
-                            <Icon />
-                            <strong>{value}</strong>
-                            <span>{label}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <div className="panel">
-                        <div className="section-heading">
-                          <h2>วันนี้ทำสิ่งดีไปเท่าไหร่?</h2>
-                          <TrendingUp />
-                        </div>
-                        <div className="today-stats">
-                          <div>
-                            <strong>{admin.stats?.approvedToday || 0}</strong>
-                            <p>รายการที่อนุมัติวันนี้</p>
-                          </div>
-                          <div>
-                            <strong>{fmt(admin.stats?.coinsToday || 0)}</strong>
-                            <p>Coins ที่มอบวันนี้</p>
-                          </div>
-                        </div>
-                        <h3>สัดส่วนขยะที่ผ่านการตรวจ</h3>
-                        {data.categories.map((c) => {
-                          const count = admin.stats?.categories?.[c] || 0;
-                          return (
-                            <div className="bar-row" key={c}>
-                              <span>{c}</span>
-                              <div>
-                                <i
-                                  style={{
-                                    width:
-                                      Math.max(
-                                        0,
-                                        (count /
-                                          Math.max(
-                                            1,
-                                            admin.stats?.submissions || 0,
-                                          )) *
-                                          100,
-                                      ) + "%",
-                                  }}
-                                />
-                              </div>
-                              <b>{count}</b>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="panel">
-                        <h2>กิจกรรมล่าสุด</h2>
-                        {admin.audit.slice(0, 5).map((a) => (
-                          <div className="ledger-row" key={a.id}>
-                            <History />
-                            <div className="grow">
-                              <b>
-                                {a.action} · {a.staff}
-                              </b>
-                              <small>
-                                {a.target} · {date(a.at)}
-                              </small>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {adminTab === "reviews" && (
-                    <>
-                      <p className="muted">
-                        ตรวจภาพ แก้ประเภทและจำนวนให้ตรงกับขยะจริง ระบบคำนวณ
-                        Coins ก่อนอนุมัติ
-                      </p>
-                      <div className="review-grid">
-                        {admin.submissions
-                          .filter((s) => s.status === "Pending")
-                          .map((s) => {
-                            const p = studentName(s.student);
-                            return (
-                              <article className="panel review-card" key={s.id}>
-                                <div className="evidence-pair">
-                                  <Photo src={s.image} onClick={setImage} />
-                                  {s.disposalImage && (
-                                    <Photo
-                                      src={s.disposalImage}
-                                      onClick={setImage}
-                                    />
-                                  )}
-                                </div>
-                                <Badge status={s.status} />
-                                <h3>{s.category}</h3>
-                                <p>
-                                  {s.submittedCount
-                                    ? `นักเรียนแจ้ง ${s.submittedCount} ${(data.recyclingRates || recyclingRates)[s.submittedCategory || s.category].unit}`
-                                    : "รายการเก่า: ครูกรอกจำนวนจากภาพก่อนอนุมัติ"}
-                                </p>
-                                <b>{p?.name}</b>
-                                <p>
-                                  {s.student} · ม.{p?.grade}/{p?.room}
-                                </p>
-                                <small>{date(s.at)}</small>
-                                <p>{s.note || "ไม่มีหมายเหตุ"}</p>
-                                <div className="button-row">
-                                  <button
-                                    className="btn primary"
-                                    onClick={() =>
-                                      openModal({
-                                        type: "review",
-                                        item: s,
-                                        status: "Approved",
-                                      })
-                                    }
-                                  >
-                                    อนุมัติ
-                                  </button>
-                                  <button
-                                    className="btn secondary danger"
-                                    onClick={() =>
-                                      openModal({
-                                        type: "review",
-                                        item: s,
-                                        status: "Rejected",
-                                      })
-                                    }
-                                  >
-                                    ไม่อนุมัติ
-                                  </button>
-                                </div>
-                              </article>
-                            );
-                          })}
-                      </div>
-                      {!admin.submissions.some(
-                        (s) => s.status === "Pending",
-                      ) && <Empty text="ตรวจครบแล้ว ขอบคุณที่ช่วยดูแลโลก!" />}
-                    </>
-                  )}
-                  {adminTab === "pickups" && (
-                    <>
-                      <input
-                        className="search-input"
-                        aria-label="ค้นหาการรับรางวัล"
-                        placeholder="ค้นหาชื่อ รหัสนักเรียน หรือรหัสรับรางวัล"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                      {admin.redemptions
-                        .filter(
-                          (r) =>
-                            r.status === "Pending Pickup" &&
-                            [r.code, r.student, studentName(r.student)?.name]
-                              .join(" ")
-                              .toLowerCase()
-                              .includes(query.toLowerCase()),
-                        )
-                        .map((r) => (
-                          <div className="panel pickup-row" key={r.id}>
-                            <Gift size={32} />
-                            <div className="grow">
-                              <h3>
-                                {r.name} · {r.cost} Coins
-                              </h3>
-                              <b>{studentName(r.student)?.name}</b>
-                              <p>
-                                {r.student} · ม.{studentName(r.student)?.grade}/
-                                {studentName(r.student)?.room}
-                              </p>
-                              <code>{r.code}</code>
-                              <small>{date(r.at)}</small>
-                            </div>
-                            <button
-                              className="btn primary"
-                              onClick={() =>
-                                openModal({ type: "handover", item: r })
-                              }
-                            >
-                              ยืนยันส่งมอบ
-                            </button>
-                            <button
-                              className="text-button danger"
-                              onClick={() =>
-                                openModal({ type: "cancelReward", item: r })
-                              }
-                            >
-                              ยกเลิกและคืน Coins
-                            </button>
-                          </div>
-                        ))}
-                      {!admin.redemptions.some(
-                        (r) => r.status === "Pending Pickup",
-                      ) && <Empty />}
-                    </>
-                  )}
-                  {adminTab === "students" && (
-                    <>
-                      <div className="student-tools">
-                        <input
-                          className="search-input"
-                          aria-label="ค้นหานักเรียน"
-                          placeholder="ค้นหาชื่อ รหัส ชั้น หรือห้อง"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                        />
-                        <button
-                          className="btn secondary danger"
-                          disabled={!selectedStudents.length || busy}
-                          onClick={() =>
-                            openModal({
-                              type: "deleteStudents",
-                              ids: selectedStudents.filter((id) =>
-                                admin.students.some((s) => s.id === id),
-                              ),
-                            })
-                          }
-                        >
-                          <Trash2 size={17} /> ลบที่เลือก (
-                          {selectedStudents.length})
-                        </button>
-                      </div>
-                      <div className="table-wrap">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>
-                                <input
-                                  type="checkbox"
-                                  aria-label="เลือกนักเรียนทั้งหมดที่แสดง"
-                                  checked={
-                                    visibleStudents.length > 0 &&
-                                    visibleStudents.every((s) =>
-                                      selectedStudents.includes(s.id),
-                                    )
-                                  }
-                                  onChange={toggleVisibleStudents}
-                                  disabled={!visibleStudents.length}
-                                />
-                              </th>
-                              <th>นักเรียน</th>
-                              <th>ชั้น / ห้อง</th>
-                              <th>สถานะ</th>
-                              <th>Coins</th>
-                              <th>จัดการ</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {visibleStudents.map((s) => (
-                              <tr key={s.id}>
-                                <td>
-                                  <input
-                                    type="checkbox"
-                                    aria-label={"เลือก " + s.name}
-                                    checked={selectedStudents.includes(s.id)}
-                                    onChange={() => toggleStudent(s.id)}
-                                  />
-                                </td>
-                                <td>
-                                  <b>{s.name}</b>
-                                  <small>
-                                    เลขที่ {s.number || "—"} · {s.id}
-                                  </small>
-                                </td>
-                                <td>
-                                  ม.{s.grade}/{s.room}
-                                </td>
-                                <td>{s.status}</td>
-                                <td>{fmt(s.balance)}</td>
-                                <td>
-                                  <div className="button-row">
-                                    <button
-                                      className="text-button"
-                                      onClick={() =>
-                                        run(async () => {
-                                          const p = await api(
-                                            "student?id=" + s.id,
-                                          );
-                                          openModal({
-                                            type: "studentDetail",
-                                            p,
-                                          });
-                                        })
-                                      }
-                                    >
-                                      ดูประวัติ
-                                    </button>
-                                    <button
-                                      className="text-button"
-                                      onClick={() =>
-                                        openModal({
-                                          type: "profile",
-                                          p: s,
-                                          adminMode: true,
-                                        })
-                                      }
-                                    >
-                                      แก้ไข
-                                    </button>
-                                    <button
-                                      className="text-button"
-                                      onClick={() =>
-                                        openModal({ type: "adjust", p: s })
-                                      }
-                                    >
-                                      ปรับ Coins
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </>
-                  )}
-                  {adminTab === "rewards" && (
-                    <>
-                      <button
-                        className="btn primary"
-                        onClick={() =>
-                          openModal({
-                            type: "reward",
-                            item: {
-                              name: "",
-                              description: "",
-                              price: 100,
-                              stock: 0,
-                              enabled: true,
-                              image: "",
-                              images: [],
-                            },
-                          })
-                        }
-                      >
-                        <Plus size={18} /> เพิ่มรางวัล
-                      </button>
-                      <div className="rewards-grid admin-rewards">
-                        {admin.rewards.map((r) => (
-                          <article className="reward-card" key={r.id}>
-                            <RewardArt reward={r} onOpen={openRewardImage} />
-                            <div className="reward-body">
-                              <h3>{r.name}</h3>
-                              <p>
-                                {r.price} Coins · เหลือ {r.stock} ชิ้น
-                              </p>
-                              <p>
-                                {r.enabled ? "เปิดให้แลก" : "ปิดให้แลก"}
-                                {r.stock <= 3 ? " · สต็อกต่ำ" : ""}
-                              </p>
-                              <button
-                                className="btn secondary"
-                                onClick={() =>
-                                  openModal({ type: "reward", item: r })
-                                }
-                              >
-                                แก้ไขรางวัล
-                              </button>
-                              <button
-                                className="btn secondary"
-                                onClick={() =>
-                                  openModal({ type: "deleteReward", item: r })
-                                }
-                              >
-                                <Trash2 size={17} /> ลบรางวัล
-                              </button>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {adminTab === "ledger" && (
-                    <>
-                      <input
-                        className="search-input"
-                        aria-label="ค้นหา Coins"
-                        placeholder="ค้นหารหัสนักเรียน เหตุผล หรือประเภท"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                      <div className="panel">
-                        {admin.ledger
-                          .filter((t) =>
-                            [t.student, t.reason, t.type]
-                              .join(" ")
-                              .includes(query),
-                          )
-                          .map((t) => (
-                            <div className="ledger-row" key={t.id}>
-                              <Coins />
-                              <div className="grow">
-                                <b>{t.reason}</b>
-                                <small>
-                                  {studentName(t.student)?.name} · {t.student} ·{" "}
-                                  {date(t.at)}
-                                </small>
-                                <small>
-                                  {t.type} · {t.staff || "นักเรียน"}
-                                  {t.related
-                                    ? " · อ้างอิง " + t.related.slice(0, 8)
-                                    : ""}
-                                </small>
-                              </div>
-                              <strong
-                                className={t.amount < 0 ? "danger" : "positive"}
-                              >
-                                {t.amount > 0 ? "+" : ""}
-                                {fmt(t.amount)}
-                              </strong>
-                            </div>
-                          ))}
-                      </div>
-                    </>
-                  )}
-                  {adminTab === "audit" && (
-                    <>
-                      <div className="filters">
-                        <input
-                          className="search-input"
-                          aria-label="ค้นหา Audit"
-                          placeholder="ค้นหาเจ้าหน้าที่ รายการ หรือเหตุผล"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                        />
-                        <select
-                          aria-label="ประเภท Audit"
-                          value={
-                            category.startsWith("audit:")
-                              ? category.slice(6)
-                              : ""
-                          }
-                          onChange={(e) =>
-                            setCategory("audit:" + e.target.value)
-                          }
-                        >
-                          <option value="">ทุกการกระทำ</option>
-                          {[...new Set(admin.audit.map((a) => a.action))].map(
-                            (a) => (
-                              <option key={a}>{a}</option>
-                            ),
-                          )}
-                        </select>
-                      </div>
-                      <div className="panel">
-                        {admin.audit
-                          .filter(
-                            (a) =>
-                              JSON.stringify(a).includes(query) &&
-                              (!category.startsWith("audit:") ||
-                                !category.slice(6) ||
-                                a.action === category.slice(6)),
-                          )
-                          .map((a) => (
-                            <div className="audit-row" key={a.id}>
-                              <div>
-                                <b>{a.action}</b>
-                                <span>
-                                  {a.staff}
-                                  {a.actorId && a.actorId !== a.staff
-                                    ? ` (${a.actorId})`
-                                    : ""}{" "}
-                                  · {date(a.at)}
-                                </span>
-                              </div>
-                              <p>
-                                {a.target}
-                                {a.reason ? " · " + a.reason : ""}
-                              </p>
-                              <div className="audit-values">
-                                <code>{JSON.stringify(a.before)}</code>
-                                <ArrowRight size={16} />
-                                <code>{JSON.stringify(a.after)}</code>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </>
-                  )}
-                  {adminTab === "promotion" && (
-                    <>
-                      <div className="panel">
-                        <h2>ตรวจสอบก่อนขึ้นปีการศึกษาใหม่</h2>
-                        <p>
-                          ปรับชั้น ห้อง และสถานะรายคนได้ Coins
-                          และประวัติทั้งหมดจะคงอยู่
-                        </p>
-                        <Field label="ปีการศึกษา (ค.ศ.)">
-                          <input
-                            type="number"
-                            readOnly
-                            value={year}
-                            onChange={(e) => setYear(e.target.value)}
-                          />
-                        </Field>
-                        <div className="promotion-summary">
-                          {[1, 2, 3, 4, 5, 6].map((g) => (
-                            <span key={g}>
-                              ม.{g} → {g === 6 ? "ศิษย์เก่า" : "ม." + (g + 1)}
-                              <b>
-                                {
-                                  promotion.filter(
-                                    (p) => p.oldGrade === String(g),
-                                  ).length
-                                }{" "}
-                                คน
-                              </b>
-                            </span>
-                          ))}
-                        </div>
-                        <div className="table-wrap">
-                          <table>
-                            <thead>
-                              <tr>
-                                <th>นักเรียน</th>
-                                <th>ชั้นเดิม</th>
-                                <th>ชั้นใหม่</th>
-                                <th>ห้อง</th>
-                                <th>เลขที่</th>
-                                <th>สถานะ</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {promotion.map((p, i) => (
-                                <tr key={p.id}>
-                                  <td>{p.name}</td>
-                                  <td>ม.{p.oldGrade}</td>
-                                  <td>
-                                    <select
-                                      aria-label={"ชั้นใหม่ " + p.name}
-                                      value={p.grade}
-                                      onChange={(e) =>
-                                        setPromotion((old) =>
-                                          old.map((s, j) =>
-                                            j === i
-                                              ? { ...s, grade: e.target.value }
-                                              : s,
-                                          ),
-                                        )
-                                      }
-                                    >
-                                      {[1, 2, 3, 4, 5, 6].map((n) => (
-                                        <option key={n}>{n}</option>
-                                      ))}
-                                    </select>
-                                  </td>
-                                  <td>
-                                    <input
-                                      aria-label={"ห้อง " + p.name}
-                                      type="number"
-                                      min="1"
-                                      max="30"
-                                      value={p.room}
-                                      onChange={(e) =>
-                                        setPromotion((old) =>
-                                          old.map((s, j) =>
-                                            j === i
-                                              ? { ...s, room: e.target.value }
-                                              : s,
-                                          ),
-                                        )
-                                      }
-                                    />
-                                  </td>
-                                  <td>
-                                    <input
-                                      aria-label={"เลขที่ใหม่ " + p.name}
-                                      type="number"
-                                      min="1"
-                                      max={policy.maxNumber}
-                                      value={p.number}
-                                      onChange={(e) =>
-                                        setPromotion((old) =>
-                                          old.map((s, j) =>
-                                            j === i
-                                              ? { ...s, number: e.target.value }
-                                              : s,
-                                          ),
-                                        )
-                                      }
-                                    />
-                                  </td>
-                                  <td>
-                                    <select
-                                      aria-label={"สถานะ " + p.name}
-                                      value={p.status}
-                                      onChange={(e) =>
-                                        setPromotion((old) =>
-                                          old.map((s, j) =>
-                                            j === i
-                                              ? { ...s, status: e.target.value }
-                                              : s,
-                                          ),
-                                        )
-                                      }
-                                    >
-                                      {[
-                                        "Active",
-                                        "Alumni",
-                                        "Transferred",
-                                        "Inactive",
-                                      ].map((t) => (
-                                        <option key={t}>{t}</option>
-                                      ))}
-                                    </select>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        <Button
-                          onClick={() => openModal({ type: "promote" })}
-                          disabled={!promotion.length || busy}
-                        >
-                          ตรวจสอบครบแล้ว · เลื่อนชั้น {promotion.length} คน
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                  {[
-                    "students",
-                    "reviews",
-                    "pickups",
-                    "ledger",
-                    "audit",
-                  ].includes(adminTab) && (
-                    <div className="pagination">
-                      <button
-                        className="btn secondary"
-                        disabled={adminPage === 0 || busy}
-                        onClick={() => setAdminPage((p) => p - 1)}
-                      >
-                        หน้าก่อน
-                      </button>
-                      <span>หน้า {adminPage + 1}</span>
-                      <button
-                        className="btn secondary"
-                        disabled={!admin.hasMore || busy}
-                        onClick={() => setAdminPage((p) => p + 1)}
-                      >
-                        หน้าถัดไป
-                      </button>
-                    </div>
-                  )}
-                </section>
-              </div>
+              <StaffWorkspace
+                view={{
+                  data: { admin, publicData: data, staff },
+                  navigation: {
+                    tab: adminTab,
+                    page: adminPage,
+                    query,
+                    auditCategory: category,
+                    reportRefresh,
+                  },
+                  status: { busy, loading: adminLoading, failed: adminFailed },
+                  selection: { ids: selectedStudents, rows: visibleStudents },
+                  promotion: { year, rows: promotion },
+                }}
+                actions={{
+                  onNavigateTab: (key) => {
+                    setQuery("");
+                    key === "promotion" ? startPromotion() : setAdminTab(key);
+                  },
+                  onRefresh: () =>
+                    adminTab === "reports"
+                      ? setReportRefresh((value) => value + 1)
+                      : run(refreshAdmin),
+                  onMaintenance: () =>
+                    run(async () => {
+                      await api("maintenance", {});
+                      await refreshAdmin();
+                    }),
+                  onStudentHistory: (selected) =>
+                    run(async () => {
+                      const profile = await api("student?id=" + selected.id);
+                      openModal({ type: "studentDetail", p: profile });
+                    }),
+                  onLogout: home,
+                  onTabChange: setAdminTab,
+                  onSearch: setQuery,
+                  onModal: openModal,
+                  onImage: setImage,
+                  onRewardImage: openRewardImage,
+                  onToggleVisibleStudents: toggleVisibleStudents,
+                  onToggleStudent: toggleStudent,
+                  onAuditCategoryChange: setCategory,
+                  onPromotionRowsChange: setPromotion,
+                  onPageChange: setAdminPage,
+                }}
+              />
             )}
           </>
         )}
@@ -2547,10 +1362,10 @@ function App() {
                       <CheckCircle2 />
                     </div>
                   )}
-                  <Button type="submit">
+                  <ActionButton busy={busy} type="submit">
                     {lookup ? "ใช่ นี่คือบัญชีของฉัน" : "ตรวจสอบรหัส"}{" "}
                     <ArrowRight size={18} />
-                  </Button>
+                  </ActionButton>
                 </form>
                 <p className="muted">ยังไม่มีบัญชี?</p>
                 <button
@@ -2638,9 +1453,9 @@ function App() {
                       />
                     </Field>
                   </div>
-                  <Button type="submit">
+                  <ActionButton busy={busy} type="submit">
                     สมัครสมาชิก <ArrowRight size={18} />
-                  </Button>
+                  </ActionButton>
                 </form>
                 <button
                   className="text-button"
@@ -2684,9 +1499,9 @@ function App() {
                       required
                     />
                   </Field>
-                  <Button>
+                  <ActionButton busy={busy}>
                     เข้าสู่ระบบ <ArrowRight size={18} />
-                  </Button>
+                  </ActionButton>
                 </form>
               </>
             )}
@@ -2720,11 +1535,12 @@ function App() {
                     );
                   })}
                 >
-                  <Button
+                  <ActionButton
+                    busy={busy}
                     disabled={busy || student?.balance < modal.reward.price}
                   >
                     ยืนยันแลก {modal.reward.price} Coins
-                  </Button>
+                  </ActionButton>
                   {student?.balance < modal.reward.price && (
                     <p className="danger">
                       Coins ยังไม่เพียงพอ มาแยกขยะเพิ่มกัน!
@@ -2748,7 +1564,7 @@ function App() {
                     );
                   })}
                 >
-                  <Button>ยืนยันยกเลิก</Button>
+                  <ActionButton busy={busy}>ยืนยันยกเลิก</ActionButton>
                 </form>
               </>
             )}
@@ -2770,7 +1586,7 @@ function App() {
                   })}
                 >
                   <ProfileForm p={modal.p} adminMode={modal.adminMode} />
-                  <Button>บันทึกข้อมูล</Button>
+                  <ActionButton busy={busy}>บันทึกข้อมูล</ActionButton>
                 </form>
               </>
             )}
@@ -2819,7 +1635,9 @@ function App() {
                       required
                     />
                   </Field>
-                  <Button>ยืนยันลบ {modal.ids.length} คน</Button>
+                  <ActionButton busy={busy}>
+                    ยืนยันลบ {modal.ids.length} คน
+                  </ActionButton>
                 </form>
               </>
             )}
@@ -2880,7 +1698,7 @@ function App() {
                   ) : (
                     <RejectionReason key={modal.item.id} />
                   )}
-                  <Button>ยืนยันผลการตรวจ</Button>
+                  <ActionButton busy={busy}>ยืนยันผลการตรวจ</ActionButton>
                 </form>
               </>
             )}
@@ -2923,7 +1741,7 @@ function App() {
                       </Field>
                     </>
                   )}
-                  <Button>ยืนยัน</Button>
+                  <ActionButton busy={busy}>ยืนยัน</ActionButton>
                 </form>
               </>
             )}
@@ -2967,7 +1785,9 @@ function App() {
                     <input name="confirmLarge" type="checkbox" />{" "}
                     ยืนยันเพิ่มเติมเมื่อปรับตั้งแต่ 1,000 Coins
                   </label>
-                  <Button>ยืนยันและบันทึกในบัญชี</Button>
+                  <ActionButton busy={busy}>
+                    ยืนยันและบันทึกในบัญชี
+                  </ActionButton>
                 </form>
               </>
             )}
@@ -2979,7 +1799,8 @@ function App() {
                   รางวัลจะหายจากร้านและหน้าจัดการ ประวัติการแลกยังอยู่
                   รายการที่รอรับของยังส่งมอบหรือยกเลิกคืน Coins ได้
                 </p>
-                <Button
+                <ActionButton
+                  busy={busy}
                   disabled={busy}
                   onClick={() =>
                     run(async () => {
@@ -2995,7 +1816,7 @@ function App() {
                   }
                 >
                   ยืนยันลบรางวัล
-                </Button>
+                </ActionButton>
               </>
             )}
             {modal.type === "reward" && (
@@ -3080,7 +1901,7 @@ function App() {
                     />{" "}
                     เปิดให้แลกรางวัล
                   </label>
-                  <Button>บันทึกรางวัล</Button>
+                  <ActionButton busy={busy}>บันทึกรางวัล</ActionButton>
                 </form>
               </>
             )}
@@ -3093,7 +1914,8 @@ function App() {
                 <p>
                   ตรวจข้อยกเว้นในตารางแล้วหรือยัง? ปีนี้จะเลื่อนชั้นซ้ำอีกไม่ได้
                 </p>
-                <Button
+                <ActionButton
+                  busy={busy}
                   onClick={() =>
                     run(async () => {
                       await action("promote", {
@@ -3118,7 +1940,7 @@ function App() {
                   }
                 >
                   ยืนยันเลื่อนชั้น
-                </Button>
+                </ActionButton>
               </>
             )}
             {modal.type === "studentDetail" && (
@@ -3178,7 +2000,8 @@ function App() {
                   </div>
                 ))}
                 {modal.p.hasMore && (
-                  <Button
+                  <ActionButton
+                    busy={busy}
                     onClick={() =>
                       run(async () => {
                         const previous = modal.p,
@@ -3208,7 +2031,7 @@ function App() {
                     }
                   >
                     โหลดประวัติเพิ่ม
-                  </Button>
+                  </ActionButton>
                 )}
               </>
             )}

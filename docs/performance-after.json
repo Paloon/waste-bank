@@ -1,0 +1,217 @@
+{
+  "label": "after",
+  "generatedAt": "2026-10-14T15:14:26.461Z",
+  "fixtureClock": "2026-10-14T08:00:00.000Z",
+  "node": "23.8.0",
+  "platform": "win32",
+  "repetitions": 3,
+  "sources": {
+    "server/store.js": "80aafa777752e80b76cc69512670111391acff6011c7eb6e8cdc8605698b8253",
+    "server/views.js": "a93d779ee4fbba9ca0131251f427233d556266bb1343253accdfd0d798ec9560",
+    "server/state.js": "04c36e2228f289adc7216f26d7448a0f8a3fa9f73a928fed3a128c3bb5099915",
+    "scripts/benchmark-performance.mjs": "de9a936c56f8eea4f01769deeaeeb5802b93e5491670b6779f2a309cd9c3aa9f"
+  },
+  "limitations": [
+    "Local synthetic SQLite only; no production/cloud network traffic",
+    "SQLite stores a complete JSON snapshot; scoped reads still parse the complete snapshot",
+    "Response/returned-read bytes describe logical payloads, not database transport or disk reads",
+    "Single process, warmup plus repeated sequential reads; p95 is descriptive with few samples"
+  ],
+  "results": [
+    {
+      "students": 300,
+      "ledgerEntries": 10000,
+      "submissions": 2000,
+      "redemptions": 500,
+      "serializedFixtureBytes": 2000300,
+      "workloads": {
+        "summary": {
+          "samplesMs": [
+            49.56,
+            47.16,
+            44.46
+          ],
+          "medianMs": 47.16,
+          "p95Ms": 49.56,
+          "responseBytes": 41242,
+          "snapshotReads": 1,
+          "recordsReturnedByReads": 12801,
+          "bytesReturnedByReads": 2000300,
+          "correctness": "passed"
+        },
+        "student-history-first": {
+          "samplesMs": [
+            35.25,
+            37.59,
+            35.48
+          ],
+          "medianMs": 35.48,
+          "p95Ms": 37.59,
+          "responseBytes": 7205,
+          "snapshotReads": 2,
+          "recordsReturnedByReads": 10343,
+          "bytesReturnedByReads": 1376675,
+          "correctness": "passed"
+        },
+        "student-history-filtered-page-2": {
+          "samplesMs": [
+            37.87,
+            37.69,
+            37.56
+          ],
+          "medianMs": 37.69,
+          "p95Ms": 37.87,
+          "responseBytes": 411,
+          "snapshotReads": 2,
+          "recordsReturnedByReads": 10307,
+          "bytesReturnedByReads": 1371847,
+          "correctness": "passed"
+        },
+        "submission-query-page-2": {
+          "samplesMs": [
+            8.93,
+            10.83,
+            8.57
+          ],
+          "medianMs": 8.93,
+          "p95Ms": 10.83,
+          "responseBytes": 14514,
+          "snapshotReads": 1,
+          "recordsReturnedByReads": 51,
+          "bytesReturnedByReads": 14514,
+          "correctness": "passed"
+        }
+      }
+    },
+    {
+      "students": 1500,
+      "ledgerEntries": 50000,
+      "submissions": 10000,
+      "redemptions": 2500,
+      "serializedFixtureBytes": 10002380,
+      "workloads": {
+        "summary": {
+          "samplesMs": [
+            244.85,
+            243.32,
+            253.94
+          ],
+          "medianMs": 244.85,
+          "p95Ms": 253.94,
+          "responseBytes": 206304,
+          "snapshotReads": 1,
+          "recordsReturnedByReads": 64001,
+          "bytesReturnedByReads": 10002380,
+          "correctness": "passed"
+        },
+        "student-history-first": {
+          "samplesMs": [
+            187.51,
+            203.48,
+            187.2
+          ],
+          "medianMs": 187.51,
+          "p95Ms": 203.48,
+          "responseBytes": 7206,
+          "snapshotReads": 2,
+          "recordsReturnedByReads": 51543,
+          "bytesReturnedByReads": 6856755,
+          "correctness": "passed"
+        },
+        "student-history-filtered-page-2": {
+          "samplesMs": [
+            194.2,
+            224.65,
+            201.42
+          ],
+          "medianMs": 201.42,
+          "p95Ms": 224.65,
+          "responseBytes": 412,
+          "snapshotReads": 2,
+          "recordsReturnedByReads": 51507,
+          "bytesReturnedByReads": 6851927,
+          "correctness": "passed"
+        },
+        "submission-query-page-2": {
+          "samplesMs": [
+            59.93,
+            60.72,
+            72.35
+          ],
+          "medianMs": 60.72,
+          "p95Ms": 72.35,
+          "responseBytes": 14550,
+          "snapshotReads": 1,
+          "recordsReturnedByReads": 51,
+          "bytesReturnedByReads": 14550,
+          "correctness": "passed"
+        }
+      }
+    },
+    {
+      "students": 3000,
+      "ledgerEntries": 100000,
+      "submissions": 20000,
+      "redemptions": 5000,
+      "serializedFixtureBytes": 20005616,
+      "workloads": {
+        "summary": {
+          "samplesMs": [
+            571.96,
+            531.1,
+            570.97
+          ],
+          "medianMs": 570.97,
+          "p95Ms": 571.96,
+          "responseBytes": 413259,
+          "snapshotReads": 1,
+          "recordsReturnedByReads": 128001,
+          "bytesReturnedByReads": 20005616,
+          "correctness": "passed"
+        },
+        "student-history-first": {
+          "samplesMs": [
+            463.06,
+            449.54,
+            449.32
+          ],
+          "medianMs": 449.54,
+          "p95Ms": 463.06,
+          "responseBytes": 7206,
+          "snapshotReads": 2,
+          "recordsReturnedByReads": 103043,
+          "bytesReturnedByReads": 13707490,
+          "correctness": "passed"
+        },
+        "student-history-filtered-page-2": {
+          "samplesMs": [
+            476.04,
+            463.13,
+            474.96
+          ],
+          "medianMs": 474.96,
+          "p95Ms": 476.04,
+          "responseBytes": 412,
+          "snapshotReads": 2,
+          "recordsReturnedByReads": 103007,
+          "bytesReturnedByReads": 13702662,
+          "correctness": "passed"
+        },
+        "submission-query-page-2": {
+          "samplesMs": [
+            115.11,
+            113.44,
+            120.72
+          ],
+          "medianMs": 115.11,
+          "p95Ms": 120.72,
+          "responseBytes": 14550,
+          "snapshotReads": 1,
+          "recordsReturnedByReads": 51,
+          "bytesReturnedByReads": 14550,
+          "correctness": "passed"
+        }
+      }
+    }
+  ]
+}

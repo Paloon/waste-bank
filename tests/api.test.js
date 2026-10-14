@@ -114,6 +114,8 @@ test("HTTP sessions, retained student access, authorization, validation and sens
     login = await call("login", { id: "teacher.mali", pin });
     cookie = getCookie(login);
     assert.equal(login.status, 200);
+    const loginAudit = store.read().audit.find((event) => event.action === "login" && event.actorId === "teacher.mali");
+    assert.equal(loginAudit.actorRole, "staff");
     assert.equal((await call("admin", null, cookie)).status, 200);
     store.transact((s) => {
       for (let i = 0; i < 60; i++)

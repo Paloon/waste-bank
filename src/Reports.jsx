@@ -88,10 +88,15 @@ export default function Reports({ refreshKey = 0 }) {
     [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setLoading(true);
     setError("");
     setReport(null);
-    api("reports?" + new URLSearchParams({ ...range, group, day, page }))
+    api(
+      "reports?" + new URLSearchParams({ ...range, group, day, page }),
+      undefined,
+      { signal: controller.signal },
+    )
       .then((value) => {
         if (active) setReport(value);
       })
@@ -103,6 +108,7 @@ export default function Reports({ refreshKey = 0 }) {
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [range, group, day, page, refreshKey, retry]);
   const apply = (start, end) => {

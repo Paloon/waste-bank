@@ -1,12 +1,41 @@
+import { schoolDate } from "../shared/time.js";
 import { policy } from "../shared/policy.js";
 import { totals } from "./state.js";
 export async function summary(store) {
   if (store.summary) return store.summary();
   const s = await store.read(),
     scores = totals(s),
-    date = (x) =>
-      new Date(x).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }),
+    date = (value) =>
+      Number.isFinite(new Date(value).getTime()) ? schoolDate(value) : "",
     today = date(Date.now());
+  const stats = {
+    pending: 0,
+    pickups: 0,
+    weight: 0,
+    coins: 0,
+    students: 0,
+    submissions: 0,
+    approvedToday: 0,
+    coinsToday: 0,
+    categories: {},
+  };
+  for (const item of s.submissions) {
+    if (item.status === "Pending") stats.pending++;
+    if (item.status !== "Approved") continue;
+    stats.submissions++;
+    stats.weight += item.weight || 0;
+    stats.categories[item.category] =
+      (stats.categories[item.category] || 0) + 1;
+    if (date(item.reviewedAt || item.at) === today) stats.approvedToday++;
+  }
+  for (const item of s.redemptions)
+    if (item.status === "Pending Pickup") stats.pickups++;
+  for (const item of s.students) if (item.status === "Active") stats.students++;
+  for (const item of s.ledger) {
+    if (item.type !== "recycle") continue;
+    stats.coins += item.amount;
+    if (date(item.at) === today) stats.coinsToday += item.amount;
+  }
   return {
     students: s.students.map((p) => ({ ...p, ...scores.get(p.id) })),
     rewards: s.rewards,
@@ -15,31 +44,7 @@ export async function summary(store) {
         .filter(([, v]) => Array.isArray(v))
         .map(([k, v]) => [k, v.length]),
     ),
-    stats: {
-      pending: s.submissions.filter((x) => x.status === "Pending").length,
-      pickups: s.redemptions.filter((x) => x.status === "Pending Pickup")
-        .length,
-      weight: s.submissions
-        .filter((x) => x.status === "Approved")
-        .reduce((n, x) => n + (x.weight || 0), 0),
-      coins: s.ledger
-        .filter((x) => x.type === "recycle")
-        .reduce((n, x) => n + x.amount, 0),
-      students: s.students.filter((x) => x.status === "Active").length,
-      submissions: s.submissions.filter((x) => x.status === "Approved").length,
-      approvedToday: s.submissions.filter(
-        (x) => x.status === "Approved" && date(x.reviewedAt || x.at) === today,
-      ).length,
-      coinsToday: s.ledger
-        .filter((x) => x.type === "recycle" && date(x.at) === today)
-        .reduce((n, x) => n + x.amount, 0),
-      categories: s.submissions
-        .filter((x) => x.status === "Approved")
-        .reduce(
-          (acc, x) => ((acc[x.category] = (acc[x.category] || 0) + 1), acc),
-          {},
-        ),
-    },
+    stats,
   };
 }
 export const publicStudent = (p) => ({
@@ -87,8 +92,10 @@ export const ranked = (students, monthly = false) =>
 export async function studentHistory(store, id, options) {
   if (store.studentHistory) return store.studentHistory(id, options);
   const { page, submissionPage, submissionStatus } = options;
-  const s = await summary(store),
-    student = s.students.find((p) => p.id === id);
+  const s = await store.read({ students: {}, ledger: {} }),
+    scores = totals(s),
+    account = s.students.find((p) => p.id === id),
+    student = account ? { ...publicStudent(account), ...scores.get(id) } : null;
   if (!student) return { student: null };
   const scope = {
     students: [id],
@@ -113,7 +120,10 @@ export async function studentHistory(store, id, options) {
   return {
     ...history,
     student,
-    rank: ranked(s.students).findIndex((p) => p.id === id) + 1,
+    rank:
+      ranked(
+        s.students.map((p) => ({ ...publicStudent(p), ...scores.get(p.id) })),
+      ).findIndex((p) => p.id === id) + 1,
     submissionStatusCounts: { All: all.length, ...counts },
     submissions: all
       .filter((x) => !submissionStatus || x.status === submissionStatus)

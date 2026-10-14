@@ -3414,3 +3414,42 @@ nav button.submit-nav.active {
 .operations-status h2 { display: flex; align-items: center; gap: 8px; }
 .operations-status li { margin: 8px 0; }
 .operations-status { border-left: 4px solid #b88927; }
+.field-error {
+  color: #a52323;
+  font-size: 0.9rem;
+  margin: -8px 0 16px;
+}
+#submission-form [aria-invalid="true"] { border-color: #a52323; }
+#submission-form [data-field]:focus-visible { outline: 3px solid #48713c; outline-offset: 3px; }
+.submission-actions { margin-top: 22px; }
+.submit-layout .upload-buttons input[type="file"] {
+  display: block;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.submit-layout .upload-buttons label:focus-within { outline: 3px solid #48713c; outline-offset: 3px; }
+.submission-actions > span { display: block; margin-top: 8px; text-align: center; font-size: 0.85rem; color: var(--muted); }
+.submission-spinner { animation: submission-spin 1s linear infinite; }
+@keyframes submission-spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) {
+  #submission-form { padding-bottom: 110px; }
+  .submission-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 25;
+    margin: 0;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+    background: #fff;
+    border-top: 1px solid #d8e0d2;
+    box-shadow: 0 -4px 20px #243d2810;
+  }
+  .submission-actions .btn { min-height: 50px; }
+}
+@media (prefers-reduced-motion: reduce) { .submission-spinner { animation: none; } }

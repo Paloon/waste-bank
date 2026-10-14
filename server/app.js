@@ -1,3 +1,10 @@
+import {
+  adminRead,
+  adminTabs,
+  publicOverview,
+  rankSearch,
+  leaderboard,
+} from "./read-queries.js";
 import express from "express";
 import { randomBytes, randomUUID } from "node:crypto";
 import { policy } from "../shared/policy.js";
@@ -15,7 +22,6 @@ import {
 } from "./validation.js";
 import { performAction } from "./actions.js";
 import {
-  summary,
   publicStudent,
   rewardView,
   rewardImages,
@@ -83,7 +89,7 @@ export function createApp({
   let cachedPublic = null;
   app.get("/api/public", async (req, res) => {
     if (!cachedPublic || cachedPublic.until < Date.now()) {
-      const s = await summary(store);
+      const s = await publicOverview(store);
       cachedPublic = {
         until: Date.now() + 15000,
         data: {
@@ -167,7 +173,7 @@ export function createApp({
       "กรุณาให้ผู้ดูแลเปลี่ยน PIN เจ้าหน้าที่เป็นอย่างน้อย 8 หลัก",
     );
     await security.login(req, res, { ...p, role: "staff" });
-    await audit(store, "login", p, "staff");
+    await audit(store, "login", { ...p, role: "staff" }, "staff");
     res.json({ name: p.name });
   });
   app.post("/api/logout", async (req, res) => {
@@ -252,74 +258,31 @@ export function createApp({
     );
   });
   app.get("/api/admin", async (req, res) => {
-    const actor = await security.actor(req, { staff: true }),
-      s = await summary(store);
+    const actor = await security.actor(req, { staff: true });
     const tab = String(req.query.tab || "dashboard"),
-      page = Math.max(0, Math.min(100000, Number(req.query.page) || 0)),
-      query = String(req.query.q || "").slice(0, 100),
-      filter = {
-        limit: policy.pageSize + 1,
-        offset: page * policy.pageSize,
-        ...(query ? { query } : {}),
-      };
-    const scopes = {
-      dashboard: { audit: { limit: 5 } },
-      reviews: { submissions: { ...filter, status: "Pending" } },
-      pickups: { redemptions: { ...filter, status: "Pending Pickup" } },
-      ledger: { ledger: filter },
-      audit: { audit: filter },
-    };
-    if (tab === "pickups" && query)
-      scopes.pickups.redemptions.queryStudents = s.students
-        .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
-        .map((p) => p.id);
-    const detail = await store.read(scopes[tab] || {}),
-      kind = {
-        reviews: "submissions",
-        pickups: "redemptions",
-        ledger: "ledger",
-        audit: "audit",
-      }[tab];
-    const hasMore = kind ? detail[kind].length > policy.pageSize : false;
-    if (kind) detail[kind] = detail[kind].slice(0, policy.pageSize);
-    const health = await readOperationsHealth(store);
-    const students = s.students.map((p) => ({
-      ...publicStudent(p),
-      balance: p.balance,
-    }));
-    const filtered =
-      tab === "students"
-        ? students.filter((p) =>
-            [p.name, p.id, "ม." + p.grade + "/" + p.room, p.grade, p.room]
-              .join(" ")
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-        : students;
+      page = Math.max(
+        0,
+        Math.min(100000, Math.trunc(Number(req.query.page) || 0)),
+      ),
+      query = String(req.query.q || "").slice(0, 100);
+    assert(adminTabs.includes(tab), "หน้ารายการไม่ถูกต้อง", 400);
+    const data = await adminRead(store, { tab, page, query });
     res.json({
-      students:
-        tab === "students"
-          ? filtered.slice(page * policy.pageSize, (page + 1) * policy.pageSize)
-          : students,
-      rewards: s.rewards.filter((r) => !r.deletedAt).map(rewardView),
-      submissions: detail.submissions.map(submissionView),
-      redemptions: detail.redemptions,
-      ledger: detail.ledger,
-      audit: detail.audit,
+      ...data,
+      students: data.students.map((p) => ({
+        ...publicStudent(p),
+        balance: p.balance,
+      })),
+      rewards: data.rewards.map(rewardView),
+      submissions: data.submissions.map(submissionView),
       name: actor.name,
-      stats: s.stats,
-      counts: s.counts,
-      databaseBytes: s.databaseBytes || null,
       page,
-      hasMore:
-        tab === "students"
-          ? (page + 1) * policy.pageSize < filtered.length
-          : hasMore,
+      databaseBytes: data.databaseBytes || null,
       drive: {
         configured: drive.configured,
         connected: await drive.connected(),
       },
-      health,
+      health: await readOperationsHealth(store),
     });
   });
   app.get("/api/promotion", async (req, res) => {
@@ -337,30 +300,27 @@ export function createApp({
       promotedYears: s.promotedYears,
     });
   });
+  app.get("/api/leaderboard", async (req, res) => {
+    await security.limit(req, "rank", { limit: 120 });
+    res.json(
+      await leaderboard(store, {
+        grade: String(req.query.grade || ""),
+        room: String(req.query.room || ""),
+        monthly: req.query.period === "month",
+      }),
+    );
+  });
   app.get("/api/rank", async (req, res) => {
     await security.limit(req, "rank", { limit: 120 });
-    const s = await summary(store),
-      q = String(req.query.q || "")
-        .trim()
-        .slice(0, 100);
     res.json(
-      ranked(
-        s.students.filter(
-          (x) =>
-            (!req.query.grade || x.grade === req.query.grade) &&
-            (!req.query.room || x.room === req.query.room),
-        ),
-        req.query.period === "month",
-      )
-        .map((x, i) => ({ ...x, rank: i + 1 }))
-        .filter((x) => q && (x.id === q || x.name.includes(q)))
-        .map((x) => ({
-          name: x.name.split(" ")[0],
-          grade: x.grade,
-          room: x.room,
-          earned: req.query.period === "month" ? x.monthly : x.earned,
-          rank: x.rank,
-        })),
+      await rankSearch(store, {
+        query: String(req.query.q || "")
+          .trim()
+          .slice(0, 100),
+        grade: String(req.query.grade || ""),
+        room: String(req.query.room || ""),
+        monthly: req.query.period === "month",
+      }),
     );
   });
   app.get("/api/drive/status", async (req, res) => {
@@ -395,7 +355,7 @@ export function createApp({
       binding,
     );
     res.clearCookie("wb_oauth", { path: "/api/drive" });
-    await audit(store, "driveConnected", { id }, "drive");
+    await audit(store, "driveConnected", { id, role: "staff" }, "drive");
     res.redirect("/?drive=connected");
   });
   app.get("/api/media/:type/:id", async (req, res) => {

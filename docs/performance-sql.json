@@ -1,0 +1,455 @@
+{
+  "engine": "PGlite PostgreSQL in WASM",
+  "samples": 5,
+  "limitations": [
+    "Local warm sequential reads; timings exclude HTTP, Vercel cold starts and Supabase network.",
+    "RPC bytes are database responses, not equivalent endpoint responses.",
+    "Five samples describe these runs and cannot establish a production p95 SLA."
+  ],
+  "levels": [
+    {
+      "students": 300,
+      "ledger": 10000,
+      "workloads": {
+        "previousSummary": {
+          "samplesMs": [
+            65.21,
+            61.47,
+            58.21,
+            64.05,
+            63.38
+          ],
+          "medianMs": 63.38,
+          "observedP95Ms": 65.21,
+          "databaseResponseBytes": 41203,
+          "correctness": "passed"
+        },
+        "studentsPage": {
+          "samplesMs": [
+            38.86,
+            36.28,
+            37.21,
+            38.19,
+            43.37
+          ],
+          "medianMs": 38.19,
+          "observedP95Ms": 43.37,
+          "databaseResponseBytes": 7111,
+          "correctness": "passed"
+        },
+        "reviewPage": {
+          "samplesMs": [
+            44.46,
+            44.25,
+            45.43,
+            47.52,
+            51.42
+          ],
+          "medianMs": 45.43,
+          "observedP95Ms": 51.42,
+          "databaseResponseBytes": 12715,
+          "correctness": "passed"
+        },
+        "publicOverview": {
+          "samplesMs": [
+            58.76,
+            59.8,
+            62.1,
+            57.19,
+            60.28
+          ],
+          "medianMs": 59.8,
+          "observedP95Ms": 62.1,
+          "databaseResponseBytes": 660,
+          "correctness": "passed"
+        },
+        "studentHistory": {
+          "samplesMs": [
+            11.13,
+            12.23,
+            9.13,
+            12,
+            13.13
+          ],
+          "medianMs": 12,
+          "observedP95Ms": 13.13,
+          "databaseResponseBytes": 4514,
+          "correctness": "passed"
+        }
+      },
+      "historyQueryPlan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.29,
+            "Total Cost": 63.22,
+            "Plan Rows": 34,
+            "Plan Width": 157,
+            "Actual Startup Time": 0.041,
+            "Actual Total Time": 0.109,
+            "Actual Rows": 34,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 36,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "waste_bank_ledger_kind_student_at_id_idx",
+                "Relation Name": "waste_bank_ledger",
+                "Alias": "waste_bank_records",
+                "Startup Cost": 0.29,
+                "Total Cost": 63.22,
+                "Plan Rows": 34,
+                "Plan Width": 157,
+                "Actual Startup Time": 0.031,
+                "Actual Total Time": 0.07,
+                "Actual Rows": 34,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((kind = 'ledger'::text) AND (student = '50000'::text))",
+                "Rows Removed by Index Recheck": 0,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 36,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.229,
+          "Triggers": [],
+          "Execution Time": 0.175
+        }
+      ]
+    },
+    {
+      "students": 1500,
+      "ledger": 50000,
+      "workloads": {
+        "previousSummary": {
+          "samplesMs": [
+            351.7,
+            339.47,
+            350.42,
+            345.66,
+            349.28
+          ],
+          "medianMs": 349.28,
+          "observedP95Ms": 351.7,
+          "databaseResponseBytes": 205927,
+          "correctness": "passed"
+        },
+        "studentsPage": {
+          "samplesMs": [
+            166.36,
+            163.35,
+            162.61,
+            168.67,
+            165.95
+          ],
+          "medianMs": 165.95,
+          "observedP95Ms": 168.67,
+          "databaseResponseBytes": 7115,
+          "correctness": "passed"
+        },
+        "reviewPage": {
+          "samplesMs": [
+            188.9,
+            187.41,
+            183.35,
+            192.47,
+            187.21
+          ],
+          "medianMs": 187.41,
+          "observedP95Ms": 192.47,
+          "databaseResponseBytes": 13446,
+          "correctness": "passed"
+        },
+        "publicOverview": {
+          "samplesMs": [
+            354.07,
+            398.03,
+            405.53,
+            366.89,
+            334.84
+          ],
+          "medianMs": 366.89,
+          "observedP95Ms": 405.53,
+          "databaseResponseBytes": 664,
+          "correctness": "passed"
+        },
+        "studentHistory": {
+          "samplesMs": [
+            38.4,
+            40.64,
+            36.72,
+            36.27,
+            34.18
+          ],
+          "medianMs": 36.72,
+          "observedP95Ms": 40.64,
+          "databaseResponseBytes": 4547,
+          "correctness": "passed"
+        }
+      },
+      "historyQueryPlan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.41,
+            "Total Cost": 65.08,
+            "Plan Rows": 33,
+            "Plan Width": 158,
+            "Actual Startup Time": 0.027,
+            "Actual Total Time": 0.153,
+            "Actual Rows": 34,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 37,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "waste_bank_ledger_kind_student_at_id_idx",
+                "Relation Name": "waste_bank_ledger",
+                "Alias": "waste_bank_records",
+                "Startup Cost": 0.41,
+                "Total Cost": 65.08,
+                "Plan Rows": 33,
+                "Plan Width": 158,
+                "Actual Startup Time": 0.025,
+                "Actual Total Time": 0.096,
+                "Actual Rows": 34,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((kind = 'ledger'::text) AND (student = '50000'::text))",
+                "Rows Removed by Index Recheck": 0,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 37,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.347,
+          "Triggers": [],
+          "Execution Time": 0.202
+        }
+      ]
+    },
+    {
+      "students": 3000,
+      "ledger": 100000,
+      "workloads": {
+        "previousSummary": {
+          "samplesMs": [
+            719.92,
+            588.19,
+            651.31,
+            606.28,
+            632.25
+          ],
+          "medianMs": 632.25,
+          "observedP95Ms": 719.92,
+          "databaseResponseBytes": 412706,
+          "correctness": "passed"
+        },
+        "studentsPage": {
+          "samplesMs": [
+            276.28,
+            281.81,
+            273.02,
+            268,
+            273.74
+          ],
+          "medianMs": 273.74,
+          "observedP95Ms": 281.81,
+          "databaseResponseBytes": 7119,
+          "correctness": "passed"
+        },
+        "reviewPage": {
+          "samplesMs": [
+            308.53,
+            301.6,
+            304.56,
+            294.36,
+            350.53
+          ],
+          "medianMs": 304.56,
+          "observedP95Ms": 350.53,
+          "databaseResponseBytes": 12809,
+          "correctness": "passed"
+        },
+        "publicOverview": {
+          "samplesMs": [
+            558.54,
+            571.82,
+            624.36,
+            573.73,
+            590.26
+          ],
+          "medianMs": 573.73,
+          "observedP95Ms": 624.36,
+          "databaseResponseBytes": 668,
+          "correctness": "passed"
+        },
+        "studentHistory": {
+          "samplesMs": [
+            63.01,
+            63.59,
+            67.69,
+            64.03,
+            68.37
+          ],
+          "medianMs": 64.03,
+          "observedP95Ms": 68.37,
+          "databaseResponseBytes": 4553,
+          "correctness": "passed"
+        }
+      },
+      "historyQueryPlan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.42,
+            "Total Cost": 65.08,
+            "Plan Rows": 33,
+            "Plan Width": 158,
+            "Actual Startup Time": 0.025,
+            "Actual Total Time": 0.137,
+            "Actual Rows": 34,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 37,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "waste_bank_ledger_kind_student_at_id_idx",
+                "Relation Name": "waste_bank_ledger",
+                "Alias": "waste_bank_records",
+                "Startup Cost": 0.42,
+                "Total Cost": 65.08,
+                "Plan Rows": 33,
+                "Plan Width": 158,
+                "Actual Startup Time": 0.022,
+                "Actual Total Time": 0.091,
+                "Actual Rows": 34,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((kind = 'ledger'::text) AND (student = '50000'::text))",
+                "Rows Removed by Index Recheck": 0,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 37,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.299,
+          "Triggers": [],
+          "Execution Time": 0.19
+        }
+      ]
+    }
+  ]
+}

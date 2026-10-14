@@ -9,7 +9,7 @@
     "start": "node --env-file-if-exists=.env server/index.js --production",
     "migrate:supabase": "node --env-file=.env.cloud.local scripts/migrate-supabase.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.js",
-    "test:browser": "node tests/browser.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/kiosk-browser.mjs && node tests/read-ui-browser.mjs",
     "test:all": "npm test && npm run build && npm run test:browser",
     "staff": "node --env-file-if-exists=.env scripts/staff.mjs",
     "backup": "node --env-file-if-exists=.env scripts/backup.mjs",
@@ -18,7 +18,8 @@
     "check:status": "node --env-file-if-exists=.env scripts/check-status.mjs",
     "verify:recovery": "node --env-file-if-exists=.env scripts/verify-recovery.mjs",
     "format": "prettier --write server src shared scripts tests",
-    "test:load": "node scripts/load-test.mjs"
+    "test:load": "node scripts/load-test.mjs",
+    "test:performance": "node scripts/benchmark-performance.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
