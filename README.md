@@ -54,3 +54,5 @@ Browser test ใช้ Edge ใน Windows และ Chromium ใน CI โด�
 - `tests/` — unit/API/PostgreSQL/browser regression tests
 
 การตั้งค่าในบัญชี Vercel/Supabase/Drive จริง การรัน migration การติดตั้งงานสำรองรายวัน และการซ้อมกู้คืนบนข้อมูลโรงเรียนต้องทำตามคู่มือ การแก้ source code ไม่ได้ทำขั้นตอนเหล่านั้นให้อัตโนมัติ
+
+วิธีนับจำนวนและอัตรา Coins ดู [Coins ตามจำนวน](docs/recycling-coins.md)

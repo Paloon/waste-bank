@@ -14,7 +14,13 @@ const profile = {
   status: z.enum(["Active", "Alumni", "Transferred", "Inactive"]).optional(),
 };
 const schemas = {
-  submit: z.object({ category: text, image, note: text.optional() }),
+  submit: z.object({
+    category: text,
+    count: number,
+    image,
+    disposalImage: image.optional(),
+    note: text.optional(),
+  }),
   cancelSubmission: z.object({ id }),
   redeem: z.object({ id }),
   deleteReward: z.object({
@@ -26,6 +32,9 @@ const schemas = {
   review: z.object({
     id,
     status: z.enum(["Approved", "Rejected"]),
+    category: text.optional(),
+    count: number.optional(),
+    coinRate: number.optional(),
     coins: number.optional(),
     weight: number.optional(),
     reason: text.optional(),

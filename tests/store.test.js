@@ -13,6 +13,7 @@ import {
   createStore,
   verify,
   registerStudent,
+  categories,
 } from "../server/store.js";
 const staff = { role: "staff", id: "teacher.mali" },
   student = { role: "student", id: "65001" };
@@ -28,7 +29,8 @@ test("approval creates exactly one ledger entry; stale decisions are rejected", 
   let r = request("review", {
     id: item.id,
     status: "Approved",
-    coins: 50,
+    count: 10,
+    coins: 9999,
     weight: 0.5,
   });
   act(s, staff, r);
@@ -115,6 +117,7 @@ test("duplicate image blocked and student can cancel pending submission without 
   let { s } = seed();
   let r = request("submit", {
     category: "กระดาษ",
+    count: 3,
     image: "data:image/png;base64,aGVsbG8=",
     note: "test",
   });
@@ -132,7 +135,7 @@ test("image size is enforced by the server even if the browser is bypassed", () 
       act(
         s,
         student,
-        request("submit", { category: "กระดาษ", image: oversized }),
+        request("submit", { category: "กระดาษ", count: 3, image: oversized }),
       ),
     /400 KiB/,
   );
@@ -294,4 +297,141 @@ test("SQLite rolls back partial mutation and persists valid transactions", () =>
     store.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("piece count approval corrects 3 bottles to 2, calculates server Coins and preserves declaration", () => {
+  const { s } = seed();
+  const before = balance(s, student.id);
+  const result = act(
+    s,
+    student,
+    request("submit", {
+      category: "ขวดพลาสติก",
+      count: 3,
+      image: "data:image/png;base64,YWJj",
+      note: "2 bottles in photo",
+    }),
+  );
+  const item = s.submissions.find((x) => x.id === result.id);
+  assert.equal(item.estimatedCoins, 15);
+  assert.equal(balance(s, student.id), before);
+  const decision = request("review", {
+    id: item.id,
+    status: "Approved",
+    category: "ขวดพลาสติก",
+    count: 2,
+    coins: 9999,
+  });
+  act(s, staff, decision);
+  act(s, staff, decision);
+  assert.equal(item.count, 2);
+  assert.equal(item.submittedCount, 3);
+  assert.equal(item.coins, 10);
+  assert.equal(item.weight, undefined);
+  assert.equal(balance(s, student.id), before + 10);
+  assert.equal(s.ledger.filter((x) => x.related === item.id).length, 1);
+  assert.equal(item.reviewCorrection.before.count, 3);
+});
+test("counts reject fractions, negatives, missing and excessive values; teacher can correct category", () => {
+  const { s } = seed();
+  for (const count of [undefined, 0, -1, 1.5, 1001, "NaN"])
+    assert.throws(() =>
+      act(
+        s,
+        student,
+        request("submit", {
+          category: "กระดาษ",
+          count,
+          image: "data:image/png;base64,YWJj",
+        }),
+      ),
+    );
+  const result = act(
+    s,
+    student,
+    request("submit", {
+      category: "ขวดพลาสติก",
+      count: 3,
+      image: "data:image/png;base64,YWJj",
+    }),
+  );
+  const item = s.submissions.find((x) => x.id === result.id);
+  for (const count of [undefined, 0, -1, 1.5, 1001])
+    assert.throws(() =>
+      act(
+        s,
+        staff,
+        request("review", { id: item.id, status: "Approved", count }),
+      ),
+    );
+  assert.equal(item.status, "Pending");
+  act(
+    s,
+    staff,
+    request("review", {
+      id: item.id,
+      status: "Approved",
+      category: "แก้วพลาสติก",
+      count: 2,
+    }),
+  );
+  assert.equal(item.category, "แก้วพลาสติก");
+  assert.equal(item.submittedCategory, "ขวดพลาสติก");
+  assert.equal(item.coins, 4);
+});
+
+test("snack wrappers and bags have fixed Coins; cardboard and unsupported categories accept legacy only", () => {
+  const { s } = seed();
+  const before = balance(s, student.id);
+  for (const category of ["กระดาษลัง", "ขยะอิเล็กทรอนิกส์", "อื่น ๆ"])
+    assert.throws(() =>
+      act(
+        s,
+        student,
+        request("submit", {
+          category,
+          count: 1,
+          image: "data:image/png;base64,YWJj",
+        }),
+      ),
+    );
+  for (const [i, category] of ["ซองขนม", "ถุงพลาสติก"].entries()) {
+    const result = act(
+      s,
+      student,
+      request("submit", {
+        category,
+        count: 3,
+        image: i ? "data:image/png;base64,YWJk" : "data:image/png;base64,YWJj",
+      }),
+    );
+    const item = s.submissions.find((x) => x.id === result.id);
+    assert.equal(item.estimatedCoins, 3);
+    act(
+      s,
+      staff,
+      request("review", {
+        id: item.id,
+        status: "Approved",
+        count: 2,
+        coinRate: 10,
+        coins: 999,
+      }),
+    );
+    assert.equal(item.coins, 2);
+    assert.equal(item.submittedCount, 3);
+  }
+  assert.equal(balance(s, student.id), before + 4);
+  s.submissions.push({
+    id: "legacy-cardboard",
+    student: student.id,
+    category: "กระดาษลัง",
+    status: "Pending",
+  });
+  act(
+    s,
+    staff,
+    request("review", { id: "legacy-cardboard", status: "Approved", count: 2 }),
+  );
+  assert.equal(s.submissions.find((x) => x.id === "legacy-cardboard").coins, 6);
 });

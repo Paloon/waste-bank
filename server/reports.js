@@ -11,6 +11,9 @@ export const reportFields = {
     "category",
     "status",
     "weight",
+    "count",
+    "submittedCount",
+    "submittedCategory",
     "coins",
     "reviewedAt",
     "cancelledAt",
@@ -100,6 +103,7 @@ const blank = () => ({
   rejected: 0,
   cancelled: 0,
   weight: 0,
+  pieces: 0,
   issued: 0,
   adjustmentPlus: 0,
   adjustmentMinus: 0,
@@ -190,7 +194,10 @@ export function buildReport(
     const rows = [total, daily.get(date), person];
     for (const row of rows) {
       row[kind] += extra.amount ?? 1;
-      if (kind === "approved") row.weight += Number(extra.weight || 0);
+      if (kind === "approved") {
+        row.weight += Number(extra.weight || 0);
+        row.pieces += Number(extra.count || 0);
+      }
       const set = {
         submitted: "submitters",
         approved: "approvers",
@@ -212,23 +219,29 @@ export function buildReport(
   };
   let unknownReviewDates = 0;
   const cohort = { Pending: 0, Approved: 0, Rejected: 0, Cancelled: 0 };
-  for (const s of source.submissions) {
-    if (!categories.has(s.category))
-      categories.set(s.category, {
-        category: s.category,
+  const categoryRow = (name) => {
+    if (!categories.has(name))
+      categories.set(name, {
+        category: name,
         submitted: 0,
         approved: 0,
         weight: 0,
+        pieces: 0,
         coins: 0,
       });
-    const category = categories.get(s.category);
+    return categories.get(name);
+  };
+  for (const s of source.submissions) {
+    const category = categoryRow(s.category);
+    const submittedCategory = s.submittedCategory || s.category;
     if (within(s.at, range)) {
-      category.submitted++;
+      categoryRow(submittedCategory).submitted++;
       cohort[s.status] = (cohort[s.status] || 0) + 1;
     }
     add(s.at, "submitted", s.student, {
-      category: s.category,
+      category: submittedCategory,
       status: s.status,
+      count: s.submittedCount ?? s.count,
     });
     if (["Approved", "Rejected"].includes(s.status)) {
       if (!s.reviewedAt && within(s.at, range)) unknownReviewDates++;
@@ -236,11 +249,16 @@ export function buildReport(
         s.reviewedAt,
         s.status === "Approved" ? "approved" : "rejected",
         s.student,
-        { category: s.category, weight: Number(s.weight || 0) },
+        {
+          category: s.category,
+          weight: Number(s.weight || 0),
+          count: Number(s.count || 0),
+        },
       );
       if (s.status === "Approved" && within(s.reviewedAt, range)) {
         category.approved++;
         category.weight += Number(s.weight || 0);
+        category.pieces += Number(s.count || 0);
       }
     }
     if (s.status === "Cancelled")
@@ -345,7 +363,10 @@ export function buildReport(
         });
       const row = selected.get(e.student);
       row[e.kind] += e.amount ?? 1;
-      if (e.kind === "approved") row.weight += e.weight || 0;
+      if (e.kind === "approved") {
+        row.weight += e.weight || 0;
+        row.pieces += e.count || 0;
+      }
     }
     people = [...selected.values()].map(cleanMetrics);
   }

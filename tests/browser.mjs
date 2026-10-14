@@ -90,7 +90,7 @@ try {
   );
   await page.setViewportSize({ width: 1280, height: 900 });
   await page
-    .locator("input[type=file]")
+    .locator(".upload-zone input[type=file]")
     .last()
     .setInputFiles({
       name: "evidence.png",
@@ -98,6 +98,40 @@ try {
       buffer: await page.screenshot(),
     });
   await page.getByAltText("ภาพที่เลือก").waitFor();
+  await page
+    .getByText("เพิ่มรูปถังหรือจุดทิ้ง (รูปที่ 2 ไม่บังคับ)", { exact: true })
+    .click();
+  await page.getByLabel("เลือกรูปจุดทิ้ง", { exact: true }).setInputFiles({
+    name: "bin.png",
+    mimeType: "image/png",
+    buffer: await page.screenshot(),
+  });
+  await page.getByAltText("ภาพถังหรือจุดทิ้งที่เลือก").waitFor();
+
+  assert.equal(
+    await page
+      .locator(".category-grid")
+      .getByRole("button", { name: /กระดาษลัง/ })
+      .count(),
+    0,
+  );
+  await page
+    .locator(".category-grid")
+    .getByRole("button", { name: /ซองขนม/ })
+    .click();
+  await page.getByLabel("จำนวน (ซอง)", { exact: true }).fill("3");
+  await page.getByText("คาดว่าจะได้ 3 Coins", { exact: true }).waitFor();
+  assert.ok(await byName("ส่งรูปให้คุณครูตรวจ").isEnabled());
+  await page
+    .locator(".category-grid")
+    .getByRole("button", { name: /ถุงพลาสติก/ })
+    .click();
+  await page.getByLabel("จำนวน (ถุง)", { exact: true }).waitFor();
+  await page
+    .locator(".category-grid")
+    .getByRole("button", { name: /ขวดพลาสติก/ })
+    .click();
+
   assert.ok(
     await page
       .getByAltText("ภาพที่เลือก")
@@ -105,16 +139,92 @@ try {
         (el) => Math.floor((el.src.split(",")[1].length * 3) / 4) <= 400 * 1024,
       ),
   );
-  await byName("ส่งขยะให้คุณครูตรวจ").click();
+  await page.getByLabel("จำนวน (ขวด)", { exact: true }).fill("3");
+  await page.getByText("คาดว่าจะได้ 15 Coins", { exact: true }).waitFor();
+  let lostSubmit = false;
+  await page.route("**/api/action", async (route) => {
+    if (!lostSubmit && route.request().postDataJSON()?.action === "submit") {
+      lostSubmit = true;
+      const committed = await route.fetch(); // Server committed; intentionally drop its response.
+      assert.equal(committed.status(), 200);
+      await route.abort("failed");
+    } else await route.continue();
+  });
+  await byName("ส่งรูปให้คุณครูตรวจ").click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "เชื่อมต่อไม่ได้ กรุณาลองรายการเดิมอีกครั้ง" })
+    .waitFor();
+  assert.equal(
+    await page.getByLabel("จำนวน (ขวด)", { exact: true }).inputValue(),
+    "3",
+  );
+  await page.getByAltText("ภาพที่เลือก").waitFor();
+  await page.getByAltText("ภาพถังหรือจุดทิ้งที่เลือก").waitFor();
+  await byName("ส่งรายการเดิมอีกครั้ง").click();
   await page.getByRole("heading", { name: "ส่งขยะเรียบร้อย!" }).waitFor();
+  await page.unroute("**/api/action");
+  const retryStore = createStore(dir);
+  const submitted = retryStore
+    .read()
+    .submissions.filter(
+      (x) => x.submittedCount === 3 && x.category === "ขวดพลาสติก",
+    );
+  assert.equal(submitted.length, 1);
+  assert.match(submitted[0].disposalImage, /^data:image/);
+  retryStore.close();
   await byName("กลับหน้าหลัก").click();
   console.log("Testing approval");
   await login();
   await page.getByRole("button", { name: /^ตรวจขยะ/ }).click();
   await byName("อนุมัติ").last().click();
-  await page.getByLabel("น้ำหนักที่ชั่งจริง (กก.)").fill("0.75");
+  await page.getByLabel("จำนวนที่ครูตรวจพบ").fill("2");
+  await page.getByText("มอบให้ 10 Coins", { exact: true }).waitFor();
   await byName("ยืนยันผลการตรวจ").click();
   await page.getByText("บันทึกผลตรวจแล้ว").waitFor();
+  console.log("Testing rejection presets and student statuses");
+  await page
+    .locator(".review-card")
+    .filter({ hasText: "65001" })
+    .getByRole("button", { name: "ไม่อนุมัติ", exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "เลือกเหตุผลไม่ผ่านแบบเร็ว" })
+    .getByRole("button", { name: "นับจำนวนไม่ได้", exact: true })
+    .click();
+  const rejection =
+    "นับจำนวนขยะจากภาพไม่ได้ กรุณาจัดขยะให้เห็นครบก่อนถ่าย กรุณาถ่ายจากด้านบน";
+  assert.match(
+    await page.getByLabel("เหตุผลที่ไม่อนุมัติ").inputValue(),
+    /นับจำนวนขยะจากภาพไม่ได้/,
+  );
+  await page.getByLabel("เหตุผลที่ไม่อนุมัติ").fill(rejection);
+  await byName("ยืนยันผลการตรวจ").click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await byName("ออกจากระบบ").click();
+  await byName("Coins ของฉัน").click();
+  await identify();
+  await page
+    .getByRole("heading", { name: "สถานะรายการของฉัน", exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: /^ไม่ผ่าน / }).click();
+  await page.getByText(rejection, { exact: true }).waitFor();
+  assert.equal(await page.locator(".student-submission.approved").count(), 0);
+  await byName("อัปเดตสถานะ").click();
+  await page.getByText(rejection, { exact: true }).waitFor();
+  await page.getByRole("button", { name: /^อนุมัติแล้ว / }).click();
+  await page.getByText("+10 Coins", { exact: true }).waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+    "student status mobile overflow",
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await byName("หน้าหลัก").click();
+  await login();
   console.log("Testing period reports");
   await byName("รายงานตามช่วงเวลา").click();
   await page.locator(".report-metrics").waitFor();

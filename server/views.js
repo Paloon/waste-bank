@@ -66,6 +66,9 @@ export const rewardView = (r) => {
 };
 export const submissionView = (s) => ({
   ...s,
+  disposalImage: s.disposalImage?.startsWith("drive:")
+    ? `/api/media/submission/${encodeURIComponent(s.id)}?index=1`
+    : s.disposalImage,
   image: s.image?.startsWith("drive:")
     ? `/api/media/submission/${encodeURIComponent(s.id)}`
     : s.image,

@@ -93,13 +93,18 @@ export async function performAction(
     });
     delete p.image;
   }
-  assert(!p.image?.startsWith("drive:"), "รูปภาพไม่ถูกต้อง");
+  assert(
+    !p.image?.startsWith("drive:") && !p.disposalImage?.startsWith("drive:"),
+    "รูปภาพไม่ถูกต้อง",
+  );
   if (p.image?.startsWith("data:"))
     p.digest = createHash("sha256").update(p.image).digest("hex");
   act(structuredClone(snapshot), actor, body); // Reject invalid/unauthorized work before image decoding or uploads.
   if (p.image?.startsWith("data:")) {
     p.image = await normalizeImage(p.image);
   }
+  if (p.disposalImage?.startsWith("data:"))
+    p.disposalImage = await normalizeImage(p.disposalImage);
   if (body.action === "reward")
     for (const item of p.images)
       if (item.src.startsWith("data:"))
@@ -112,6 +117,15 @@ export async function performAction(
             set: (value) => (p.image = value),
             kind: "evidence",
           },
+          ...(p.disposalImage
+            ? [
+                {
+                  get: () => p.disposalImage,
+                  set: (value) => (p.disposalImage = value),
+                  kind: "evidence",
+                },
+              ]
+            : []),
         ]
       : body.action === "reward"
         ? p.images.map((item) => ({
@@ -157,8 +171,9 @@ export async function performAction(
       const result = act(s, actor, body);
       if (body.action === "review" && p.status === "Approved") {
         const item = s.submissions.find((x) => x.id === p.id);
-        if (item?.image?.startsWith("drive:")) {
-          const id = item.image.slice(6);
+        for (const ref of [item?.image, item?.disposalImage]) {
+          if (!ref?.startsWith("drive:")) continue;
+          const id = ref.slice(6);
           if (!s.mediaJobs.some((x) => x.id === id))
             s.mediaJobs.push({
               id,

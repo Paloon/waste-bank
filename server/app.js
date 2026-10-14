@@ -4,6 +4,7 @@ import { policy } from "../shared/policy.js";
 import { createSecurity } from "./security.js";
 import { AppError, assert } from "./errors.js";
 import { verifyAsync, hash } from "./credentials.js";
+import { recyclingRates } from "../shared/recycling.js";
 import { categories, registerStudent } from "./store.js";
 import {
   actionBody,
@@ -85,6 +86,7 @@ export function createApp({
         until: Date.now() + 15000,
         data: {
           categories,
+          recyclingRates,
           rewards: s.rewards
             .filter((r) => r.enabled && !r.deletedAt)
             .map(rewardView),
@@ -413,7 +415,13 @@ export function createApp({
         "ไม่มีสิทธิ์อ่านรูปนี้",
         403,
       );
-      ref = item.image;
+      const index = Number(req.query.index || 0);
+      assert(
+        Number.isInteger(index) && index >= 0 && index <= 1,
+        "ไม่พบรูป",
+        404,
+      );
+      ref = index === 1 ? item.disposalImage : item.image;
     }
     assert(ref?.startsWith("drive:"), "ไม่พบรูป", 404);
     const response = await drive.download(ref.slice(6));

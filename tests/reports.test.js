@@ -342,3 +342,26 @@ test("report API is staff-only and rejects invalid ranges", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("reports count confirmed pieces and preserve original category at submission", () => {
+  const source = fixture();
+  source.submissions[0].count = 2;
+  source.submissions[0].submittedCount = 3;
+  source.submissions[0].submittedCategory = "ขวดพลาสติก";
+  const range = reportRange("2026-10-03", "2026-10-04");
+  const report = buildReport(selectReportSource(source, range), range);
+  assert.equal(report.totals.pieces, 2);
+  assert.equal(
+    report.categories.find((c) => c.category === "ขวดพลาสติก").submitted,
+    1,
+  );
+  assert.equal(
+    report.categories.find((c) => c.category === "กระดาษ").pieces,
+    2,
+  );
+  assert.equal(
+    report.rows.find((e) => e.kind === "approved" && e.student === "65001")
+      .count,
+    2,
+  );
+});

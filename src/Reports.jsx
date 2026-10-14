@@ -136,7 +136,7 @@ export default function Reports({ refreshKey = 0 }) {
   const metrics = {
     overview: [
       ["submitted", "รายการส่งขยะ", "ครั้ง"],
-      ["weight", "น้ำหนักอนุมัติ", "กก."],
+      ["pieces", "จำนวนที่อนุมัติ", "ชิ้น"],
       ["issued", "Coins จากขยะ", "Coins"],
       ["spent", "Coins ใช้แลก", "Coins"],
       ["submitters", "นักเรียนที่ส่ง", "คน"],
@@ -147,7 +147,7 @@ export default function Reports({ refreshKey = 0 }) {
       ["approved", "อนุมัติในช่วงนี้", "ครั้ง"],
       ["rejected", "ไม่ผ่านในช่วงนี้", "ครั้ง"],
       ["cancelled", "ยกเลิกในช่วงนี้", "ครั้ง"],
-      ["weight", "น้ำหนักอนุมัติ", "กก."],
+      ["pieces", "จำนวนที่อนุมัติ", "ชิ้น"],
       ["submitters", "นักเรียนที่ส่ง", "คน"],
     ],
     coins: [
@@ -267,13 +267,13 @@ export default function Reports({ refreshKey = 0 }) {
           {report.coverage.unknownReviewDates > 0 && (
             <p className="report-note" role="status">
               มีรายการส่งในช่วงนี้ {fmt(report.coverage.unknownReviewDates)}{" "}
-              รายการที่ไม่ระบุวันตรวจ จึงยังรวมเป็นน้ำหนักและผลตรวจรายวันไม่ได้
+              รายการที่ไม่ระบุวันตรวจ จึงยังรวมเป็นจำนวนและผลตรวจรายวันไม่ได้
             </p>
           )}
           <details className="report-explanation">
             <summary>ตัวเลขแต่ละกลุ่มนับตามวันไหน?</summary>
             <p>
-              รายการส่งขยะและคนที่ส่ง: วันส่ง · น้ำหนักและผลตรวจ:
+              รายการส่งขยะและคนที่ส่ง: วันส่ง · จำนวนที่อนุมัติและผลตรวจ:
               วันอนุมัติ/ไม่ผ่าน · Coins: วันที่บันทึกในบัญชี · รางวัล: วันแลก
               วันรับ หรือวันยกเลิกตามกิจกรรม
             </p>
@@ -284,13 +284,14 @@ export default function Reports({ refreshKey = 0 }) {
               หากไม่มีประวัติจะหมายถึง “ไม่พบข้อมูล” ไม่ยืนยันว่าไม่มีผู้ใช้งาน
             </p>
             <p>
-              รายการขยะนับเป็นจำนวนครั้งที่ส่ง ไม่ใช่จำนวนขวดหรือชิ้น
+              รายการส่งนับเป็นครั้ง ส่วนจำนวนที่อนุมัตินับตามที่ครูยืนยัน
+              รายการเก่าที่ไม่มีจำนวนไม่นำมารวมเป็นชิ้น
               ข้อมูลชั้น/ห้องเป็นข้อมูลนักเรียนปัจจุบัน ไม่ใช่ชั้น/ห้องย้อนหลัง
             </p>
             {report.coverage.unknownReviewDates > 0 && (
               <p>
                 มีรายการส่งในช่วงนี้ {fmt(report.coverage.unknownReviewDates)}{" "}
-                รายการที่ไม่ระบุวันตรวจ จึงไม่นำมารวมเป็นผลตรวจและน้ำหนักรายวัน
+                รายการที่ไม่ระบุวันตรวจ จึงไม่นำมารวมเป็นผลตรวจและจำนวนรายวัน
               </p>
             )}
           </details>
@@ -303,7 +304,8 @@ export default function Reports({ refreshKey = 0 }) {
                   "ประเภท",
                   "ส่ง (ครั้ง)",
                   "อนุมัติ (ครั้ง)",
-                  "น้ำหนัก (กก.)",
+                  "จำนวนอนุมัติ (ชิ้น)",
+                  "น้ำหนักรายการเก่า (กก.)",
                   "Coins จากขยะ",
                 ]}
               >
@@ -312,6 +314,7 @@ export default function Reports({ refreshKey = 0 }) {
                     <td>{c.category}</td>
                     <td>{fmt(c.submitted)}</td>
                     <td>{fmt(c.approved)}</td>
+                    <td>{fmt(c.pieces)}</td>
                     <td>{fmt(c.weight)}</td>
                     <td>{fmt(c.coins)}</td>
                   </tr>
@@ -419,7 +422,8 @@ export default function Reports({ refreshKey = 0 }) {
                   "เข้าใช้ที่พบ (ครั้ง)",
                   "ส่ง (ครั้ง)",
                   "อนุมัติ (ครั้ง)",
-                  "น้ำหนัก (กก.)",
+                  "จำนวนอนุมัติ (ชิ้น)",
+                  "น้ำหนักรายการเก่า (กก.)",
                   "Coins รับจากขยะ",
                   "Coins ใช้",
                   "แลก (ครั้ง)",
@@ -436,6 +440,7 @@ export default function Reports({ refreshKey = 0 }) {
                     <td>{p.logins ? fmt(p.logins) : "ไม่พบประวัติ"}</td>
                     <td>{fmt(p.submitted)}</td>
                     <td>{fmt(p.approved)}</td>
+                    <td>{fmt(p.pieces)}</td>
                     <td>{fmt(p.weight)}</td>
                     <td>{fmt(p.issued)}</td>
                     <td>{fmt(p.spent)}</td>
@@ -452,7 +457,7 @@ export default function Reports({ refreshKey = 0 }) {
                   "กิจกรรม",
                   "นักเรียน",
                   "รายละเอียด",
-                  "น้ำหนัก / Coins",
+                  "จำนวน / Coins",
                 ]}
               >
                 {report.rows.map((e, i) => (
@@ -474,8 +479,12 @@ export default function Reports({ refreshKey = 0 }) {
                     <td>
                       {e.amount !== undefined
                         ? fmt(e.amount) + " Coins"
-                        : e.kind === "approved"
-                          ? fmt(e.weight) + " กก."
+                        : ["approved", "submitted"].includes(e.kind)
+                          ? e.count
+                            ? fmt(e.count) + " ชิ้น"
+                            : e.weight
+                              ? fmt(e.weight) + " กก. (รายการเก่า)"
+                              : "ไม่ได้ระบุจำนวน"
                           : "—"}
                     </td>
                   </tr>

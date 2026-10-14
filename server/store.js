@@ -16,18 +16,14 @@ import {
 } from "./state.js";
 import { controlValue } from "./control.js";
 import { policy } from "../shared/policy.js";
+import {
+  recyclingRates,
+  maxRecyclingCount,
+  activeCategories,
+} from "../shared/recycling.js";
 export { hash, verify };
 
-export const categories = [
-  "ขวดพลาสติก",
-  "แก้วพลาสติก",
-  "กระป๋องอะลูมิเนียม",
-  "กระดาษ",
-  "กระดาษลัง",
-  "แก้ว",
-  "ขยะอิเล็กทรอนิกส์",
-  "อื่น ๆ",
-];
+export const categories = activeCategories;
 export const balance = (s, id) =>
   s.ledger.filter((x) => x.student === id).reduce((n, x) => n + x.amount, 0);
 const monthInSchoolZone = (value) =>
@@ -466,7 +462,9 @@ export function act(s, actor, body) {
   if (action === "submit") {
     requireStudent();
     image(p.image, true);
+    image(p.disposalImage);
     fail(categories.includes(p.category), "เลือกประเภทขยะ");
+    const count = integer(p.count, 1, maxRecyclingCount);
     const digest =
       p.digest || createHash("sha256").update(p.image).digest("hex");
     fail(
@@ -482,8 +480,17 @@ export function act(s, actor, body) {
       id: randomUUID(),
       student: actor.id,
       category: p.category,
+      submittedCategory: p.category,
+      count,
+      submittedCount: count,
+      coinRate: recyclingRates[p.category].coins,
+      estimatedCoins:
+        recyclingRates[p.category].coins === null
+          ? null
+          : count * recyclingRates[p.category].coins,
       note: clean(p.note),
       image: p.image,
+      disposalImage: p.disposalImage || "",
       digest,
       status: "Pending",
       coins: 0,
@@ -578,15 +585,40 @@ export function act(s, actor, body) {
     fail(item?.status === "Pending", "รายการนี้ถูกดำเนินการแล้ว");
     fail(["Approved", "Rejected"].includes(p.status), "สถานะไม่ถูกต้อง");
     if (p.status === "Approved") {
-      const amount = integer(p.coins, 1, 10000);
-      const weight = Number(p.weight);
+      const category = p.category || item.category;
       fail(
-        Number.isFinite(weight) && weight > 0 && weight <= 1000,
-        "กรอกน้ำหนักที่ชั่งจริง",
+        categories.includes(category) ||
+          (category === item.category && recyclingRates[category]),
+        "เลือกประเภทขยะ",
       );
-      tx(item.student, amount, "recycle", "รีไซเคิล " + item.category, item.id);
+      const count = integer(p.count, 1, maxRecyclingCount);
+      const rate =
+        category === item.submittedCategory && item.coinRate
+          ? item.coinRate
+          : recyclingRates[category].coins;
+      const amount = count * rate;
+      const before = {
+        category: item.category,
+        count: item.count,
+        submittedCount: item.submittedCount,
+      };
+      if (amount > 0)
+        tx(
+          item.student,
+          amount,
+          "recycle",
+          `รีไซเคิล ${category} ${count} ${recyclingRates[category].unit} × ${rate} Coins`,
+          item.id,
+        );
+      item.category = category;
+      item.count = count;
+      item.coinRate = rate;
       item.coins = amount;
-      item.weight = weight;
+      item.reviewNote = clean(p.reason);
+      item.reviewCorrection = {
+        before,
+        after: { category, count, coins: amount },
+      };
     } else {
       fail(clean(p.reason).length >= 3, "กรุณาระบุเหตุผล");
       item.reason = clean(p.reason);
@@ -594,7 +626,13 @@ export function act(s, actor, body) {
     item.status = p.status;
     item.reviewedAt = now();
     item.staff = staff.id;
-    log(item.id, "Pending", p.status, item.reason || `${item.coins} Coins`);
+    log(
+      item.id,
+      "Pending",
+      p.status,
+      item.reason ||
+        `${item.category} ${item.count} ${recyclingRates[item.category].unit} × ${item.coinRate} = ${item.coins} Coins (นักเรียนแจ้ง ${item.submittedCount ?? "ไม่ระบุ"}) ${item.reviewNote || ""}`,
+    );
   } else if (action === "handover" || action === "cancelReward") {
     requireStaff();
     const item = s.redemptions.find((x) => x.id === p.id);
@@ -656,7 +694,7 @@ export function act(s, actor, body) {
     const driveFiles = [
       ...new Set(
         submissions
-          .map((x) => x.image)
+          .flatMap((x) => [x.image, x.disposalImage])
           .filter((x) => x?.startsWith("drive:"))
           .map((x) => x.slice(6)),
       ),

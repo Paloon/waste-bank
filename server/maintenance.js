@@ -21,7 +21,7 @@ export const evidenceExpired = (item, now = Date.now()) =>
 export function referencedFiles(s) {
   return new Set(
     [
-      ...s.submissions.map((x) => x.image),
+      ...s.submissions.flatMap((x) => [x.image, x.disposalImage]),
       ...s.rewards.flatMap((r) =>
         r.images?.length ? r.images.map((x) => x.src) : [r.image],
       ),
@@ -76,6 +76,9 @@ export async function maintenance(
     for (const item of s.submissions)
       if (item.image && evidenceExpired(item, now)) {
         if (item.image.startsWith("drive:")) queue(item.image.slice(6));
+        if (item.disposalImage?.startsWith("drive:"))
+          queue(item.disposalImage.slice(6));
+        item.disposalImage = "";
         item.image = "";
         item.evidenceRemovedAt = new Date(now).toISOString();
         s.audit.unshift({
@@ -124,7 +127,9 @@ export async function maintenance(
             referenced = referencedFiles(s).has(job.id);
           if (referenced) {
             const approved = s.submissions.find(
-              (x) => x.image === `drive:${job.id}` && x.status === "Approved",
+              (x) =>
+                [x.image, x.disposalImage].includes(`drive:${job.id}`) &&
+                x.status === "Approved",
             );
             if (approved) await drive.moveToWaste(job.id);
           } else await drive.remove(job.id);

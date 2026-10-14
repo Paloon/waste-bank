@@ -2983,3 +2983,431 @@ td .text-button {
     font-size: 0.875rem;
   }
 }
+
+.category-grid button small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.coin-estimate {
+  padding: 16px;
+  margin: 12px 0 20px;
+  border-radius: 12px;
+  background: var(--pale, #eef4e8);
+}
+.coin-estimate strong {
+  display: block;
+  font-size: 20px;
+}
+.coin-estimate p {
+  margin: 8px 0;
+}
+.coin-estimate small {
+  display: block;
+  line-height: 1.6;
+}
+
+.review-evidence {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  margin-bottom: 16px;
+  cursor: zoom-in;
+}
+.review-evidence img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.home-coin-rates {
+  margin-bottom: 28px;
+}
+.home-coin-rates h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.home-coin-rates table {
+  min-width: 0;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.home-coin-rates th,
+.home-coin-rates td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line, #dce5dd);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.home-coin-rates thead th {
+  color: var(--muted, #657567);
+  font-size: 13px;
+}
+.home-coin-rates th:first-child {
+  width: 48%;
+}
+.home-coin-rates th:nth-child(2) {
+  width: 20%;
+}
+.home-coin-rates tbody th {
+  font-weight: 500;
+}
+.home-coin-rates td:last-child {
+  color: var(--green, #185b3e);
+}
+.home-coin-rates .rate-pending {
+  font-size: 13px;
+  color: var(--muted, #657567);
+}
+.home-rates-note {
+  margin-bottom: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted, #657567);
+}
+@media (max-width: 540px) {
+  .home-coin-rates th,
+  .home-coin-rates td {
+    padding: 10px 6px;
+    font-size: 14px;
+  }
+  .home-coin-rates th:first-child {
+    width: 43%;
+  }
+  .home-coin-rates th:nth-child(2) {
+    width: 21%;
+  }
+}
+
+.waste-guide summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  min-height: 40px;
+}
+.waste-guide summary::-webkit-details-marker {
+  display: none;
+}
+.waste-guide summary svg {
+  flex-shrink: 0;
+  color: #185b3e;
+}
+.waste-guide summary span {
+  flex: 1;
+}
+.waste-guide[open] summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.waste-guide div {
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.7;
+}
+.waste-guide p {
+  margin: 8px 0;
+}
+.waste-guide p svg {
+  vertical-align: middle;
+}
+.category-grid button > svg {
+  display: block;
+  margin: 0 auto 6px;
+  color: #185b3e;
+}
+.disposal-upload {
+  border: 1px solid #dce5dd;
+  border-radius: 12px;
+  padding: 14px;
+  margin: 16px 0;
+}
+.disposal-upload summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.disposal-upload summary svg {
+  vertical-align: middle;
+}
+.evidence-pair {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.review-correction {
+  background: #eef4e8;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.waste-guide-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  min-height: 40px;
+  color: inherit;
+}
+.waste-guide-toggle span {
+  flex: 1;
+}
+.waste-guide-toggle svg {
+  flex-shrink: 0;
+  color: #185b3e;
+}
+.waste-guide-toggle[aria-expanded="true"] > svg:last-child {
+  transform: rotate(180deg);
+}
+.waste-guide-content {
+  line-height: 1.7;
+  font-size: 14px;
+  color: #526256;
+  font-weight: 400;
+}
+.waste-guide-content p {
+  margin: 8px 0;
+}
+.waste-guide-content svg {
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.coin-column-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #795400;
+}
+.coin-column-title svg,
+.gold-coin-icon {
+  color: #a46b00;
+  fill: #ffd85a;
+  flex-shrink: 0;
+}
+.coin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 54px;
+  justify-content: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid #e6bd47;
+  background: #fff2b9;
+  color: #704b00;
+  box-shadow: 0 2px 0 #e6bd4733;
+}
+.coin-badge svg {
+  color: #a46b00;
+  fill: #ffd85a;
+  flex-shrink: 0;
+}
+.coin-badge span {
+  font-size: 17px;
+  font-weight: 700;
+}
+.coin-estimate {
+  background: #fff7d6;
+  border: 1px solid #e6bd47;
+}
+.coin-estimate strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #704b00;
+  flex-wrap: wrap;
+}
+.gold-coin-total {
+  color: #855b00;
+}
+.coin-card .action-icon {
+  background: #fff2b9;
+  color: #a46b00;
+}
+.coin-card .action-icon svg {
+  fill: #ffd85a;
+}
+@media (max-width: 540px) {
+  .coin-badge {
+    min-width: 46px;
+    padding: 6px 8px;
+    gap: 5px;
+  }
+}
+
+nav button.submit-nav {
+  background: #185b3e;
+  color: #fff;
+  font-weight: 700;
+  border: 1px solid #185b3e;
+  box-shadow: 0 3px 8px #185b3e20;
+}
+nav button.submit-nav svg {
+  color: #d6ef94;
+}
+nav button.submit-nav:hover {
+  background: #10472f;
+  color: #fff;
+}
+nav button.submit-nav.active {
+  background: #10472f;
+  color: #fff;
+  border-color: #b4d66b;
+  box-shadow: inset 0 0 0 1px #b4d66b;
+}
+.submit-page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #185b3e;
+}
+.submit-page-title > span {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #185b3e;
+  color: #d6ef94;
+  flex-shrink: 0;
+}
+
+.submission-status-filters,
+.rejection-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.submission-status-filters button,
+.rejection-presets button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #dce5dd;
+  border-radius: 10px;
+  background: #f6f8f3;
+  font-size: 14px;
+}
+.submission-status-filters button[aria-pressed="true"] {
+  background: #185b3e;
+  color: white;
+  border-color: #185b3e;
+}
+.rejection-presets button[aria-pressed="true"] {
+  background: #fff0e8;
+  color: #923d28;
+  border-color: #c67a5d;
+}
+.student-submission {
+  border: 1px solid #dce5dd;
+  border-left: 4px solid #94a38f;
+  border-radius: 12px;
+  margin: 14px 0;
+  padding: 16px;
+}
+.student-submission.pending {
+  border-left-color: #ba8c21;
+}
+.student-submission.approved {
+  border-left-color: #23754f;
+}
+.student-submission.rejected {
+  border-left-color: #c05a42;
+}
+.submission-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.submission-card-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  margin: 0;
+}
+.submission-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef2ea;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pending .submission-status {
+  background: #fff4d4;
+  color: #795400;
+}
+.approved .submission-status {
+  background: #e5f3e9;
+  color: #185b3e;
+}
+.rejected .submission-status {
+  background: #ffede7;
+  color: #923d28;
+}
+.submission-card-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.submission-card-body p {
+  margin: 6px 0;
+  line-height: 1.6;
+}
+.submission-card-body small {
+  display: block;
+  color: #667467;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.submission-result {
+  font-size: 14px;
+}
+.submission-result > svg {
+  vertical-align: middle;
+}
+.submission-rejection {
+  background: #fff4ee;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 9px;
+  color: #823e2e;
+  overflow-wrap: anywhere;
+}
+.submission-review-note {
+  overflow-wrap: anywhere;
+}
+.submission-empty {
+  text-align: center;
+  padding: 24px 0;
+  color: #667467;
+}
+@media (max-width: 540px) {
+  .submission-card-body {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .student-submission {
+    padding: 12px;
+  }
+}

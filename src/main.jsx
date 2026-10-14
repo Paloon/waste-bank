@@ -38,7 +38,16 @@ import {
 } from "lucide-react";
 import "./style.css";
 import Reports from "./Reports.jsx";
+import SubmissionHistory from "./SubmissionHistory.jsx";
+import RejectionReason from "./RejectionReason.jsx";
+import RecyclingGuide, { WasteIcon, categoryLabel } from "./RecyclingGuide.jsx";
 import { api, invalidateRequests } from "./api.js";
+import {
+  recyclingRates,
+  estimateCoins,
+  maxRecyclingCount,
+  validCount,
+} from "../shared/recycling.js";
 import { policy } from "../shared/policy.js";
 
 const fmt = (n) => Number(n || 0).toLocaleString("th-TH");
@@ -55,6 +64,73 @@ import {
   Photo,
   RewardImageEditor,
 } from "./components.jsx";
+function ReviewCount({ item, rates }) {
+  const [category, setCategory] = useState(item.category);
+  const [count, setCount] = useState(String(item.count || ""));
+  const rate =
+    category === item.submittedCategory && item.coinRate
+      ? item.coinRate
+      : rates[category].coins;
+  const amount = estimateCoins(category, count, {
+    [category]: { coins: rate },
+  });
+  return (
+    <>
+      <p>
+        นักเรียนแจ้ง: {item.submittedCategory || item.category} ·{" "}
+        {item.submittedCount ?? "ไม่ได้ระบุจำนวน"}
+        {item.submittedCount
+          ? ` ${rates[item.submittedCategory || item.category].unit}`
+          : ""}
+      </p>
+      <Field label="ประเภทขยะที่ครูตรวจพบ">
+        <select
+          name="category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          {Object.keys(rates)
+            .filter((c) => !rates[c].legacy || c === item.category)
+            .map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+        </select>
+      </Field>
+      <Field label="จำนวนที่ครูตรวจพบ">
+        <input
+          name="count"
+          type="number"
+          inputMode="numeric"
+          min="1"
+          max={maxRecyclingCount}
+          step="1"
+          required
+          value={count}
+          onChange={(e) => setCount(e.target.value)}
+        />
+      </Field>
+      <Field label="หมายเหตุการตรวจ (ไม่บังคับ)">
+        <textarea
+          name="reason"
+          maxLength={150}
+          placeholder="เช่น ในรูปเห็นขวด 2 ขวด จึงแก้จำนวนจาก 3 เป็น 2"
+        />
+      </Field>
+      <div className="coin-estimate" aria-live="polite">
+        <strong>
+          <Coins className="gold-coin-icon" size={25} aria-hidden="true" />{" "}
+          มอบให้ {amount ?? "—"} Coins
+        </strong>
+        <p>
+          {count || "—"} {rates[category].unit} × {rate} Coins
+        </p>
+        <small>
+          {rates[category].rule} · แก้ประเภทหรือจำนวนให้ตรงกับหลักฐานก่อนยืนยัน
+        </small>
+      </div>
+    </>
+  );
+}
 function App() {
   const [page, setPage] = useState("home"),
     [data, setData] = useState(null),
@@ -70,7 +146,9 @@ function App() {
     [lookup, setLookup] = useState(null),
     [id, setId] = useState(""),
     [photo, setPhoto] = useState(""),
+    [disposalPhoto, setDisposalPhoto] = useState(""),
     [category, setCategory] = useState("ขวดพลาสติก"),
+    [count, setCount] = useState(""),
     [note, setNote] = useState(""),
     [success, setSuccess] = useState(null),
     [query, setQuery] = useState(""),
@@ -117,7 +195,9 @@ function App() {
     setLookup(null);
     setId("");
     setPhoto("");
+    setDisposalPhoto("");
     setNote("");
+    setCount("");
     setModal(null);
     setSuccess(null);
     setSuccessUntil(0);
@@ -271,7 +351,9 @@ function App() {
     setLookup(null);
     setId("");
     setPhoto("");
+    setDisposalPhoto("");
     setNote("");
+    setCount("");
     setSuccess({ title, description, code, pickupInstructions });
     setPage("success");
     api("logout", {}).catch(() => {});
@@ -367,6 +449,7 @@ function App() {
   }
   function identify(next, reward) {
     setPhoto("");
+    setDisposalPhoto("");
     setError("");
     setId("");
     setLookup(null);
@@ -488,7 +571,7 @@ function App() {
     shop: "ร้านรางวัล",
     leaderboard: "ทำเนียบคนรักษ์โลก",
     account: "Coins ของฉัน",
-    submit: "ส่งขยะรีไซเคิล",
+    submit: "ถ่ายรูปการทิ้งขยะ",
   };
   const navItems = [
     ["home", Home, "หน้าหลัก"],
@@ -581,10 +664,11 @@ function App() {
           {navItems.map(([key, Icon, label]) => (
             <button
               key={key}
-              className={page === key ? "active" : ""}
+              className={`${page === key ? "active" : ""} ${key === "submit" ? "submit-nav" : ""}`}
+              aria-current={page === key ? "page" : undefined}
               onClick={() => navigate(key)}
             >
-              <Icon size={19} />
+              <Icon size={key === "submit" ? 23 : 19} aria-hidden="true" />
               <span>{label}</span>
             </button>
           ))}
@@ -606,11 +690,17 @@ function App() {
             {error}
             <button
               onClick={() => {
-                setError("");
-                if (!data) refresh().catch((e) => setError(e.message));
+                if (page === "submit" && error.startsWith("เชื่อมต่อไม่ได้")) {
+                  document.getElementById("submission-form")?.requestSubmit();
+                } else {
+                  setError("");
+                  if (!data) refresh().catch((e) => setError(e.message));
+                }
               }}
             >
-              ลองใหม่
+              {page === "submit" && error.startsWith("เชื่อมต่อไม่ได้")
+                ? "ส่งรายการเดิมอีกครั้ง"
+                : "ลองใหม่"}
             </button>
           </div>
         )}
@@ -719,9 +809,9 @@ function App() {
                     </span>
                     <div>
                       <strong>
-                        {data.stats.weight.toFixed(1)} <small>กก.</small>
+                        {fmt(data.stats.submissions)} <small>ครั้ง</small>
                       </strong>
-                      <p>ขยะที่รีไซเคิลแล้ว</p>
+                      <p>รายการขยะที่อนุมัติแล้ว</p>
                     </div>
                   </div>
                   <div className="metric">
@@ -729,7 +819,9 @@ function App() {
                       <Coins />
                     </span>
                     <div>
-                      <strong>{fmt(data.stats.coins)}</strong>
+                      <strong className="gold-coin-total">
+                        {fmt(data.stats.coins)}
+                      </strong>
                       <p>Coins ที่มอบให้</p>
                     </div>
                   </div>
@@ -745,6 +837,7 @@ function App() {
                     </div>
                   </div>
                 </section>
+                <RecyclingGuide data={data} />
                 <section className="lower-grid">
                   <div className="how">
                     <div className="section-heading">
@@ -756,7 +849,7 @@ function App() {
                         [
                           Camera,
                           "แยกแล้วถ่าย",
-                          "ล้างขยะ แยกประเภท แล้วถ่ายรูป",
+                          "แยกขยะ ทิ้งถูกที่ ถ่ายรูปและกรอกจำนวน",
                         ],
                         [ShieldCheck, "รอครูตรวจ", "รับ Coins เมื่ออนุมัติ"],
                         [Gift, "แลกของที่ชอบ", "รับรางวัลกับคุณครู"],
@@ -809,7 +902,18 @@ function App() {
                   <button className="back" onClick={home}>
                     <ArrowLeft size={17} /> หน้าหลัก
                   </button>
-                  <h1>{pageTitles[page]}</h1>
+                  <h1
+                    className={
+                      page === "submit" ? "submit-page-title" : undefined
+                    }
+                  >
+                    {page === "submit" && (
+                      <span>
+                        <Recycle size={28} aria-hidden="true" />
+                      </span>
+                    )}
+                    {pageTitles[page]}
+                  </h1>
                 </div>
                 <span className="privacy">
                   <ShieldCheck size={16} /> กลับหน้าหลักอัตโนมัติเมื่อไม่ใช้งาน
@@ -868,12 +972,15 @@ function App() {
                     <span>3 เสร็จแล้ว</span>
                   </div>
                   <form
+                    id="submission-form"
                     onSubmit={(e) => {
                       e.preventDefault();
                       run(async () => {
                         await action("submit", {
                           image: photo,
+                          disposalImage: disposalPhoto,
                           category,
+                          count,
                           note,
                         });
                         done(
@@ -886,8 +993,9 @@ function App() {
                     <div className="submission-help">
                       <h2>ก่อนถ่ายรูป</h2>
                       <p>
-                        เทน้ำออก ล้างให้สะอาด และแยกตามประเภท
-                        ให้ภาพเห็นชนิดขยะและจำนวนชัดเจน
+                        แยกขยะตามประเภท ถ่ายให้เห็นขยะ จำนวน
+                        และถังหรือจุดทิ้งตามป้ายของโรงเรียน
+                        หากรูปเดียวเห็นไม่ครบให้เพิ่มรูปที่ 2
                       </p>
                     </div>
                     <div className="upload-zone">
@@ -901,7 +1009,7 @@ function App() {
                         <>
                           <Camera size={46} />
                           <h3>ถ่ายภาพขยะที่แยกแล้ว</h3>
-                          <p>ให้เห็นชนิดขยะและจำนวนชัดเจน</p>
+                          <p>ให้เห็นขยะ จำนวน และจุดทิ้งที่ถูกประเภท</p>
                         </>
                       )}
                       <div className="upload-buttons">
@@ -929,20 +1037,122 @@ function App() {
                         </label>
                       </div>
                     </div>
+                    <details
+                      className="disposal-upload"
+                      open={Boolean(disposalPhoto)}
+                    >
+                      <summary>
+                        <Trash2 size={18} aria-hidden="true" />{" "}
+                        เพิ่มรูปถังหรือจุดทิ้ง (รูปที่ 2 ไม่บังคับ)
+                      </summary>
+                      <p>
+                        ใช้เมื่อรูปแรกเห็นขยะและจุดทิ้งไม่ครบ
+                        ถ่ายตามจุดทิ้งจริงของโรงเรียน
+                      </p>
+                      {disposalPhoto && (
+                        <img
+                          className="upload-preview"
+                          src={disposalPhoto}
+                          alt="ภาพถังหรือจุดทิ้งที่เลือก"
+                        />
+                      )}
+                      <div className="upload-buttons">
+                        <label className="btn secondary">
+                          <Camera size={18} aria-hidden="true" /> ถ่ายรูปจุดทิ้ง
+                          <input
+                            aria-label="ถ่ายรูปจุดทิ้ง"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            capture="environment"
+                            onChange={(e) =>
+                              run(() =>
+                                readImage(e.target.files[0], setDisposalPhoto),
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="btn secondary">
+                          <Upload size={18} aria-hidden="true" />{" "}
+                          เลือกรูปจุดทิ้ง
+                          <input
+                            aria-label="เลือกรูปจุดทิ้ง"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) =>
+                              run(() =>
+                                readImage(e.target.files[0], setDisposalPhoto),
+                              )
+                            }
+                          />
+                        </label>
+                        {disposalPhoto && (
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() => setDisposalPhoto("")}
+                          >
+                            <Trash2 size={16} aria-hidden="true" /> ลบรูปที่ 2
+                          </button>
+                        )}
+                      </div>
+                    </details>
                     <Field label="ประเภทขยะ">
                       <div className="category-grid">
                         {data.categories.map((c) => (
                           <button
                             key={c}
                             type="button"
+                            aria-label={c}
+                            aria-pressed={c === category}
                             className={c === category ? "selected" : ""}
                             onClick={() => setCategory(c)}
                           >
-                            {c}
+                            <WasteIcon category={c} /> {categoryLabel(c)}
+                            <small>
+                              {(data.recyclingRates || recyclingRates)[c]
+                                .coins === null
+                                ? "รอครูกำหนดแต้ม"
+                                : `${(data.recyclingRates || recyclingRates)[c].coins} Coins / ${(data.recyclingRates || recyclingRates)[c].unit}`}
+                            </small>
                           </button>
                         ))}
                       </div>
                     </Field>
+                    <Field
+                      label={`จำนวน (${(data.recyclingRates || recyclingRates)[category].unit})`}
+                    >
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        max={maxRecyclingCount}
+                        step="1"
+                        required
+                        value={count}
+                        onChange={(e) => setCount(e.target.value)}
+                        placeholder="เช่น 2"
+                      />
+                    </Field>
+                    <div className="coin-estimate" aria-live="polite">
+                      <strong>
+                        <Coins
+                          className="gold-coin-icon"
+                          size={25}
+                          aria-hidden="true"
+                        />
+                        {(data.recyclingRates || recyclingRates)[category]
+                          .coins === null
+                          ? "Coins รอครูตรวจและกำหนด"
+                          : `คาดว่าจะได้ ${estimateCoins(category, count, data.recyclingRates || recyclingRates) ?? "—"} Coins`}
+                      </strong>
+                      <p>
+                        {(data.recyclingRates || recyclingRates)[category].rule}
+                      </p>
+                      <small>
+                        ส่งครั้งละหนึ่งประเภท
+                        ครูตรวจและแก้จำนวนตามภาพก่อนอนุมัติ Coins
+                      </small>
+                    </div>
                     <Field label="ฝากข้อความถึงคุณครู (ไม่บังคับ)">
                       <textarea
                         value={note}
@@ -954,13 +1164,14 @@ function App() {
                     <Button
                       type="submit"
                       style={{ width: "100%" }}
-                      disabled={busy || !photo}
+                      disabled={busy || !photo || !validCount(count)}
                     >
-                      ส่งขยะให้คุณครูตรวจ <ArrowRight size={19} />
+                      ส่งรูปให้คุณครูตรวจ <ArrowRight size={19} />
                     </Button>
                     <p className="submission-feedback">
-                      ได้รับ Coins หลังเจ้าหน้าที่ตรวจและอนุมัติแล้วเท่านั้น
-                      หากไม่ทราบจุดส่งขยะ ให้สอบถามครูผู้ดูแลธนาคารขยะ
+                      ได้รับ Coins หลังครูตรวจรูปและอนุมัติ หากส่งไม่สำเร็จ
+                      รูปและจำนวนยังอยู่ กดส่งรายการเดิมอีกครั้งได้
+                      หากไม่แน่ใจจุดทิ้ง ให้สอบถามครูผู้ดูแลก่อนทิ้ง
                     </p>
                   </form>
                 </section>
@@ -1015,7 +1226,7 @@ function App() {
                       อันดับโรงเรียน <b>#{student.rank}</b>
                     </p>
                     <p>
-                      ส่งขยะสำเร็จ{" "}
+                      อนุมัติในหน้านี้{" "}
                       <b>
                         {
                           student.submissions.filter(
@@ -1044,34 +1255,23 @@ function App() {
                 </div>
                 <div className="panel">
                   {tab === "trash" && (
-                    <>
-                      {!student.submissions.length && <Empty />}
-                      {student.submissions.map((s) => (
-                        <div className="history-row" key={s.id}>
-                          <Photo src={s.image} onClick={setImage} />
-                          <div className="grow">
-                            <b>{s.category}</b>
-                            <small>{date(s.at)}</small>
-                            {s.reason && <p className="reason">{s.reason}</p>}
-                            {s.evidenceRemovedAt && (
-                              <small>ภาพถูกลบตามระยะเวลาเก็บรักษา</small>
-                            )}
-                          </div>
-                          <Badge status={s.status} />
-                          <strong>{s.coins ? `+${s.coins}` : "—"}</strong>
-                          {s.status === "Pending" && (
-                            <button
-                              className="text-button danger"
-                              onClick={() =>
-                                openModal({ type: "cancelSubmission", item: s })
-                              }
-                            >
-                              ยกเลิก
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </>
+                    <SubmissionHistory
+                      key={`${student.id}:${student.page}`}
+                      student={student}
+                      rates={data.recyclingRates || recyclingRates}
+                      onPhoto={setImage}
+                      onCancel={(s) =>
+                        openModal({ type: "cancelSubmission", item: s })
+                      }
+                      busy={busy}
+                      onRefresh={() =>
+                        run(async () =>
+                          setStudent(
+                            await api("student?page=" + (student.page || 0)),
+                          ),
+                        )
+                      }
+                    />
                   )}
                   {tab === "coins" && (
                     <>
@@ -1596,7 +1796,8 @@ function App() {
                   {adminTab === "reviews" && (
                     <>
                       <p className="muted">
-                        ตรวจหลักฐาน ชั่งน้ำหนัก และระบุ Coins ก่อนอนุมัติ
+                        ตรวจภาพ แก้ประเภทและจำนวนให้ตรงกับขยะจริง ระบบคำนวณ
+                        Coins ก่อนอนุมัติ
                       </p>
                       <div className="review-grid">
                         {admin.submissions
@@ -1605,9 +1806,22 @@ function App() {
                             const p = studentName(s.student);
                             return (
                               <article className="panel review-card" key={s.id}>
-                                <Photo src={s.image} onClick={setImage} />
+                                <div className="evidence-pair">
+                                  <Photo src={s.image} onClick={setImage} />
+                                  {s.disposalImage && (
+                                    <Photo
+                                      src={s.disposalImage}
+                                      onClick={setImage}
+                                    />
+                                  )}
+                                </div>
                                 <Badge status={s.status} />
                                 <h3>{s.category}</h3>
+                                <p>
+                                  {s.submittedCount
+                                    ? `นักเรียนแจ้ง ${s.submittedCount} ${(data.recyclingRates || recyclingRates)[s.submittedCategory || s.category].unit}`
+                                    : "รายการเก่า: ครูกรอกจำนวนจากภาพก่อนอนุมัติ"}
+                                </p>
                                 <b>{p?.name}</b>
                                 <p>
                                   {s.student} · ม.{p?.grade}/{p?.room}
@@ -2584,6 +2798,29 @@ function App() {
                   {modal.item.category} ·{" "}
                   {studentName(modal.item.student)?.name}
                 </p>
+                {modal.item.image && (
+                  <button
+                    type="button"
+                    className="review-evidence"
+                    onClick={() => setImage(modal.item.image)}
+                    aria-label="ขยายภาพหลักฐาน"
+                  >
+                    <img src={modal.item.image} alt="ภาพขยะสำหรับตรวจจำนวน" />
+                  </button>
+                )}
+                {modal.item.disposalImage && (
+                  <button
+                    type="button"
+                    className="review-evidence"
+                    onClick={() => setImage(modal.item.disposalImage)}
+                    aria-label="ขยายภาพจุดทิ้ง"
+                  >
+                    <img
+                      src={modal.item.disposalImage}
+                      alt="ภาพถังหรือจุดทิ้งสำหรับตรวจ"
+                    />
+                  </button>
+                )}
                 <form
                   onSubmit={submitModal(async (v) => {
                     await action("review", {
@@ -2599,38 +2836,13 @@ function App() {
                 >
                   {modal.status === "Approved" ? (
                     <>
-                      <Field label="Coins ที่มอบให้">
-                        <input
-                          name="coins"
-                          type="number"
-                          min="1"
-                          max="10000"
-                          required
-                          defaultValue="50"
-                        />
-                      </Field>
-                      <Field label="น้ำหนักที่ชั่งจริง (กก.)">
-                        <input
-                          name="weight"
-                          type="number"
-                          min="0.001"
-                          max="1000"
-                          step="0.001"
-                          required
-                          placeholder="0.50"
-                        />
-                      </Field>
+                      <ReviewCount
+                        item={modal.item}
+                        rates={data.recyclingRates || recyclingRates}
+                      />
                     </>
                   ) : (
-                    <Field label="เหตุผลที่ไม่อนุมัติ">
-                      <textarea
-                        name="reason"
-                        required
-                        minLength={3}
-                        maxLength={150}
-                        placeholder="เช่น ภาพไม่ชัด ไม่เห็นขยะ หรือส่งซ้ำ"
-                      />
-                    </Field>
+                    <RejectionReason key={modal.item.id} />
                   )}
                   <Button>ยืนยันผลการตรวจ</Button>
                 </form>
@@ -2887,7 +3099,12 @@ function App() {
                 <h3>ประวัติส่งขยะ</h3>
                 {modal.p.submissions.map((s) => (
                   <div className="history-row" key={s.id}>
-                    <Photo src={s.image} onClick={setImage} />
+                    <div className="evidence-pair">
+                      <Photo src={s.image} onClick={setImage} />
+                      {s.disposalImage && (
+                        <Photo src={s.disposalImage} onClick={setImage} />
+                      )}
+                    </div>
                     <span className="grow">
                       {s.category}
                       <small>{date(s.at)}</small>

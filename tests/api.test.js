@@ -87,6 +87,7 @@ test("HTTP sessions, retained student access, authorization, validation and sens
             action: "submit",
             payload: {
               category: "กระดาษ",
+              count: 3,
               image: "data:image/png;base64,aGVsbG8=",
             },
           },

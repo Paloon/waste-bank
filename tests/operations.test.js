@@ -62,7 +62,12 @@ test("ambiguous commit never deletes a committed image; retry returns original r
     body = {
       action: "submit",
       key: randomUUID(),
-      payload: { image: await picture(), category: "กระดาษ" },
+      payload: {
+        image: await picture(),
+        disposalImage: await picture(),
+        category: "กระดาษ",
+        count: 3,
+      },
     };
   store.transact = (fn, scope) => {
     const result = original(fn, scope);
@@ -79,11 +84,12 @@ test("ambiguous commit never deletes a committed image; retry returns original r
     );
     assert.equal(drive.removed.length, 0);
     const saved = store.read().submissions.at(-1);
+    assert.match(saved.disposalImage, /^drive:/);
     assert.deepEqual(
       await performAction(store, drive, actor, structuredClone(body)),
       { ok: true, id: saved.id },
     );
-    assert.equal(drive.files.size, 1);
+    assert.equal(drive.files.size, 2);
     await assert.rejects(
       performAction(store, drive, actor, {
         ...structuredClone(body),
@@ -92,7 +98,7 @@ test("ambiguous commit never deletes a committed image; retry returns original r
       /ภาพนี้เคยส่ง/,
     );
     await maintenance(store, drive, { now: Date.now() + 2 * 86400000 });
-    assert.equal(drive.files.size, 1);
+    assert.equal(drive.files.size, 2);
   } finally {
     store.close();
     rmSync(dir, { recursive: true, force: true });
@@ -108,6 +114,7 @@ test("retention retries deletes, removes abandoned uploads and preserves referen
         ...s.submissions[0],
         status: "Rejected",
         image: "drive:rejectedImage123",
+        disposalImage: "drive:rejectedBin123",
         reviewedAt: old,
       };
       s.submissions[1] = {
@@ -129,6 +136,8 @@ test("retention retries deletes, removes abandoned uploads and preserves referen
     assert.equal(first.failures, 1);
     assert.ok(store.read().mediaJobs.some((x) => x.id === "rejectedImage123"));
     assert.equal(store.read().submissions[0].image, "");
+    assert.equal(store.read().submissions[0].disposalImage, "");
+    assert.ok(drive.removed.includes("rejectedBin123"));
     assert.ok(drive.removed.includes("abandonedImage123"));
     assert.ok(!drive.removed.includes("recentCancel123"));
     failed = false;
@@ -151,7 +160,9 @@ test("encrypted backup restores balances, stock and images into an empty target"
       "backupImage123",
       Buffer.from((await picture()).split(",")[1], "base64"),
     );
+    drive.files.set("backupBin123", drive.files.get("backupImage123"));
     store.transact((s) => {
+      s.submissions[0].disposalImage = "drive:backupBin123";
       s.submissions[0].image = "drive:backupImage123";
     });
     const file = await backup(store, drive, join(dir, "backups"), key);
@@ -162,6 +173,7 @@ test("encrypted backup restores balances, stock and images into an empty target"
     assert.deepEqual(restored.ledger, store.read().ledger);
     assert.deepEqual(restored.rewards, store.read().rewards);
     assert.match(restored.submissions[0].image, /^data:image/);
+    assert.match(restored.submissions[0].disposalImage, /^data:image/);
     assert.equal(reconcile(restored).ok, true);
     await assert.rejects(restoreLocal(bundle, file, key, target), /empty/);
   } finally {

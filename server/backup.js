@@ -53,6 +53,7 @@ export async function backup(
   for (const item of state.submissions)
     if (item.image && evidenceExpired(item)) {
       item.image = "";
+      item.disposalImage = "";
       item.evidenceRemovedAt = new Date().toISOString();
     }
   const files = {};
@@ -132,10 +133,15 @@ export async function restoreLocal(bundle, sourcePath, key, store) {
   for (const item of state.submissions) {
     if (evidenceExpired(item)) {
       item.image = "";
+      item.disposalImage = "";
       item.evidenceRemovedAt = new Date().toISOString();
     } else if (item.image?.startsWith("drive:")) {
       assert(photos.has(item.image), "Missing image");
       item.image = photos.get(item.image);
+    }
+    if (item.disposalImage?.startsWith("drive:")) {
+      assert(photos.has(item.disposalImage), "Missing disposal image");
+      item.disposalImage = photos.get(item.disposalImage);
     }
   }
   for (const reward of state.rewards) {
