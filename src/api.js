@@ -32,14 +32,24 @@ export async function api(path, body) {
         signal: controller.signal,
         keepalive: path === "logout",
       });
-      const data = await response.json();
+      const data = await response.json().catch((error) => {
+        if (response.ok) throw error;
+        return {};
+      });
       if (path !== "logout" && epoch !== generation)
         throw Object.assign(new Error("ยกเลิกแล้ว"), { cancelled: true });
       if (!response.ok) {
-        if (data.code === "SESSION_EXPIRED")
+        if (
+          (!auth && response.status === 401) ||
+          data.code === "SESSION_EXPIRED"
+        )
           window.dispatchEvent(new Event("session-expired"));
         throw Object.assign(new Error(data.error || "โหลดข้อมูลไม่สำเร็จ"), {
           serverError: true,
+          status: response.status,
+          code: data.code,
+          retryable: response.status >= 500,
+          eventId: data.eventId,
         });
       }
       if (auth) channel?.postMessage({ changed: true });
@@ -48,7 +58,7 @@ export async function api(path, body) {
       if (error.serverError || error.cancelled) throw error;
       throw Object.assign(
         new Error("เชื่อมต่อไม่ได้ กรุณาลองรายการเดิมอีกครั้ง"),
-        { cancelled: epoch !== generation },
+        { cancelled: epoch !== generation, retryable: true },
       );
     } finally {
       clearTimeout(timeout);

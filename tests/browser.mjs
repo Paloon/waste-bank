@@ -1,4 +1,4 @@
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -47,15 +47,30 @@ try {
   const byName = (name) =>
     page.getByRole("button", { name, exact: true }).first();
   const identify = async () => {
+    // Each scenario may advance fake timers; request keys must use real server time.
+    await page.clock.setSystemTime(new Date());
     await page.getByLabel("เลขประจำตัวนักเรียน", { exact: true }).fill("65001");
     await byName("ใช่ นี่คือบัญชีของฉัน").waitFor();
     await byName("ใช่ นี่คือบัญชีของฉัน").click();
   };
+  let checkBadPin = true;
   const login = async () => {
+    await page.clock.setSystemTime(new Date());
     await byName("เจ้าหน้าที่").click();
     await page
       .getByLabel("บัญชีเจ้าหน้าที่", { exact: true })
       .fill("teacher.mali");
+    if (checkBadPin) {
+      checkBadPin = false;
+      await page
+        .getByLabel("PIN ส่วนตัว", { exact: true })
+        .fill("incorrect-pin");
+      await byName("เข้าสู่ระบบ").click();
+      await page
+        .getByText("ชื่อบัญชีหรือ PIN ไม่ถูกต้อง", { exact: true })
+        .waitFor();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    }
     await page.getByLabel("PIN ส่วนตัว", { exact: true }).fill(pin);
     await byName("เข้าสู่ระบบ").click();
     await page.getByText("STAFF WORKSPACE").waitFor();
@@ -73,6 +88,134 @@ try {
     .getByRole("heading", { name: "Coins ของฉัน", exact: true })
     .waitFor();
   await page.getByText("ดารา ใจดี").waitFor();
+  await byName("หน้าหลัก").click();
+  console.log("Testing heartbeat retry and draft privacy");
+  const openDraft = async () => {
+    await byName("ส่งขยะ").click();
+    await identify();
+    await page
+      .locator(".upload-zone input[type=file]")
+      .last()
+      .setInputFiles({
+        name: "draft.png",
+        mimeType: "image/png",
+        buffer: await page.screenshot(),
+      });
+    await page.getByAltText("ภาพที่เลือก").waitFor();
+    await page.getByLabel("จำนวน (ขวด)", { exact: true }).fill("7");
+  };
+  const retainedDraft = async () => {
+    assert.equal(
+      await page.getByLabel("จำนวน (ขวด)", { exact: true }).inputValue(),
+      "7",
+    );
+    assert.equal(await page.getByAltText("ภาพที่เลือก").count(), 1);
+  };
+  await openDraft();
+  let heartbeatMode = "transport",
+    heartbeatCalls = 0;
+  await page.route("**/api/session", async (route) => {
+    heartbeatCalls++;
+    if (heartbeatMode === "transport") await route.abort("failed");
+    else if (heartbeatMode === "server")
+      await route.fulfill({
+        status: 503,
+        json: { error: "temporarily unavailable" },
+      });
+    else await route.continue();
+  });
+  await page.clock.fastForward(20000);
+  await page
+    .getByText(
+      "เชื่อมต่อไม่ได้ ข้อมูลที่กรอกยังอยู่ กรุณาลองอีกครั้งก่อนหมดเวลาใช้งาน",
+    )
+    .waitFor();
+  await retainedDraft();
+  heartbeatMode = "server";
+  await page.getByLabel("จำนวน (ขวด)", { exact: true }).fill("7");
+  const unavailableHeartbeat = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/session") && response.status() === 503,
+  );
+  await page.clock.fastForward(20000);
+  await unavailableHeartbeat;
+  await retainedDraft();
+  heartbeatMode = "recover";
+  await page.getByLabel("จำนวน (ขวด)", { exact: true }).fill("7");
+  await byName("ลองเชื่อมต่ออีกครั้ง").click();
+  await page
+    .getByText(
+      "เชื่อมต่อไม่ได้ ข้อมูลที่กรอกยังอยู่ กรุณาลองอีกครั้งก่อนหมดเวลาใช้งาน",
+    )
+    .waitFor({ state: "hidden" });
+  assert.ok(heartbeatCalls >= 3);
+  await retainedDraft();
+  await page.unroute("**/api/session");
+  await byName("หน้าหลัก").click();
+  await byName("ส่งขยะ").click();
+  await identify();
+  assert.equal(await page.getByAltText("ภาพที่เลือก").count(), 0);
+  assert.equal(
+    await page.getByLabel("จำนวน (ขวด)", { exact: true }).inputValue(),
+    "",
+  );
+  await byName("หน้าหลัก").click();
+  await openDraft();
+  await page.route("**/api/session", (route) => route.abort("failed"));
+  await page.clock.fastForward(71000);
+  const continuedHeartbeat = page.waitForRequest("**/api/session");
+  await byName("ใช้งานต่อ").click();
+  await continuedHeartbeat;
+  await page
+    .getByText(
+      "เชื่อมต่อไม่ได้ ข้อมูลที่กรอกยังอยู่ กรุณาลองอีกครั้งก่อนหมดเวลาใช้งาน",
+    )
+    .waitFor();
+  await retainedDraft();
+  await page.clock.fastForward(91000);
+  await byName("เริ่มส่งขยะ").waitFor();
+  assert.equal(await page.getByAltText("ภาพที่เลือก").count(), 0);
+  await page.unroute("**/api/session");
+  await openDraft();
+  await page.route("**/api/session", (route) =>
+    route.fulfill({
+      status: 401,
+      json: { code: "SESSION_EXPIRED", error: "expired" },
+    }),
+  );
+  await page.clock.fastForward(20000);
+  await byName("เริ่มส่งขยะ").waitFor();
+  assert.equal(await page.getByAltText("ภาพที่เลือก").count(), 0);
+  await page.unroute("**/api/session");
+  await openDraft();
+  let releaseHeartbeat;
+  const heartbeatArrived = new Promise((resolve) => {
+    page.route("**/api/session", async (route) => {
+      releaseHeartbeat = () =>
+        route
+          .fulfill({ status: 401, json: { code: "SESSION_EXPIRED" } })
+          .catch(() => {});
+      resolve();
+      await new Promise((done) => {
+        const release = releaseHeartbeat;
+        releaseHeartbeat = async () => {
+          await release();
+          done();
+        };
+      });
+    });
+  });
+  await page.clock.fastForward(20000);
+  await heartbeatArrived;
+  await byName("หน้าหลัก").click();
+  await byName("Coins ของฉัน").click();
+  await page.getByLabel("เลขประจำตัวนักเรียน", { exact: true }).fill("70001");
+  await byName("ใช่ นี่คือบัญชีของฉัน").click();
+  await page.getByText("ดารา ใจดี").waitFor();
+  await releaseHeartbeat();
+  await page.unroute("**/api/session");
+  assert.ok(await page.getByText("ดารา ใจดี").isVisible());
+  assert.equal(await page.getByAltText("ภาพที่เลือก").count(), 0);
   await byName("หน้าหลัก").click();
   console.log("Testing submission");
   await byName("ส่งขยะ").click();
@@ -209,7 +352,7 @@ try {
     .waitFor();
   await page.getByRole("button", { name: /^ไม่ผ่าน / }).click();
   await page.getByText(rejection, { exact: true }).waitFor();
-  assert.equal(await page.locator(".student-submission.approved").count(), 0);
+  await expect(page.locator(".student-submission.approved")).toHaveCount(0);
   await byName("อัปเดตสถานะ").click();
   await page.getByText(rejection, { exact: true }).waitFor();
   await page.getByRole("button", { name: /^อนุมัติแล้ว / }).click();
@@ -408,6 +551,25 @@ try {
         number: i + 1,
         status: "Inactive",
       });
+    s.students.push({
+      id: "80001",
+      name: "นักเรียนทดสอบประวัติ",
+      grade: "4",
+      room: "29",
+      number: 59,
+      status: "Active",
+    });
+    for (let i = 0; i < 120; i++)
+      s.submissions.push({
+        id: `history-${String(i).padStart(3, "0")}`,
+        student: "80001",
+        category: "ขวดพลาสติก",
+        count: 1,
+        status: i < 60 ? "Pending" : "Rejected",
+        at: new Date(Date.now() - i * 60000).toISOString(),
+        image: "",
+        reason: i >= 60 ? "หลักฐานทดสอบไม่ชัด" : "",
+      });
   });
   fixtureStore.close();
   await byName("รีเฟรช").click();
@@ -416,6 +578,28 @@ try {
   await page.getByLabel("เลือก Pagination 59").waitFor();
   await byName("หน้าก่อน").click();
   await page.getByText("หน้า 1", { exact: true }).waitFor();
+  console.log("Testing full student history filters beyond 50 entries");
+  await byName("ออกจากระบบ").click();
+  await page.clock.setSystemTime(new Date());
+  await byName("Coins ของฉัน").click();
+  await page.getByLabel("เลขประจำตัวนักเรียน", { exact: true }).fill("80001");
+  await byName("ใช่ นี่คือบัญชีของฉัน").click();
+  await byName("ทั้งหมด 120").waitFor();
+  await expect(page.locator(".student-submission.pending")).toHaveCount(50);
+  await byName("ไม่ผ่าน 60").click();
+  await expect(page.locator(".student-submission.rejected")).toHaveCount(50);
+  await expect(page.locator(".student-submission.pending")).toHaveCount(0);
+  await byName("ถัดไป").click();
+  await expect(page.locator(".student-submission.rejected")).toHaveCount(10);
+  await byName("ไม่ผ่าน 60").waitFor();
+  await byName("รอตรวจ 60").click();
+  await expect(page.locator(".student-submission.pending")).toHaveCount(50);
+  await expect(
+    page
+      .getByRole("region", { name: "สถานะรายการส่งของฉัน" })
+      .getByText("หน้า 1", { exact: true }),
+  ).toBeVisible();
+  await byName("หน้าหลัก").click();
   assert.deepEqual(errors, []);
   console.log(
     "PASS: self-registration → upload → approve → redeem → history → refund → adjustment → promotion → reward gallery → responsive → privacy timeout → bulk deletion; no browser errors",

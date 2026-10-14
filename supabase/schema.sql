@@ -147,4 +147,41 @@ revoke all on function public.wb_refresh_drive(text,jsonb) from public,anon,auth
 grant execute on function public.wb_refresh_drive(text,jsonb) to service_role;
 revoke all on function public.wb_snapshot(jsonb),public.wb_commit(bigint,jsonb),public.wb_control(text,jsonb),public.wb_summary(),public.wb_initialize(jsonb) from public,anon,authenticated;
 grant execute on function public.wb_snapshot(jsonb),public.wb_commit(bigint,jsonb),public.wb_control(text,jsonb),public.wb_summary(),public.wb_initialize(jsonb) to service_role;
+-- Additive read endpoint: full status counts and independently paged history.
+create index if not exists wb_student_status_history on public.waste_bank_records(kind,student,status,at desc,id);
+create or replace function public.wb_student_history(student_id text,wallet_page integer,submission_page integer,submission_status text,page_size integer)
+returns jsonb language sql stable security invoker set search_path=public as $$
+with scores as (
+ select student,sum((data->>'amount')::bigint) balance,
+ coalesce(sum((data->>'amount')::bigint) filter(where data->>'type' in ('recycle','adjustment','opening')),0) earned
+ from waste_bank_records where kind='ledger' group by student
+), people as (
+ select r.data||jsonb_build_object('balance',coalesce(s.balance,0),'earned',coalesce(s.earned,0)) data
+ from waste_bank_records r left join scores s on s.student=r.id where r.kind='students'
+), ranks as (
+ select data->>'id' id,row_number() over(order by (data->>'earned')::bigint desc,data->>'id') rank
+ from people where data->>'status'='Active'
+), counts as (
+ select count(*) total,count(*) filter(where status='Pending') pending,
+ count(*) filter(where status='Approved') approved,count(*) filter(where status='Rejected') rejected,
+ count(*) filter(where status='Cancelled') cancelled
+ from waste_bank_records where kind='submissions' and student=student_id
+)
+select jsonb_build_object(
+ 'student',(select data from people where data->>'id'=student_id),
+ 'rank',coalesce((select rank from ranks where id=student_id),0),
+ 'submissionStatusCounts',(select jsonb_build_object('All',total,'Pending',pending,'Approved',approved,'Rejected',rejected,'Cancelled',cancelled) from counts),
+ 'ledger',coalesce((select jsonb_agg(data order by at desc nulls last,id) from (
+ select data,at,id from waste_bank_records where kind='ledger' and student=student_id order by at desc nulls last,id
+ limit least(greatest(page_size,1),100)+1 offset greatest(wallet_page,0)*least(greatest(page_size,1),100)) q),'[]'),
+ 'redemptions',coalesce((select jsonb_agg(data order by at desc nulls last,id) from (
+ select data,at,id from waste_bank_records where kind='redemptions' and student=student_id order by at desc nulls last,id
+ limit least(greatest(page_size,1),100)+1 offset greatest(wallet_page,0)*least(greatest(page_size,1),100)) q),'[]'),
+ 'submissions',coalesce((select jsonb_agg(data order by at desc nulls last,id) from (
+ select data,at,id from waste_bank_records where kind='submissions' and student=student_id and (submission_status='' or status=submission_status) order by at desc nulls last,id
+ limit least(greatest(page_size,1),100)+1 offset greatest(submission_page,0)*least(greatest(page_size,1),100)) q),'[]')
+);
+$$;
+revoke all on function public.wb_student_history(text,integer,integer,text,integer) from public,anon,authenticated;
+grant execute on function public.wb_student_history(text,integer,integer,text,integer) to service_role;
 commit;

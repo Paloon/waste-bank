@@ -15,6 +15,7 @@ import {
   totals,
 } from "./state.js";
 import { controlValue } from "./control.js";
+import { evidenceExpired } from "./maintenance.js";
 import { policy } from "../shared/policy.js";
 import {
   recyclingRates,
@@ -191,7 +192,8 @@ export function seed() {
       coins: i > 5 ? 50 : 0,
       weight: i > 5 ? 0.5 : 0,
       reason: i === 4 ? "ภาพไม่ชัด กรุณาส่งใหม่" : "",
-      image: "",
+      image:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC",
       at: now(),
     });
     if (i > 5)
@@ -434,6 +436,8 @@ export function act(s, actor, body) {
     s.audit.unshift({
       id: randomUUID(),
       staff: isStaff ? staff.name : "นักเรียน " + actor.id,
+      actorId: actor.id,
+      actorRole: actor.role,
       action,
       target,
       before,
@@ -585,6 +589,14 @@ export function act(s, actor, body) {
     fail(item?.status === "Pending", "รายการนี้ถูกดำเนินการแล้ว");
     fail(["Approved", "Rejected"].includes(p.status), "สถานะไม่ถูกต้อง");
     if (p.status === "Approved") {
+      fail(
+        Boolean(item.image) &&
+          !item.evidenceDetachedAt &&
+          !item.evidenceRemovedAt &&
+          !evidenceExpired(item),
+        "หลักฐานไม่ครบหรือหมดอายุแล้ว ไม่สามารถอนุมัติรายการนี้ได้",
+      );
+      image(item.image, true);
       const category = p.category || item.category;
       fail(
         categories.includes(category) ||

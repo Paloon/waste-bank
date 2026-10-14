@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { PGlite } from "@electric-sql/pglite";
+import { createTestDatabase } from "./pglite.mjs";
 import { createCloudStore } from "../server/cloud-store.js";
 import { seed, act, balance } from "../server/store.js";
 import { randomUUID } from "node:crypto";
 
 test("PostgreSQL schema migration, scoped commits, races, summaries and distributed controls", async () => {
-  const db = new PGlite();
+  const db = await createTestDatabase();
   try {
     await db.exec(
       "create role anon;create role authenticated;create role service_role bypassrls;create table waste_bank_state(id integer primary key,version bigint not null default 0,value jsonb not null);",

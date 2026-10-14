@@ -9,6 +9,8 @@ export async function audit(store, action, actor, target = "", details = {}) {
           actor?.role === "student"
             ? "นักเรียน " + actor.id
             : actor?.id || "system",
+        actorId: actor?.id || "system",
+        actorRole: actor?.role || "system",
         action,
         target,
         before: null,
@@ -22,11 +24,15 @@ export async function audit(store, action, actor, target = "", details = {}) {
 export async function report(store, code) {
   // Never log bodies, PINs, cookies, tokens, names, photos or upstream error text.
   const at = new Date().toISOString();
-  console.error(JSON.stringify({ event: "waste-bank-error", code, at }));
+  const eventId = randomUUID();
+  console.error(
+    JSON.stringify({ event: "waste-bank-error", code, at, eventId }),
+  );
   try {
     await store.control("put", {
       id: "health:error",
-      value: { code, at, expires: Date.now() + 30 * 86400000 },
+      value: { code, at, eventId, expires: Date.now() + 30 * 86400000 },
     });
   } catch {}
+  return eventId;
 }

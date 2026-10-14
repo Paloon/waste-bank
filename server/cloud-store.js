@@ -1,3 +1,4 @@
+import { policy } from "../shared/policy.js";
 import { emptyState, delta, records } from "./state.js";
 import { AppError, assert } from "./errors.js";
 import { reportFields, reportLimit } from "./reports.js";
@@ -31,12 +32,16 @@ export function createCloudStore({
         "COMMIT_UNKNOWN",
       );
     }
-    if (!response.ok)
-      throw new AppError(
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const error = new AppError(
         "ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้งหรือติดต่อเจ้าหน้าที่",
         503,
         "DATABASE_UNAVAILABLE",
       );
+      error.databaseCode = payload.code;
+      throw error;
+    }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   }
@@ -105,6 +110,93 @@ export function createCloudStore({
   return {
     read: async (scope) => (await snapshot(scope)).value,
     summary: () => rpc("wb_summary"),
+    studentHistory: async (id, { page, submissionPage, submissionStatus }) => {
+      try {
+        return await rpc("wb_student_history", {
+          student_id: id,
+          wallet_page: page,
+          submission_page: submissionPage,
+          submission_status: submissionStatus,
+          page_size: policy.pageSize,
+        });
+      } catch (error) {
+        if (error.databaseCode !== "PGRST202" && error.databaseCode !== "42883")
+          throw error;
+      }
+      // Compatibility with deployed schema v2: count projected statuses in bounded
+      // batches, never fetch evidence from the student's entire history.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const before = (await snapshot({})).version;
+        assert(
+          before !== undefined && before !== null,
+          "ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง",
+          503,
+        );
+        const overview = await rpc("wb_summary");
+        const student = overview.students.find((x) => x.id === id);
+        if (!student) {
+          if ((await snapshot({})).version === before) return { student: null };
+          continue;
+        }
+        const submissionStatusCounts = {
+          All: 0,
+          Pending: 0,
+          Approved: 0,
+          Rejected: 0,
+          Cancelled: 0,
+        };
+        const params = new URLSearchParams({
+          kind: "eq.submissions",
+          student: "eq." + id,
+          select: "status",
+          order: "id.asc",
+          limit: "500",
+        });
+        for (let offset = 0; ;) {
+          params.set("offset", String(offset));
+          const batch = await request("waste_bank_records?" + params);
+          for (const row of batch) {
+            submissionStatusCounts.All++;
+            if (Object.hasOwn(submissionStatusCounts, row.status))
+              submissionStatusCounts[row.status]++;
+          }
+          if (!batch.length) break;
+          offset += batch.length;
+        }
+        const wallet = {
+          students: [id],
+          limit: policy.pageSize + 1,
+          offset: page * policy.pageSize,
+        };
+        const history = (
+          await snapshot({
+            ledger: wallet,
+            redemptions: wallet,
+            submissions: {
+              students: [id],
+              limit: policy.pageSize + 1,
+              offset: submissionPage * policy.pageSize,
+              ...(submissionStatus ? { status: submissionStatus } : {}),
+            },
+          })
+        ).value;
+        if ((await snapshot({})).version !== before) continue;
+        const active = overview.students
+          .filter((x) => x.status === "Active")
+          .sort((a, b) => b.earned - a.earned || a.id.localeCompare(b.id));
+        return {
+          ...history,
+          student,
+          submissionStatusCounts,
+          rank: active.findIndex((x) => x.id === id) + 1,
+        };
+      }
+      throw new AppError(
+        "ข้อมูลเปลี่ยนระหว่างอ่าน กรุณาลองใหม่",
+        409,
+        "HISTORY_CHANGED",
+      );
+    },
     async reportSource(range) {
       // A version check prevents totals assembled from different concurrent snapshots.
       for (let attempt = 0; attempt < 3; attempt++) {

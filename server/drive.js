@@ -281,7 +281,7 @@ export function createDrive(
   }
 
   async function remove(id) {
-    if (!validId(id)) return;
+    if (!validId(id)) throw new Error("รหัสรูปภาพไม่ถูกต้อง");
     const response = await fetch(
       `https://www.googleapis.com/drive/v3/files/${id}?supportsAllDrives=true`,
       {

@@ -39,6 +39,7 @@ import {
 import "./style.css";
 import Reports from "./Reports.jsx";
 import SubmissionHistory from "./SubmissionHistory.jsx";
+import OperationsStatus from "./OperationsStatus.jsx";
 import RejectionReason from "./RejectionReason.jsx";
 import RecyclingGuide, { WasteIcon, categoryLabel } from "./RecyclingGuide.jsx";
 import { api, invalidateRequests } from "./api.js";
@@ -191,6 +192,7 @@ function App() {
     setPage("home");
     setStudent(null);
     setStaff(null);
+    setTab("trash");
     setAdmin(null);
     setLookup(null);
     setId("");
@@ -218,6 +220,22 @@ function App() {
     clear();
     api("logout", {}).catch(() => {});
     refresh().catch(() => {});
+  };
+  const sessionRetryMessage =
+    "เชื่อมต่อไม่ได้ ข้อมูลที่กรอกยังอยู่ กรุณาลองอีกครั้งก่อนหมดเวลาใช้งาน";
+  const renewSession = () => {
+    const epoch = uiEpoch.current;
+    return api("session", {})
+      .then(() => {
+        if (epoch === uiEpoch.current)
+          setError((current) =>
+            current === sessionRetryMessage ? "" : current,
+          );
+      })
+      .catch((e) => {
+        if (!e.cancelled && epoch === uiEpoch.current)
+          setError(e.retryable ? sessionRetryMessage : e.message);
+      });
   };
   useEffect(() => {
     if (page !== "success" || !successUntil) return;
@@ -272,10 +290,7 @@ function App() {
     if (!student && !staff) return;
     const timer = setInterval(() => {
       if (Date.now() - lastActivity.current < policy.heartbeatMs + 1000)
-        api("session", {}).catch(() => {
-          home();
-          setNotice("หมดเวลาใช้งาน กรุณาระบุตัวตนใหม่");
-        });
+        renewSession();
     }, policy.heartbeatMs);
     return () => clearInterval(timer);
   }, [student?.id, staff]);
@@ -447,6 +462,18 @@ function App() {
     setStudent(result);
     return result;
   }
+  const studentHistoryQuery = (changes = {}) =>
+    "student?" +
+    new URLSearchParams({
+      page: student?.page || 0,
+      submissionPage: student?.submissionPage || 0,
+      submissionStatus: student?.submissionStatus || "",
+      ...changes,
+    });
+  const refreshStudentHistory = (changes = {}) =>
+    run(async () => {
+      setStudent(await api(studentHistoryQuery(changes)));
+    });
   function identify(next, reward) {
     setPhoto("");
     setDisposalPhoto("");
@@ -690,7 +717,12 @@ function App() {
             {error}
             <button
               onClick={() => {
-                if (page === "submit" && error.startsWith("เชื่อมต่อไม่ได้")) {
+                if (error === sessionRetryMessage) {
+                  renewSession();
+                } else if (
+                  page === "submit" &&
+                  error.startsWith("เชื่อมต่อไม่ได้")
+                ) {
                   document.getElementById("submission-form")?.requestSubmit();
                 } else {
                   setError("");
@@ -698,9 +730,11 @@ function App() {
                 }
               }}
             >
-              {page === "submit" && error.startsWith("เชื่อมต่อไม่ได้")
-                ? "ส่งรายการเดิมอีกครั้ง"
-                : "ลองใหม่"}
+              {error === sessionRetryMessage
+                ? "ลองเชื่อมต่ออีกครั้ง"
+                : page === "submit" && error.startsWith("เชื่อมต่อไม่ได้")
+                  ? "ส่งรายการเดิมอีกครั้ง"
+                  : "ลองใหม่"}
             </button>
           </div>
         )}
@@ -1226,13 +1260,12 @@ function App() {
                       อันดับโรงเรียน <b>#{student.rank}</b>
                     </p>
                     <p>
-                      อนุมัติในหน้านี้{" "}
+                      อนุมัติทั้งหมด{" "}
                       <b>
-                        {
+                        {student.submissionStatusCounts?.Approved ??
                           student.submissions.filter(
                             (x) => x.status === "Approved",
-                          ).length
-                        }{" "}
+                          ).length}{" "}
                         ครั้ง
                       </b>
                     </p>
@@ -1256,7 +1289,7 @@ function App() {
                 <div className="panel">
                   {tab === "trash" && (
                     <SubmissionHistory
-                      key={`${student.id}:${student.page}`}
+                      key={student.id}
                       student={student}
                       rates={data.recyclingRates || recyclingRates}
                       onPhoto={setImage}
@@ -1264,12 +1297,15 @@ function App() {
                         openModal({ type: "cancelSubmission", item: s })
                       }
                       busy={busy}
-                      onRefresh={() =>
-                        run(async () =>
-                          setStudent(
-                            await api("student?page=" + (student.page || 0)),
-                          ),
-                        )
+                      onRefresh={() => refreshStudentHistory()}
+                      onFilter={(submissionStatus) =>
+                        refreshStudentHistory({
+                          submissionStatus,
+                          submissionPage: 0,
+                        })
+                      }
+                      onPage={(submissionPage) =>
+                        refreshStudentHistory({ submissionPage })
                       }
                     />
                   )}
@@ -1584,6 +1620,7 @@ function App() {
                   {adminTab === "reports" && (
                     <Reports refreshKey={reportRefresh} />
                   )}
+                  <OperationsStatus health={admin.health} />
                   {adminTab === "dashboard" && (
                     <div className="panel">
                       <h3>Google Drive</h3>
@@ -1662,22 +1699,15 @@ function App() {
                             ? date(admin.health.backup.at)
                             : "ยังไม่มีหลักฐานการสำรองข้อมูล"}
                         </p>
-                        {(!admin.health?.maintenance?.at ||
-                          Date.now() - Date.parse(admin.health.maintenance.at) >
-                            48 * 3600000) && (
-                          <p className="danger">กรุณาตรวจงานล้างรูปอัตโนมัติ</p>
-                        )}
-                        {(!admin.health?.backup?.at ||
-                          Date.now() - Date.parse(admin.health.backup.at) >
-                            48 * 3600000) && (
-                          <p className="danger">
-                            กรุณาสำรองข้อมูลด้วยเครื่องของโรงเรียน
-                          </p>
-                        )}
                         {admin.health?.error && (
                           <p className="danger">
                             เหตุขัดข้องล่าสุด: {admin.health.error.code} ·{" "}
                             {date(admin.health.error.at)}
+                            {admin.health.error.eventId && (
+                              <small>
+                                รหัสเหตุการณ์: {admin.health.error.eventId}
+                              </small>
+                            )}
                           </p>
                         )}
                         <button
@@ -2181,7 +2211,11 @@ function App() {
                               <div>
                                 <b>{a.action}</b>
                                 <span>
-                                  {a.staff} · {date(a.at)}
+                                  {a.staff}
+                                  {a.actorId && a.actorId !== a.staff
+                                    ? ` (${a.actorId})`
+                                    : ""}{" "}
+                                  · {date(a.at)}
                                 </span>
                               </div>
                               <p>
@@ -2369,16 +2403,18 @@ function App() {
             )}
           </>
         )}
-        {page === "account" && student?.hasMore && (
+        {page === "account" && tab !== "trash" && student?.hasMore && (
           <button
             className="btn secondary"
             onClick={() =>
               run(async () => {
-                const next = await api("student?page=" + (student.page + 1));
+                const next = await api(
+                  studentHistoryQuery({ page: student.page + 1 }),
+                );
                 setStudent({
                   ...next,
                   ledger: [...student.ledger, ...next.ledger],
-                  submissions: [...student.submissions, ...next.submissions],
+                  submissions: next.submissions,
                   redemptions: [...student.redemptions, ...next.redemptions],
                 });
               })
@@ -2403,7 +2439,7 @@ function App() {
             onClick={() => {
               lastActivity.current = Date.now();
               setIdleRemaining(null);
-              if (student || staff) api("session", {}).catch(() => home());
+              if (student || staff) renewSession();
             }}
           >
             ใช้งานต่อ

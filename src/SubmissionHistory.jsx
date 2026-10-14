@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Clock,
   CheckCircle2,
@@ -31,11 +31,12 @@ export default function SubmissionHistory({
   onCancel,
   onRefresh,
   busy,
+  onFilter,
+  onPage,
 }) {
-  const [filter, setFilter] = useState("");
-  const items = student.submissions.filter(
-    (s) => !filter || s.status === filter,
-  );
+  const filter = student.submissionStatus || "";
+  const items = student.submissions;
+  const counts = student.submissionStatusCounts || {};
   return (
     <section aria-label="สถานะรายการส่งของฉัน">
       <div className="section-heading">
@@ -45,35 +46,36 @@ export default function SubmissionHistory({
         </button>
       </div>
       <p className="muted">
-        จำนวนด้านล่างนับเฉพาะรายการในหน้านี้ · Coins เข้าบัญชีเมื่อครูอนุมัติ
+        จำนวนด้านล่างนับจากรายการทั้งหมดของฉัน · Coins เข้าบัญชีเมื่อครูอนุมัติ
       </p>
       <div
         className="submission-status-filters"
-        aria-label="กรองสถานะรายการในหน้านี้"
+        aria-label="กรองสถานะรายการทั้งหมด"
       >
         <button
           type="button"
           aria-pressed={!filter}
-          onClick={() => setFilter("")}
+          disabled={busy}
+          onClick={() => onFilter?.("")}
         >
-          ทั้งหมด {student.submissions.length}
+          ทั้งหมด {counts.All || 0}
         </button>
         {Object.entries(statuses).map(([key, { label, Icon }]) => (
           <button
             type="button"
             key={key}
             aria-pressed={filter === key}
-            onClick={() => setFilter(key)}
+            disabled={busy}
+            onClick={() => onFilter?.(key)}
           >
-            <Icon size={17} aria-hidden="true" /> {label}{" "}
-            {student.submissions.filter((s) => s.status === key).length}
+            <Icon size={17} aria-hidden="true" /> {label} {counts[key] || 0}
           </button>
         ))}
       </div>
       {!items.length && (
         <p className="submission-empty">
-          {student.submissions.length
-            ? "ไม่มีรายการสถานะนี้ในหน้านี้"
+          {counts.All
+            ? "ไม่มีรายการสถานะนี้"
             : "ยังไม่มีรายการส่งรูปการทิ้งขยะ"}
         </p>
       )}
@@ -162,9 +164,11 @@ export default function SubmissionHistory({
                     <b>หมายเหตุจากครู:</b> {s.reviewNote}
                   </p>
                 )}
-                {s.evidenceRemovedAt && (
-                  <small>ภาพถูกลบตามระยะเวลาเก็บรักษา</small>
-                )}
+                {s.evidenceDeletedAt ? (
+                  <small>ภาพถูกลบตามระยะเวลาเก็บรักษาแล้ว</small>
+                ) : s.evidenceDetachedAt || s.evidenceRemovedAt ? (
+                  <small>ภาพถูกนำออกจากรายการตามระยะเวลาเก็บรักษา</small>
+                ) : null}
               </div>
             </div>
             {s.status === "Pending" && (
@@ -178,6 +182,23 @@ export default function SubmissionHistory({
           </article>
         );
       })}
+      <div className="pager" aria-label="เปลี่ยนหน้ารายการส่ง">
+        <button
+          className="btn secondary"
+          disabled={busy || !student.submissionPage}
+          onClick={() => onPage?.(student.submissionPage - 1)}
+        >
+          ก่อนหน้า
+        </button>
+        <span>หน้า {(student.submissionPage || 0) + 1}</span>
+        <button
+          className="btn secondary"
+          disabled={busy || !student.submissionsHasMore}
+          onClick={() => onPage?.((student.submissionPage || 0) + 1)}
+        >
+          ถัดไป
+        </button>
+      </div>
     </section>
   );
 }

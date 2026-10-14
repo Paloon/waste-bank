@@ -3411,3 +3411,6 @@ nav button.submit-nav.active {
     padding: 12px;
   }
 }
+.operations-status h2 { display: flex; align-items: center; gap: 8px; }
+.operations-status li { margin: 8px 0; }
+.operations-status { border-left: 4px solid #b88927; }

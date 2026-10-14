@@ -3,6 +3,37 @@ import { policy } from "../shared/policy.js";
 import { AppError, assert } from "./errors.js";
 sharp.cache(false);
 sharp.concurrency(1);
+// Only the buffer loaders used by uploads may decode untrusted input.
+sharp.block({ operation: ["VipsForeignLoad"] });
+sharp.unblock({
+  operation: [
+    "VipsForeignLoadJpegBuffer",
+    "VipsForeignLoadPngBuffer",
+    "VipsForeignLoadWebpBuffer",
+  ],
+});
+
+function imageFormat(bytes) {
+  if (
+    bytes.length >= 3 &&
+    bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))
+  )
+    return "jpeg";
+  if (
+    bytes.length >= 8 &&
+    bytes
+      .subarray(0, 8)
+      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  )
+    return "png";
+  if (
+    bytes.length >= 12 &&
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP"
+  )
+    return "webp";
+  return null;
+}
 export async function normalizeImage(uri) {
   assert(
     typeof uri === "string" &&
@@ -16,6 +47,11 @@ export async function normalizeImage(uri) {
   assert(
     bytes.length <= policy.imageBytes,
     "รูปภาพต้องไม่เกิน 400 KiB หลังบีบอัด",
+  );
+  // Reject spoofed MIME types before invoking any native decoder.
+  assert(
+    imageFormat(bytes) === match[1],
+    "เปิดรูปไม่ได้ กรุณาเลือกภาพ JPG, PNG หรือ WebP ให้ตรงชนิดไฟล์",
   );
   try {
     const image = sharp(bytes, {

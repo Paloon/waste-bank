@@ -35,7 +35,27 @@ export function unseal(bytes, key) {
     Buffer.concat([decipher.update(bytes.subarray(32)), decipher.final()]),
   );
 }
-export async function backup(
+export async function backup(store, drive, directory, key, options = {}) {
+  try {
+    return await createBackup(store, drive, directory, key, options);
+  } catch (error) {
+    try {
+      await store.control("put", {
+        id: "health:backupAttempt",
+        value: {
+          at: new Date().toISOString(),
+          ok: false,
+          code: "BACKUP_FAILED",
+          expires: Date.now() + 30 * 86400000,
+        },
+      });
+    } catch {
+      /* Preserve the original backup error if health storage is offline. */
+    }
+    throw error;
+  }
+}
+async function createBackup(
   store,
   drive,
   directory,
@@ -43,23 +63,29 @@ export async function backup(
   { keepDays = 7 } = {},
 ) {
   keyBytes(key);
+  assert(
+    Number.isInteger(keepDays) && keepDays >= 1 && keepDays <= 30,
+    "Backup retention must be 1–30 days",
+  );
   directory = resolve(directory);
   await mkdir(join(directory, "blobs"), { recursive: true });
-  const state = await store.read();
+  const state = structuredClone(await store.read());
   // Ephemeral work and secrets are not restored. Remove evidence already beyond retention.
   state.requests = {};
   state.mediaJobs = [];
   state.pendingDriveDeletes = [];
+  for (const item of state.submissions) delete item.evidenceDeletionPending;
   for (const item of state.submissions)
-    if (item.image && evidenceExpired(item)) {
+    if ((item.image || item.disposalImage) && evidenceExpired(item)) {
       item.image = "";
       item.disposalImage = "";
-      item.evidenceRemovedAt = new Date().toISOString();
+      item.evidenceDetachedAt = new Date().toISOString();
     }
   const files = {};
   for (const id of referencedFiles(state)) {
-    const response = await drive.download(id),
-      bytes = Buffer.from(await response.arrayBuffer()),
+    const response = await drive.download(id);
+    assert(response.ok, "Backup image download failed");
+    const bytes = Buffer.from(await response.arrayBuffer()),
       hash = createHash("sha256").update(bytes).digest("hex");
     const path = join(directory, "blobs", hash + ".wb");
     try {
@@ -86,15 +112,25 @@ export async function backup(
   });
   // Read back every written manifest before recording a successful backup.
   await readBackup(path, key);
+  await pruneBackups(directory, key, keepDays);
   await store.control("put", {
     id: "health:backup",
     value: {
       at,
       files: Object.keys(files).length,
+      verified: true,
+      retentionVerified: true,
       expires: Date.now() + 30 * 86400000,
     },
   });
-  await pruneBackups(directory, key, keepDays);
+  await store.control("put", {
+    id: "health:backupAttempt",
+    value: {
+      at,
+      ok: true,
+      expires: Date.now() + 30 * 86400000,
+    },
+  });
   return path;
 }
 export async function readBackup(path, key) {
@@ -103,6 +139,8 @@ export async function readBackup(path, key) {
     bundle.format === 2 && bundle.state && bundle.files,
     "Unsupported backup",
   );
+  for (const id of referencedFiles(bundle.state))
+    assert(bundle.files[id], "Backup is missing a referenced image");
   const folder = resolve(path, "..", "blobs");
   for (const file of Object.values(bundle.files)) {
     assert(/^[a-f0-9]{64}$/.test(file.hash), "Invalid backup filename");
@@ -115,9 +153,24 @@ export async function readBackup(path, key) {
   return bundle;
 }
 export async function restoreLocal(bundle, sourcePath, key, store) {
+  // Never trust a caller-supplied manifest without authenticating disk contents.
+  const verified = await readBackup(sourcePath, key);
+  assert(
+    JSON.stringify(bundle) === JSON.stringify(verified),
+    "Backup manifest mismatch",
+  );
   const current = await store.read();
   assert(
-    !current.students.length && !current.staff.length && !current.ledger.length,
+    [
+      "students",
+      "staff",
+      "ledger",
+      "submissions",
+      "rewards",
+      "redemptions",
+      "audit",
+      "mediaJobs",
+    ].every((name) => !current[name]?.length),
     "Restore target must be empty",
   );
   const state = { ...emptyState(), ...structuredClone(bundle.state) },
@@ -131,10 +184,11 @@ export async function restoreLocal(bundle, sourcePath, key, store) {
     );
   }
   for (const item of state.submissions) {
+    delete item.evidenceDeletionPending;
     if (evidenceExpired(item)) {
       item.image = "";
       item.disposalImage = "";
-      item.evidenceRemovedAt = new Date().toISOString();
+      item.evidenceDetachedAt = new Date().toISOString();
     } else if (item.image?.startsWith("drive:")) {
       assert(photos.has(item.image), "Missing image");
       item.image = photos.get(item.image);
@@ -164,14 +218,21 @@ async function pruneBackups(directory, key, keepDays) {
     "Backup retention must be 1–30 days",
   );
   const live = new Set();
+  const expired = [];
   for (const name of await readdir(directory))
     if (/^\d{4}-.*\.wb$/.test(name)) {
       const path = join(directory, name),
-        bundle = JSON.parse(unseal(await readFile(path), key));
+        bundle = await readBackup(path, key);
+      assert(
+        Number.isFinite(Date.parse(bundle.at)),
+        "Invalid backup timestamp",
+      );
       if (Date.now() - Date.parse(bundle.at) > keepDays * 86400000)
-        await unlink(path);
+        expired.push(path);
       else for (const file of Object.values(bundle.files)) live.add(file.hash);
     }
+  // Validate every manifest/blob before deleting anything.
+  for (const path of expired) await unlink(path);
   for (const name of await readdir(join(directory, "blobs")))
     if (/^[a-f0-9]{64}\.wb$/.test(name) && !live.has(name.slice(0, -3)))
       await unlink(join(directory, "blobs", name));

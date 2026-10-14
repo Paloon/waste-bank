@@ -427,6 +427,8 @@ test("snack wrappers and bags have fixed Coins; cardboard and unsupported catego
     student: student.id,
     category: "กระดาษลัง",
     status: "Pending",
+    image: "data:image/png;base64,aGVsbG8=",
+    at: new Date().toISOString(),
   });
   act(
     s,

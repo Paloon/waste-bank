@@ -16,8 +16,11 @@ export const retentionDays = (status) =>
     ) || (status === "Pending" ? 90 : status === "Approved" ? 180 : 30),
   );
 export const evidenceExpired = (item, now = Date.now()) =>
-  now - Date.parse(item.cancelledAt || item.reviewedAt || item.at) >
-  retentionDays(item.status) * 86400000;
+  !Number.isFinite(
+    Date.parse(item.cancelledAt || item.reviewedAt || item.at),
+  ) ||
+  now - Date.parse(item.cancelledAt || item.reviewedAt || item.at) >=
+    retentionDays(item.status) * 86400000;
 export function referencedFiles(s) {
   return new Set(
     [
@@ -74,13 +77,19 @@ export async function maintenance(
     for (const id of s.pendingDriveDeletes) queue(id);
     s.pendingDriveDeletes = [];
     for (const item of s.submissions)
-      if (item.image && evidenceExpired(item, now)) {
-        if (item.image.startsWith("drive:")) queue(item.image.slice(6));
+      if ((item.image || item.disposalImage) && evidenceExpired(item, now)) {
+        item.evidenceDeletionPending = [item.image, item.disposalImage]
+          .filter((src) => src?.startsWith("drive:"))
+          .map((src) => src.slice(6));
+        if (item.image?.startsWith("drive:")) queue(item.image.slice(6));
         if (item.disposalImage?.startsWith("drive:"))
           queue(item.disposalImage.slice(6));
         item.disposalImage = "";
         item.image = "";
-        item.evidenceRemovedAt = new Date(now).toISOString();
+        item.evidenceDetachedAt = new Date(now).toISOString();
+        // Historical evidenceRemovedAt meant app detachment, not confirmed DELETE.
+        if (!item.evidenceDeletionPending.length)
+          item.evidenceDeletedAt = new Date(now).toISOString();
         s.audit.unshift({
           id: randomUUID(),
           staff: "system",
@@ -136,12 +145,30 @@ export async function maintenance(
           await store.transact(
             (s) => {
               s.mediaJobs = s.mediaJobs.filter((x) => x.id !== job.id);
+              if (!referenced)
+                for (const item of s.submissions) {
+                  if (!item.evidenceDeletionPending?.includes(job.id)) continue;
+                  item.evidenceDeletionPending =
+                    item.evidenceDeletionPending.filter((id) => id !== job.id);
+                  if (!item.evidenceDeletionPending.length)
+                    item.evidenceDeletedAt = new Date(now).toISOString();
+                }
             },
-            { mediaJobs: { ids: [job.id] } },
+            { mediaJobs: { ids: [job.id] }, submissions: {} },
           );
           processed++;
         } catch {
           failures++;
+          await store.transact(
+            (s) => {
+              const pending = s.mediaJobs.find((x) => x.id === job.id);
+              if (pending) {
+                pending.attempts = (pending.attempts || 0) + 1;
+                pending.lastFailedAt = new Date(now).toISOString();
+              }
+            },
+            { mediaJobs: { ids: [job.id] } },
+          );
           await report(store, "DRIVE_CLEANUP_FAILED");
         }
       }),
@@ -156,6 +183,9 @@ export async function maintenance(
     storage,
     pending: pending.length,
     overdue: pending.filter((j) => now - Date.parse(j.at) > 86400000).length,
+    deletionPending: pending.filter((j) => j.kind === "delete").length,
+    deletionFailed: pending.filter((j) => j.kind === "delete" && j.lastFailedAt)
+      .length,
     expires: Date.now() + 30 * 86400000,
   };
   await store.control("put", { id: "health:maintenance", value: health });

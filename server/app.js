@@ -21,9 +21,11 @@ import {
   rewardImages,
   submissionView,
   ranked,
+  studentHistory,
 } from "./views.js";
 import { promotionVersion, schoolYear } from "./state.js";
 import { audit, report } from "./monitor.js";
+import { readOperationsHealth } from "./operations-health.js";
 import { maintenance } from "./maintenance.js";
 import { deploymentBaseUrl } from "./config.js";
 import { reportRange, selectReportSource, buildReport } from "./reports.js";
@@ -181,34 +183,48 @@ export function createApp({
   app.get("/api/student", async (req, res) => {
     const actor = await security.actor(req),
       id = actor.role === "staff" ? String(req.query.id || "") : actor.id;
-    const s = await summary(store),
-      p = s.students.find((x) => x.id === id);
-    assert(p, "ไม่พบนักเรียน", 404);
-    const page = Math.max(0, Math.min(100000, Number(req.query.page) || 0)),
-      filter = {
-        students: [id],
-        limit: policy.pageSize + 1,
-        offset: page * policy.pageSize,
-      };
-    const history = await store.read({
-      ledger: filter,
-      submissions: filter,
-      redemptions: filter,
-    });
-    res.json({
-      ...publicStudent(p),
-      balance: p.balance,
-      earned: p.earned,
-      rank: ranked(s.students).findIndex((x) => x.id === id) + 1,
-      page,
-      hasMore: ["ledger", "submissions", "redemptions"].some(
-        (k) => history[k].length > policy.pageSize,
+    const page = Math.max(
+        0,
+        Math.min(100000, Math.trunc(Number(req.query.page) || 0)),
       ),
-      ledger: history.ledger.slice(0, policy.pageSize),
-      submissions: history.submissions
+      submissionPage = Math.max(
+        0,
+        Math.min(100000, Math.trunc(Number(req.query.submissionPage) || 0)),
+      ),
+      submissionStatus = String(req.query.submissionStatus || "");
+    assert(
+      ["", "Pending", "Approved", "Rejected", "Cancelled"].includes(
+        submissionStatus,
+      ),
+      "สถานะรายการไม่ถูกต้อง",
+      400,
+    );
+    const data = await studentHistory(store, id, {
+      page,
+      submissionPage,
+      submissionStatus,
+    });
+    assert(data.student, "ไม่พบนักเรียน", 404);
+    res.json({
+      ...publicStudent(data.student),
+      balance: data.student.balance,
+      earned: data.student.earned,
+      rank: data.rank,
+      page,
+      submissionPage,
+      submissionStatus,
+      hasMore:
+        data.ledger.length > policy.pageSize ||
+        data.redemptions.length > policy.pageSize,
+      ledgerHasMore: data.ledger.length > policy.pageSize,
+      redemptionsHasMore: data.redemptions.length > policy.pageSize,
+      submissionsHasMore: data.submissions.length > policy.pageSize,
+      submissionStatusCounts: data.submissionStatusCounts,
+      ledger: data.ledger.slice(0, policy.pageSize),
+      redemptions: data.redemptions.slice(0, policy.pageSize),
+      submissions: data.submissions
         .slice(0, policy.pageSize)
         .map(submissionView),
-      redemptions: history.redemptions.slice(0, policy.pageSize),
     });
   });
   app.get("/api/reports", async (req, res) => {
@@ -266,11 +282,7 @@ export function createApp({
       }[tab];
     const hasMore = kind ? detail[kind].length > policy.pageSize : false;
     if (kind) detail[kind] = detail[kind].slice(0, policy.pageSize);
-    const health = {
-      maintenance: await store.control("get", { id: "health:maintenance" }),
-      error: await store.control("get", { id: "health:error" }),
-      backup: await store.control("get", { id: "health:backup" }),
-    };
+    const health = await readOperationsHealth(store);
     const students = s.students.map((p) => ({
       ...publicStudent(p),
       balance: p.balance,
@@ -493,7 +505,8 @@ export function createApp({
         : error.type === "entity.too.large"
           ? "IMAGE_TOO_LARGE"
           : "SERVER_ERROR";
-    if (!known || error.status >= 500) await report(store, code);
+    const eventId =
+      !known || error.status >= 500 ? await report(store, code) : undefined;
     if (error.retryAfter) res.set("Retry-After", String(error.retryAfter));
     res
       .status(
@@ -506,6 +519,7 @@ export function createApp({
             ? "รูปใหญ่เกินไป กรุณาลดจำนวนรูปหรือถ่ายใหม่"
             : "ระบบขัดข้อง กรุณาลองอีกครั้งหรือติดต่อเจ้าหน้าที่",
         code,
+        ...(eventId ? { eventId } : {}),
       });
   });
   return app;

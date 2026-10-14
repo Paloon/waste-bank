@@ -77,6 +77,9 @@ test("OAuth, private folder uploads, download, move and retention delete", async
     );
     await drive.remove(id);
     assert.ok(seen.some((x) => x.options.method === "DELETE"));
+    const calls = seen.length;
+    await assert.rejects(() => drive.remove("bad"), /รหัสรูปภาพ/);
+    assert.equal(seen.length, calls, "invalid IDs must not appear deleted successfully");
   } finally {
     globalThis.fetch = oldFetch;
     for (const name of names)
