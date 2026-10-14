@@ -24,6 +24,8 @@ export function fieldMessage(control) {
   )
     return `${label}ต้องมีอย่างน้อย ${control.minLength} ตัวอักษร`;
   if (control.validity.patternMismatch) return `ตรวจสอบรูปแบบ${label}อีกครั้ง`;
+  if (control.validity.tooLong)
+    return `${label}ต้องไม่เกิน ${control.maxLength} ตัวอักษร`;
   if (!control.validity.valid) return `ตรวจสอบ${label}อีกครั้ง`;
   return "";
 }

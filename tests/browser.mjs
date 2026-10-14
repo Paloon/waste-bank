@@ -79,16 +79,35 @@ try {
   console.log("Testing self-registration");
   await byName("Coins ของฉัน").click();
   await byName("สมัครสมาชิกใหม่").click();
+  await expect(
+    page.getByLabel("คำนำหน้า").locator("option:not([disabled])"),
+  ).toHaveText(["เด็กชาย", "เด็กหญิง", "นาย", "นางสาว"]);
+  await byName("สมัครสมาชิก").click();
+  await page.getByText("กรอกคำนำหน้าก่อนยืนยัน", { exact: true }).waitFor();
+  await page.getByLabel("คำนำหน้า").selectOption("เด็กหญิง");
   await page.getByLabel("ชื่อ–นามสกุล").fill("ดารา ใจดี");
   await page.getByLabel("เลขที่", { exact: true }).fill("14");
   await page.getByLabel("เลขประจำตัวนักเรียน", { exact: true }).fill("70001");
   await page.getByLabel("ระดับชั้น").selectOption("2");
   await page.getByLabel("ห้อง", { exact: true }).fill("3");
+  const registrationRequest = page.waitForRequest((request) =>
+    request.url().endsWith("/api/register"),
+  );
   await byName("สมัครสมาชิก").click();
+  const registrationPayload = (await registrationRequest).postDataJSON();
+  assert.equal(registrationPayload.name, "เด็กหญิงดารา ใจดี");
+  assert.equal("title" in registrationPayload, false);
   await page
     .getByRole("heading", { name: "Coins ของฉัน", exact: true })
     .waitFor();
   await page.getByText("ดารา ใจดี").waitFor();
+  const registeredStore = createStore(dir);
+  const registeredStudent = registeredStore
+    .read()
+    .students.find((student) => student.id === "70001");
+  assert.equal(registeredStudent.name, "เด็กหญิงดารา ใจดี");
+  assert.equal("title" in registeredStudent, false);
+  registeredStore.close();
   await byName("หน้าหลัก").click();
   console.log("Testing heartbeat retry and draft privacy");
   const openDraft = async () => {

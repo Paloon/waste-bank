@@ -1,4 +1,6 @@
 import ReviewDialog from "./features/staff/ReviewDialog.jsx";
+import RegistrationNameFields from "./features/student/RegistrationNameFields.jsx";
+import { studentName as combinedStudentName } from "../shared/student-name.js";
 import {
   validateForm,
   handleInvalid,
@@ -1403,7 +1405,11 @@ function App() {
                 <p className="muted">กรอกข้อมูลนักเรียน ไม่มีรหัสผ่าน</p>
                 <form
                   onSubmit={submitModal(async (v) => {
-                    await api("register", v);
+                    const { title, ...profile } = v;
+                    await api("register", {
+                      ...profile,
+                      name: combinedStudentName(title, profile.name),
+                    });
                     await loadStudent();
                     await refresh();
                     const next = modal.next;
@@ -1416,15 +1422,7 @@ function App() {
                     }
                   })}
                 >
-                  <Field label="ชื่อ–นามสกุล">
-                    <input
-                      name="name"
-                      autoFocus
-                      required
-                      maxLength="80"
-                      placeholder="ชื่อและนามสกุล"
-                    />
-                  </Field>
+                  <RegistrationNameFields />
                   <div className="form-grid">
                     <Field label="เลขที่">
                       <input
