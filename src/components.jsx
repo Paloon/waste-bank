@@ -129,7 +129,12 @@ export function Field({ label, children }) {
   return (
     <label className="field">
       <span>{label}</span>
-      {children}
+      {React.isValidElement(children) &&
+      ["input", "select", "textarea"].includes(children.type)
+        ? React.cloneElement(children, {
+            "aria-label": children.props["aria-label"] || label,
+          })
+        : children}
     </label>
   );
 }

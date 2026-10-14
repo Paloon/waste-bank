@@ -1,6 +1,11 @@
+import ReviewDialog from "./features/staff/ReviewDialog.jsx";
+import {
+  validateForm,
+  handleInvalid,
+  clearFieldError,
+} from "./forms/validation.js";
 import ProfileForm from "./components/ProfileForm.jsx";
 import ActionButton from "./components/ActionButton.jsx";
-import ReviewCount from "./features/staff/ReviewCount.jsx";
 import { compressImage } from "./images/compress.js";
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
@@ -47,7 +52,6 @@ import SubmitWaste from "./features/student/SubmitWaste.jsx";
 import useKioskSession, {
   sessionRetryMessage,
 } from "./hooks/useKioskSession.js";
-import RejectionReason from "./RejectionReason.jsx";
 import RecyclingGuide, { WasteIcon, categoryLabel } from "./RecyclingGuide.jsx";
 import { api, invalidateRequests } from "./api.js";
 import { useAdminData } from "./hooks/useAdminData.js";
@@ -225,14 +229,16 @@ function App() {
   useEffect(() => {
     if (modal) {
       lastFocus.current = document.activeElement;
-      const timer = setTimeout(
-        () =>
-          (
-            modalRef.current?.querySelector("input,select,textarea") ||
-            modalRef.current?.querySelector("button")
-          )?.focus(),
-        30,
-      );
+      const timer = setTimeout(() => {
+        const dialog = modalRef.current;
+        if (!dialog || dialog.contains(document.activeElement)) return;
+        (
+          [...dialog.querySelectorAll("input,select,textarea")].find(
+            (element) =>
+              !element.matches(":disabled") && element.getClientRects().length,
+          ) || dialog.querySelector("button:not(:disabled)")
+        )?.focus();
+      }, 30);
       return () => clearTimeout(timer);
     } else lastFocus.current?.focus?.();
   }, [modal?.type]);
@@ -456,6 +462,7 @@ function App() {
   ];
   const submitModal = (fn) => (e) => {
     e.preventDefault();
+    if (!validateForm(e.currentTarget)) return;
     const values = Object.fromEntries(new FormData(e.currentTarget));
     run(() => fn(values));
   };
@@ -494,7 +501,10 @@ function App() {
           <span>{staff || "เจ้าหน้าที่"}</span>
         </button>
       </header>
-      <main>
+      <main
+        onInvalidCapture={handleInvalid}
+        onInputCapture={(event) => clearFieldError(event.target)}
+      >
         {error && !modal && (
           <div className="alert" role="alert">
             <AlertCircle size={20} />
@@ -1275,7 +1285,11 @@ function App() {
           }}
         >
           <section
-            className="modal"
+            className={
+              "modal" + (modal.type === "review" ? " review-modal" : "")
+            }
+            onInvalidCapture={handleInvalid}
+            onInputCapture={(event) => clearFieldError(event.target)}
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
@@ -1287,7 +1301,11 @@ function App() {
                   ...modalRef.current.querySelectorAll(
                     'button:not(:disabled),input:not(:disabled),select,textarea,[tabindex="0"]',
                   ),
-                ];
+                ].filter(
+                  (element) =>
+                    !element.matches(":disabled") &&
+                    element.getClientRects().length,
+                );
                 let first = els[0],
                   last = els.at(-1);
                 if (e.shiftKey && document.activeElement === first) {
@@ -1642,65 +1660,29 @@ function App() {
               </>
             )}
             {modal.type === "review" && (
-              <>
-                <h2 id="modal-title">
-                  {modal.status === "Approved"
-                    ? "อนุมัติการส่งขยะ"
-                    : "ไม่อนุมัติรายการ"}
-                </h2>
-                <p>
-                  {modal.item.category} ·{" "}
-                  {studentName(modal.item.student)?.name}
-                </p>
-                {modal.item.image && (
-                  <button
-                    type="button"
-                    className="review-evidence"
-                    onClick={() => setImage(modal.item.image)}
-                    aria-label="ขยายภาพหลักฐาน"
-                  >
-                    <img src={modal.item.image} alt="ภาพขยะสำหรับตรวจจำนวน" />
-                  </button>
-                )}
-                {modal.item.disposalImage && (
-                  <button
-                    type="button"
-                    className="review-evidence"
-                    onClick={() => setImage(modal.item.disposalImage)}
-                    aria-label="ขยายภาพจุดทิ้ง"
-                  >
-                    <img
-                      src={modal.item.disposalImage}
-                      alt="ภาพถังหรือจุดทิ้งสำหรับตรวจ"
-                    />
-                  </button>
-                )}
-                <form
-                  onSubmit={submitModal(async (v) => {
-                    await action("review", {
-                      ...v,
-                      id: modal.item.id,
-                      version: modal.item.version,
-                      status: modal.status,
-                    });
-                    await refreshAdmin();
-                    setModal(null);
-                    setNotice("บันทึกผลตรวจแล้ว");
-                  })}
-                >
-                  {modal.status === "Approved" ? (
-                    <>
-                      <ReviewCount
-                        item={modal.item}
-                        rates={data.recyclingRates || recyclingRates}
-                      />
-                    </>
-                  ) : (
-                    <RejectionReason key={modal.item.id} />
-                  )}
-                  <ActionButton busy={busy}>ยืนยันผลการตรวจ</ActionButton>
-                </form>
-              </>
+              <ReviewDialog
+                key={modal.item.id}
+                item={modal.item}
+                studentName={studentName(modal.item.student)?.name}
+                status={modal.status}
+                rates={data.recyclingRates || recyclingRates}
+                busy={busy}
+                onStatus={(status) => {
+                  setError("");
+                  setModal((current) => ({ ...current, status }));
+                }}
+                onPhoto={setImage}
+                onSubmit={submitModal(async (values) => {
+                  await action("review", {
+                    ...values,
+                    id: modal.item.id,
+                    status: modal.status,
+                  });
+                  await refreshAdmin();
+                  setModal(null);
+                  setNotice("บันทึกผลตรวจแล้ว");
+                })}
+              />
             )}
             {["handover", "cancelReward"].includes(modal.type) && (
               <>

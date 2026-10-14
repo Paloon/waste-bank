@@ -110,6 +110,15 @@ export default function SubmissionHistory({
                 )}
               </div>
               <div className="grow">
+                <h4 className="submission-next-step">
+                  {s.status === "Pending"
+                    ? "ส่งสำเร็จแล้ว รอครูตรวจ"
+                    : s.status === "Approved"
+                      ? "รับ Coins แล้ว"
+                      : s.status === "Rejected"
+                        ? "อ่านคำแนะนำก่อนส่งรูปใหม่"
+                        : "รายการนี้ยกเลิกแล้ว"}
+                </h4>
                 <p>
                   {s.count
                     ? `${fmt(s.count)} ${rates[s.category]?.unit || "ชิ้น"}`
@@ -153,11 +162,26 @@ export default function SubmissionHistory({
                   </p>
                 )}
                 {corrected && (
-                  <p className="review-correction">
-                    นักเรียนแจ้ง {s.submittedCount}{" "}
-                    {categoryLabel(s.submittedCategory)} → ครูยืนยัน {s.count}{" "}
-                    {categoryLabel(s.category)}
-                  </p>
+                  <div className="review-correction">
+                    <b>ครูปรับข้อมูลให้ตรงกับรูป</b>
+                    <div className="correction-comparison">
+                      <span>
+                        นักเรียนแจ้ง
+                        <strong>
+                          {fmt(s.submittedCount)}{" "}
+                          {rates[s.submittedCategory]?.unit || "ชิ้น"}
+                        </strong>
+                        <small>{categoryLabel(s.submittedCategory)}</small>
+                      </span>
+                      <span>
+                        ครูยืนยัน
+                        <strong>
+                          {fmt(s.count)} {rates[s.category]?.unit || "ชิ้น"}
+                        </strong>
+                        <small>{categoryLabel(s.category)}</small>
+                      </span>
+                    </div>
+                  </div>
                 )}
                 {s.status === "Approved" && s.reviewNote && (
                   <p className="submission-review-note">
@@ -174,6 +198,7 @@ export default function SubmissionHistory({
             {s.status === "Pending" && (
               <button
                 className="text-button danger"
+                disabled={busy}
                 onClick={() => onCancel(s)}
               >
                 ยกเลิกรายการ

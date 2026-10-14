@@ -19,7 +19,7 @@ const server = spawn(process.execPath, ["server/index.js", "--production"], {
   },
   stdio: "pipe",
 });
-let browser;
+let browser, diagnosticPage;
 try {
   for (let i = 0; i < 40; i++) {
     try {
@@ -38,6 +38,7 @@ try {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 900 },
   });
+  diagnosticPage = page;
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -319,9 +320,58 @@ try {
   await byName("กลับหน้าหลัก").click();
   console.log("Testing approval");
   await login();
+  await expect(
+    page
+      .locator(".stat-card")
+      .filter({ hasText: "รอตรวจขยะ" })
+      .locator("strong"),
+  ).toHaveText("5");
+  assert.equal(
+    await page.locator(".staff-system-details").getAttribute("open"),
+    null,
+  );
   await page.getByRole("button", { name: /^ตรวจขยะ/ }).click();
   await byName("อนุมัติ").last().click();
+  const proof = await page.locator(".review-proof").boundingBox();
+  const decision = await page.locator(".review-decision").boundingBox();
+  assert.ok(
+    decision.x > proof.x + proof.width,
+    "desktop proof sits beside correction fields",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileProof = await page.locator(".review-proof").boundingBox();
+  const mobileDecision = await page.locator(".review-decision").boundingBox();
+  assert.ok(
+    mobileDecision.y > mobileProof.y,
+    "mobile review stacks proof and fields",
+  );
+  assert.equal(
+    await page
+      .locator(".review-modal")
+      .evaluate((element) => element.scrollWidth > element.clientWidth),
+    false,
+    "review does not overflow sideways",
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByLabel("จำนวนที่ครูตรวจพบ").fill("1.5");
+  await byName("ยืนยันผลการตรวจ").click();
+  await page
+    .getByText("จำนวนที่ครูตรวจพบต้องเป็นจำนวนเต็ม", { exact: true })
+    .waitFor();
+  await expect(page.getByLabel("จำนวนที่ครูตรวจพบ")).toBeFocused();
   await page.getByLabel("จำนวนที่ครูตรวจพบ").fill("2");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "ไม่ผ่าน", exact: true })
+    .click();
+  await page
+    .getByLabel("เหตุผลที่ไม่อนุมัติ")
+    .fill("เหตุผลนี้ไม่ใช้เมื่อเลือกอนุมัติ");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "อนุมัติ", exact: true })
+    .click();
+  await expect(page.getByLabel("จำนวนที่ครูตรวจพบ")).toHaveValue("2");
   await page.getByText("มอบให้ 10 Coins", { exact: true }).waitFor();
   await byName("ยืนยันผลการตรวจ").click();
   await page.getByText("บันทึกผลตรวจแล้ว").waitFor();
@@ -357,6 +407,9 @@ try {
   await page.getByText(rejection, { exact: true }).waitFor();
   await page.getByRole("button", { name: /^อนุมัติแล้ว / }).click();
   await page.getByText("+10 Coins", { exact: true }).waitFor();
+  await page.getByText("ครูปรับข้อมูลให้ตรงกับรูป", { exact: true }).waitFor();
+  await expect(page.locator(".correction-comparison")).toContainText("3 ขวด");
+  await expect(page.locator(".correction-comparison")).toContainText("2 ขวด");
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(
     await page.evaluate(
@@ -604,6 +657,17 @@ try {
   console.log(
     "PASS: self-registration → upload → approve → redeem → history → refund → adjustment → promotion → reward gallery → responsive → privacy timeout → bulk deletion; no browser errors",
   );
+} catch (error) {
+  if (diagnosticPage)
+    console.error(
+      JSON.stringify({
+        uiErrors: await diagnosticPage
+          .locator(".field-error,.alert")
+          .allTextContents(),
+        headings: await diagnosticPage.getByRole("heading").allTextContents(),
+      }),
+    );
+  throw error;
 } finally {
   await browser?.close();
   server.kill();

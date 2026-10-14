@@ -109,97 +109,13 @@ export default function StaffWorkspace({ view, actions }) {
         {adminTab === "reports" && <Reports refreshKey={reportRefresh} />}
         <OperationsStatus health={admin.health} />
         {adminTab === "dashboard" && (
-          <div className="panel">
-            <h3>Google Drive</h3>
-            <p>
-              {admin.drive?.connected
-                ? "เชื่อมแล้ว — รูปใหม่เก็บใน Drive"
-                : admin.drive?.configured
-                  ? "ตั้งค่า OAuth แล้ว แต่ยังไม่ได้เชื่อมบัญชี"
-                  : "ยังไม่ตั้งค่า OAuth ใน .env — รูปยังเก็บใน SQLite"}
-            </p>
-            {admin.drive?.configured && !admin.drive?.connected && (
-              <a className="btn secondary" href="/api/drive/connect">
-                เชื่อมบัญชี Google Drive
-              </a>
-            )}
-          </div>
-        )}
-        {adminTab === "dashboard" && (
           <>
-            <div className="panel">
-              <h3>สถานะดูแลระบบ</h3>
-              {admin.databaseBytes && (
-                <p>
-                  ฐานข้อมูล: {fmt(Math.ceil(admin.databaseBytes / 1024 / 1024))}{" "}
-                  MiB{" "}
-                  {admin.databaseBytes > 400 * 1024 * 1024 && (
-                    <strong className="danger">ใกล้ขีดจำกัด Free Plan</strong>
-                  )}
-                </p>
-              )}
-              {admin.health?.maintenance?.storage && (
-                <p>
-                  พื้นที่บัญชี Drive ใช้แล้ว{" "}
-                  {fmt(
-                    Math.ceil(
-                      Number(admin.health.maintenance.storage.usage) /
-                        1024 /
-                        1024,
-                    ),
-                  )}{" "}
-                  MiB{" "}
-                  {admin.health.maintenance.storage.limit &&
-                    Number(admin.health.maintenance.storage.usage) >
-                      Number(admin.health.maintenance.storage.limit) * 0.8 && (
-                      <strong className="danger">พื้นที่เหลือน้อย</strong>
-                    )}
-                </p>
-              )}
-              {admin.health?.maintenance?.reconciliation?.ok === false && (
-                <p className="danger">
-                  พบยอดบัญชีหรือรายการที่ไม่สอดคล้องกัน กรุณาให้ผู้ดูแลตรวจสอบ
-                </p>
-              )}
-              <p>
-                ล้างรูปครั้งล่าสุด:{" "}
-                {admin.health?.maintenance?.at
-                  ? date(admin.health.maintenance.at)
-                  : "ยังไม่มีผลการทำงาน"}
-              </p>
-              <p>
-                งานรูปค้างเกิน 1 วัน: {admin.health?.maintenance?.overdue || 0}{" "}
-                · ผิดพลาด: {admin.health?.maintenance?.failures || 0}
-              </p>
-              <p>
-                สำรองข้อมูลครั้งล่าสุด:{" "}
-                {admin.health?.backup?.at
-                  ? date(admin.health.backup.at)
-                  : "ยังไม่มีหลักฐานการสำรองข้อมูล"}
-              </p>
-              {admin.health?.error && (
-                <p className="danger">
-                  เหตุขัดข้องล่าสุด: {admin.health.error.code} ·{" "}
-                  {date(admin.health.error.at)}
-                  {admin.health.error.eventId && (
-                    <small>รหัสเหตุการณ์: {admin.health.error.eventId}</small>
-                  )}
-                </p>
-              )}
-              <button
-                className="btn secondary"
-                disabled={busy}
-                onClick={onMaintenance}
-              >
-                ตรวจและล้างรูปที่ค้าง
-              </button>
-            </div>
+            <h2 className="staff-task-heading">งานที่ต้องทำ</h2>
             <div className="dashboard-stats">
               {[
                 [
                   "รอตรวจขยะ",
-                  admin.submissions.filter((s) => s.status === "Pending")
-                    .length,
+                  admin.stats?.pending || 0,
                   ClipboardCheck,
                   "reviews",
                 ],
@@ -283,6 +199,93 @@ export default function StaffWorkspace({ view, actions }) {
                 </div>
               ))}
             </div>
+            <details className="staff-system-details">
+              <summary>รายละเอียดระบบและการสำรองข้อมูล</summary>
+              <div className="panel">
+                <h3>Google Drive</h3>
+                <p>
+                  {admin.drive?.connected
+                    ? "เชื่อมแล้ว — รูปใหม่เก็บใน Drive"
+                    : admin.drive?.configured
+                      ? "ตั้งค่า OAuth แล้ว แต่ยังไม่ได้เชื่อมบัญชี"
+                      : "ยังไม่ตั้งค่า OAuth ใน .env — รูปยังเก็บใน SQLite"}
+                </p>
+                {admin.drive?.configured && !admin.drive?.connected && (
+                  <a className="btn secondary" href="/api/drive/connect">
+                    เชื่อมบัญชี Google Drive
+                  </a>
+                )}
+              </div>
+              <div className="panel">
+                <h3>สถานะดูแลระบบ</h3>
+                {admin.databaseBytes && (
+                  <p>
+                    ฐานข้อมูล:{" "}
+                    {fmt(Math.ceil(admin.databaseBytes / 1024 / 1024))} MiB{" "}
+                    {admin.databaseBytes > 400 * 1024 * 1024 && (
+                      <strong className="danger">ใกล้ขีดจำกัด Free Plan</strong>
+                    )}
+                  </p>
+                )}
+                {admin.health?.maintenance?.storage && (
+                  <p>
+                    พื้นที่บัญชี Drive ใช้แล้ว{" "}
+                    {fmt(
+                      Math.ceil(
+                        Number(admin.health.maintenance.storage.usage) /
+                          1024 /
+                          1024,
+                      ),
+                    )}{" "}
+                    MiB{" "}
+                    {admin.health.maintenance.storage.limit &&
+                      Number(admin.health.maintenance.storage.usage) >
+                        Number(admin.health.maintenance.storage.limit) *
+                          0.8 && (
+                        <strong className="danger">พื้นที่เหลือน้อย</strong>
+                      )}
+                  </p>
+                )}
+                {admin.health?.maintenance?.reconciliation?.ok === false && (
+                  <p className="danger">
+                    พบยอดบัญชีหรือรายการที่ไม่สอดคล้องกัน กรุณาให้ผู้ดูแลตรวจสอบ
+                  </p>
+                )}
+                <p>
+                  ล้างรูปครั้งล่าสุด:{" "}
+                  {admin.health?.maintenance?.at
+                    ? date(admin.health.maintenance.at)
+                    : "ยังไม่มีผลการทำงาน"}
+                </p>
+                <p>
+                  งานรูปค้างเกิน 1 วัน:{" "}
+                  {admin.health?.maintenance?.overdue || 0} · ผิดพลาด:{" "}
+                  {admin.health?.maintenance?.failures || 0}
+                </p>
+                <p>
+                  สำรองข้อมูลครั้งล่าสุด:{" "}
+                  {admin.health?.backup?.at
+                    ? date(admin.health.backup.at)
+                    : "ยังไม่มีหลักฐานการสำรองข้อมูล"}
+                </p>
+                {admin.health?.error && (
+                  <p className="danger">
+                    เหตุขัดข้องล่าสุด: {admin.health.error.code} ·{" "}
+                    {date(admin.health.error.at)}
+                    {admin.health.error.eventId && (
+                      <small>รหัสเหตุการณ์: {admin.health.error.eventId}</small>
+                    )}
+                  </p>
+                )}
+                <button
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={onMaintenance}
+                >
+                  ตรวจและล้างรูปที่ค้าง
+                </button>
+              </div>
+            </details>
           </>
         )}
         {adminTab === "reviews" && (

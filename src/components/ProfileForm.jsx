@@ -5,7 +5,13 @@ export default function ProfileForm({ p, adminMode = false }) {
   return (
     <>
       <Field label="ชื่อ–นามสกุล">
-        <input name="name" required defaultValue={p.name} />
+        <input
+          name="name"
+          required
+          minLength={2}
+          maxLength={80}
+          defaultValue={p.name}
+        />
       </Field>
       <div className="form-grid">
         <Field label="เลขที่">

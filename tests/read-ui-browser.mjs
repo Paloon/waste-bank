@@ -143,6 +143,10 @@ try {
   await button("แก้ไข").click();
   const name = page.getByLabel("ชื่อ–นามสกุล", { exact: true });
   await page.clock.fastForward(50);
+  await name.fill("");
+  await button("บันทึกข้อมูล").click();
+  await page.getByText("กรอกชื่อ–นามสกุลก่อนยืนยัน", { exact: true }).waitFor();
+  await expect(name).toBeFocused();
   await name.fill("Edited name remains during warning");
   await page.clock.fastForward(71000);
   await page.getByText(/จะออกจากระบบใน/).waitFor();

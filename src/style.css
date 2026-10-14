@@ -3453,3 +3453,41 @@ nav button.submit-nav.active {
   .submission-actions .btn { min-height: 50px; }
 }
 @media (prefers-reduced-motion: reduce) { .submission-spinner { animation: none; } }
+.review-modal { width: 1040px; }
+.review-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.review-proof { min-width: 0; border: 1px solid #dce7df; background: #f5f8f3; border-radius: 16px; padding: 16px; }
+.review-proof h3 { margin-top: 0; }
+.review-proof .review-evidence { width: 100%; margin: 8px 0; }
+.review-proof .review-evidence img { width: 100%; max-height: 340px; object-fit: contain; }
+.review-student { color: var(--muted); margin-bottom: 18px; }
+.review-student-note { overflow-wrap: anywhere; }
+.review-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.review-fields[hidden] { display: none; }
+.review-choice { display: flex; gap: 8px; margin-bottom: 18px; }
+.review-choice button { flex: 1; min-height: 46px; border: 1px solid #cddbcf; border-radius: 12px; display: flex; justify-content: center; align-items: center; gap: 8px; }
+.review-choice button[aria-pressed="true"] { background: #e4f3e8; border-color: #247747; color: #17562f; font-weight: 700; }
+.review-choice button:last-child[aria-pressed="true"] { background: #fff0ed; color: #963827; border-color: #ba685a; }
+.review-confirm { border-top: 1px solid #dce7df; margin-top: 16px; padding-top: 10px; }
+.review-confirm > .btn { width: 100%; min-height: 48px; }
+.staff-task-heading { margin: 0 0 16px; }
+.staff-system-details { background: #f5f8f3; border: 1px solid #dce7df; border-radius: 16px; margin-top: 20px; }
+.staff-system-details > summary { cursor: pointer; padding: 18px; font-weight: 600; min-height: 48px; }
+.staff-system-details[open] > summary { border-bottom: 1px solid #dce7df; margin-bottom: 12px; }
+.staff-system-details .panel { margin: 12px; }
+.submission-next-step { font-size: 1rem; margin: 0 0 8px; }
+.student-submission.approved .submission-next-step { color: #17562f; }
+.student-submission.rejected .submission-next-step { color: #963827; }
+.correction-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.correction-comparison > span { display: flex; flex-direction: column; gap: 4px; border: 1px solid #dce7df; padding: 12px; border-radius: 10px; background: #fff; }
+.correction-comparison strong { font-size: 1.12rem; color: #17452c; }
+.field [aria-invalid="true"] { border-color: #b74c38; outline-color: #b74c38; }
+.field > .field-error { color: #963827; font-size: .84rem; line-height: 1.5; }
+@media (max-width: 720px) {
+  .review-modal { padding: 22px 16px; }
+  .review-layout { grid-template-columns: 1fr; gap: 18px; }
+  .review-proof .review-evidence img { max-height: 260px; }
+  .review-confirm { position: sticky; bottom: -22px; background: #fff; padding: 12px 0; z-index: 1; }
+  .correction-comparison { gap: 8px; }
+}
+.review-decision { position: sticky; top: 0; background: #fff; }
+@media (max-width: 720px) { .review-decision { position: static; } }
