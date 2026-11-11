@@ -3246,25 +3246,22 @@ td .text-button {
   }
 }
 
+/* The submit tab is a call to action, but only the current page may look selected. */
 nav button.submit-nav {
-  background: #185b3e;
-  color: #fff;
+  background: transparent;
+  color: var(--green);
   font-weight: 700;
-  border: 1px solid #185b3e;
-  box-shadow: 0 3px 8px #185b3e20;
+  border: 1.5px solid var(--green);
 }
 nav button.submit-nav svg {
-  color: #d6ef94;
+  color: var(--green);
 }
 nav button.submit-nav:hover {
-  background: #10472f;
-  color: #fff;
+  background: #f1f5ed;
 }
 nav button.submit-nav.active {
-  background: #10472f;
-  color: #fff;
-  border-color: #b4d66b;
-  box-shadow: inset 0 0 0 1px #b4d66b;
+  background: #edf3e8;
+  color: var(--green);
 }
 .submit-page-title {
   display: flex;
