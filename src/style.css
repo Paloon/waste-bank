@@ -1437,16 +1437,57 @@ code {
 .review-card {
   margin: 0;
 }
-.review-card > .photo {
+/* Evidence fills the card: one photo full width, two photos side by side. */
+.review-card .evidence-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.review-card .evidence-pair.two {
+  grid-template-columns: 1fr 1fr;
+}
+.review-card .evidence-pair .photo {
   width: 100%;
-  height: 160px;
-  margin-bottom: 15px;
+  height: 180px;
+}
+.review-category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--green);
+}
+.review-category svg {
+  flex-shrink: 0;
+}
+.review-card .review-count {
+  font-size: 1rem;
+  font-weight: 600;
+  color: inherit;
+  margin: 0 0 12px;
+}
+.review-student {
+  display: grid;
+  gap: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, #dce5dd);
+}
+.review-student span,
+.review-student small {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.review-card .review-note {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  background: #f4f7f1;
+  border-radius: 8px;
 }
 .review-card .no-photo small {
   font-size: 0.8rem;
 }
 .review-card h3 {
-  margin: 14px 0 10px;
+  margin: 0 0 6px;
 }
 .review-card > p {
   font-size: 0.875rem;
@@ -2330,16 +2371,13 @@ td .text-button {
   .review-card {
     padding: 13px;
   }
-  .review-card > .photo {
+  .review-card .evidence-pair .photo {
     height: 110px;
   }
   .review-card > p {
     font-size: 0.875rem;
   }
   .review-card > small {
-    font-size: 0.875rem;
-  }
-  .review-card > b {
     font-size: 0.875rem;
   }
   .review-card h3 {
@@ -2787,7 +2825,7 @@ td .text-button {
   .review-grid {
     grid-template-columns: 1fr;
   }
-  .review-card > .photo {
+  .review-card .evidence-pair .photo {
     height: 220px;
   }
   .review-card .btn {

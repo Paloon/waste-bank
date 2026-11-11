@@ -14,8 +14,9 @@ import {
   Trash2,
   ArrowRight,
 } from "lucide-react";
-import { Badge, Empty, Field, Photo, RewardArt } from "../../components.jsx";
+import { Empty, Field, Photo, RewardArt } from "../../components.jsx";
 import OperationsStatus from "../../OperationsStatus.jsx";
+import { WasteIcon, categoryLabel } from "../../RecyclingGuide.jsx";
 import Reports from "../../Reports.jsx";
 import ActionButton from "../../components/ActionButton.jsx";
 import { recyclingRates } from "../../../shared/recycling.js";
@@ -301,25 +302,31 @@ export default function StaffWorkspace({ view, actions }) {
                   const p = studentName(s.student);
                   return (
                     <article className="panel review-card" key={s.id}>
-                      <div className="evidence-pair">
+                      <div
+                        className={`evidence-pair${s.disposalImage ? " two" : ""}`}
+                      >
                         <Photo src={s.image} onClick={setImage} />
                         {s.disposalImage && (
                           <Photo src={s.disposalImage} onClick={setImage} />
                         )}
                       </div>
-                      <Badge status={s.status} />
-                      <h3>{s.category}</h3>
-                      <p>
+                      <h3 className="review-category">
+                        <WasteIcon category={s.category} size={22} />
+                        {categoryLabel(s.category)}
+                      </h3>
+                      <p className="review-count">
                         {s.submittedCount
                           ? `นักเรียนแจ้ง ${s.submittedCount} ${(data.recyclingRates || recyclingRates)[s.submittedCategory || s.category].unit}`
                           : "รายการเก่า: ครูกรอกจำนวนจากภาพก่อนอนุมัติ"}
                       </p>
-                      <b>{p?.name}</b>
-                      <p>
-                        {s.student} · ม.{p?.grade}/{p?.room}
-                      </p>
-                      <small>{date(s.at)}</small>
-                      <p>{s.note || "ไม่มีหมายเหตุ"}</p>
+                      <div className="review-student">
+                        <b>{p?.name}</b>
+                        <span>
+                          {s.student} · ม.{p?.grade}/{p?.room}
+                        </span>
+                        <small>{date(s.at)}</small>
+                      </div>
+                      {s.note && <p className="review-note">{s.note}</p>}
                       <div className="button-row">
                         <button
                           className="btn primary"
