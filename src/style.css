@@ -3562,3 +3562,80 @@ nav button.submit-nav.active {
   font-weight: 700;
   text-decoration: underline;
 }
+
+/* Coin rates: compact cards instead of a full-width table. */
+.rate-grid {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.rate-card {
+  margin: 0;
+}
+.rate-toggle {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  color: inherit;
+  background: #f6f9f3;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.rate-toggle:hover {
+  background: #edf3e8;
+}
+.rate-toggle[aria-expanded="true"] {
+  border-color: var(--green);
+  background: #edf3e8;
+}
+.rate-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--green);
+}
+.rate-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.rate-name {
+  font-weight: 600;
+}
+.rate-unit {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.rate-detail {
+  grid-column: 1 / -1;
+  padding: 4px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+@media (max-width: 900px) {
+  .rate-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 540px) {
+  .rate-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .rate-toggle {
+    min-height: 64px;
+  }
+}
