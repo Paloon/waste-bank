@@ -108,7 +108,11 @@ export default function StaffWorkspace({ view, actions }) {
           </p>
         )}
         {adminTab === "reports" && <Reports refreshKey={reportRefresh} />}
-        <OperationsStatus health={admin.health} />
+        <OperationsStatus
+          health={admin.health}
+          compact={adminTab !== "dashboard"}
+          onOpen={() => onNavigateTab("dashboard")}
+        />
         {adminTab === "dashboard" && (
           <>
             <h2 className="staff-task-heading">งานที่ต้องทำ</h2>
@@ -218,7 +222,7 @@ export default function StaffWorkspace({ view, actions }) {
                 )}
               </div>
               <div className="panel">
-                <h3>สถานะดูแลระบบ</h3>
+                <h3>พื้นที่จัดเก็บและข้อมูล</h3>
                 {admin.databaseBytes && (
                   <p>
                     ฐานข้อมูล:{" "}

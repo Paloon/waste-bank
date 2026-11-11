@@ -1,9 +1,22 @@
 import React from "react";
 import { AlertCircle, ShieldCheck } from "lucide-react";
 
-export default function OperationsStatus({ health }) {
+export default function OperationsStatus({ health, compact = false, onOpen }) {
   if (!health?.status) return null;
   const { alerts, ok } = health.status;
+  // Outside the overview a healthy system shows nothing, and problems take one line.
+  if (compact) {
+    if (ok) return null;
+    return (
+      <div className="operations-strip" role="status">
+        <AlertCircle size={18} aria-hidden="true" />
+        <span>ระบบมี {alerts.length} เรื่องที่ต้องดูแล</span>
+        <button type="button" onClick={onOpen}>
+          ดูรายละเอียด
+        </button>
+      </div>
+    );
+  }
   return (
     <section className="panel operations-status" aria-label="สถานะการดูแลระบบ">
       <h2>

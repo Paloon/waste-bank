@@ -3533,3 +3533,32 @@ nav button.submit-nav.active {
 .leader-intro .hero-tag {
   letter-spacing: 1.5px;
 }
+
+/* One-line notice on staff tabs other than the overview. */
+.operations-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 6px 8px 6px 14px;
+  background: #fbf3df;
+  border-left: 4px solid #b88927;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+.operations-strip svg {
+  flex-shrink: 0;
+  color: #8a6416;
+}
+.operations-strip span {
+  flex: 1;
+}
+.operations-strip button {
+  min-height: 44px;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  color: var(--green);
+  font-weight: 700;
+  text-decoration: underline;
+}
