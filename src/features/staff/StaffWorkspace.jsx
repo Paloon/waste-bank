@@ -21,6 +21,15 @@ import Reports from "../../Reports.jsx";
 import ActionButton from "../../components/ActionButton.jsx";
 import { recyclingRates } from "../../../shared/recycling.js";
 import { policy } from "../../../shared/policy.js";
+// Audit entries written by the system carry codes; staff read them in Thai.
+const auditLabels = {
+  login: "เข้าสู่ระบบ",
+  logout: "ออกจากระบบ",
+  register: "นักเรียนสมัครสมาชิก",
+  driveConnected: "เชื่อมบัญชี Google Drive",
+  evidenceExpired: "ลบรูปหลักฐานที่หมดอายุ",
+};
+const auditLabel = (action) => auditLabels[action] || action;
 const fmt = (value) => Number(value || 0).toLocaleString("th-TH");
 const date = (value) =>
   new Date(value).toLocaleString("th-TH", {
@@ -75,7 +84,7 @@ export default function StaffWorkspace({ view, actions }) {
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <span className="eyebrow">STAFF WORKSPACE</span>
+        <span className="eyebrow">พื้นที่เจ้าหน้าที่</span>
         <h2>{staff}</h2>
         {adminNav.map(([key, Icon, label]) => (
           <button
@@ -126,7 +135,7 @@ export default function StaffWorkspace({ view, actions }) {
                 ],
                 ["รอรับรางวัล", admin.stats?.pickups || 0, Gift, "pickups"],
                 [
-                  "นักเรียน Active",
+                  "นักเรียนที่ใช้งานอยู่",
                   admin.stats?.students || 0,
                   Users,
                   "students",
@@ -195,7 +204,7 @@ export default function StaffWorkspace({ view, actions }) {
                   <History />
                   <div className="grow">
                     <b>
-                      {a.action} · {a.staff}
+                      {auditLabel(a.action)} · {a.staff}
                     </b>
                     <small>
                       {a.target} · {date(a.at)}
@@ -633,7 +642,9 @@ export default function StaffWorkspace({ view, actions }) {
               >
                 <option value="">ทุกการกระทำ</option>
                 {[...new Set(admin.audit.map((a) => a.action))].map((a) => (
-                  <option key={a}>{a}</option>
+                  <option key={a} value={a}>
+                    {auditLabel(a)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -649,7 +660,7 @@ export default function StaffWorkspace({ view, actions }) {
                 .map((a) => (
                   <div className="audit-row" key={a.id}>
                     <div>
-                      <b>{a.action}</b>
+                      <b>{auditLabel(a.action)}</b>
                       <span>
                         {a.staff}
                         {a.actorId && a.actorId !== a.staff

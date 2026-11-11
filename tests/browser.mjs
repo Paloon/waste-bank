@@ -74,7 +74,7 @@ try {
     }
     await page.getByLabel("PIN ส่วนตัว", { exact: true }).fill(pin);
     await byName("เข้าสู่ระบบ").click();
-    await page.getByText("STAFF WORKSPACE").waitFor();
+    await page.getByText("พื้นที่เจ้าหน้าที่").waitFor();
   };
   console.log("Testing self-registration");
   await byName("Coins ของฉัน").click();

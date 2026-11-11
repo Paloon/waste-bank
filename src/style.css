@@ -1321,7 +1321,7 @@ code {
 }
 .admin-sidebar > .eyebrow {
   font-size: 0.75rem;
-  letter-spacing: 1.1px;
+  letter-spacing: 0;
 }
 .admin-sidebar h2 {
   margin: 13px 0 25px;
@@ -3637,5 +3637,44 @@ nav button.submit-nav.active {
   }
   .rate-toggle {
     min-height: 64px;
+  }
+}
+
+/* Phone: staff menu as an even 3-column grid instead of ragged wrapped chips. */
+@media (max-width: 760px) {
+  .admin-sidebar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .admin-sidebar > .eyebrow,
+  .admin-sidebar > h2,
+  .admin-sidebar > button.logout {
+    grid-column: 1 / -1;
+  }
+  .admin-sidebar > button:not(.logout) {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    gap: 4px;
+    min-height: 64px;
+    padding: 8px 6px;
+    line-height: 1.25;
+    background: #f1f5ed;
+  }
+  .admin-sidebar > button.active:not(.logout) {
+    background: #e6efd9;
+  }
+  .admin-sidebar > button .count {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+  }
+  .admin-sidebar > button.logout {
+    justify-content: center;
+    margin-top: 4px;
+    border: 0;
   }
 }
