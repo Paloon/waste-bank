@@ -71,7 +71,7 @@ h3 {
   font-size: 1.1rem;
 }
 small {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 header {
   height: 100px;
@@ -98,8 +98,8 @@ header {
 }
 .brand small {
   display: block;
-  font-size: 0.55rem;
-  letter-spacing: 1.8px;
+  font-size: 0.75rem;
+  letter-spacing: 1.2px;
   margin-top: 7px;
 }
 .brand-icon {
@@ -137,7 +137,7 @@ nav button:hover {
   align-items: center;
   gap: 7px;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   min-height: 44px;
   flex-shrink: 0;
 }
@@ -148,8 +148,8 @@ main {
   min-height: calc(100vh - 178px);
 }
 .eyebrow {
-  font-size: 0.73rem;
-  letter-spacing: 1.5px;
+  font-size: 0.875rem;
+  letter-spacing: 0;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -187,9 +187,9 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  letter-spacing: 1.9px;
+  letter-spacing: 0;
   color: #d7e4cd;
 }
 .hero h1 {
@@ -199,7 +199,7 @@ main {
   font-weight: 600;
   line-height: 1.43;
   margin: 18px 0 12px;
-  letter-spacing: -1.8px;
+  letter-spacing: 0;
 }
 .hero h1 span {
   color: var(--lime);
@@ -253,7 +253,7 @@ main {
   align-items: center;
   gap: 9px;
   margin-top: 23px;
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   color: #d3e1d1;
   position: relative;
   z-index: 1;
@@ -283,7 +283,7 @@ main {
 .recycle-mark span {
   position: absolute;
   font-weight: 700;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   text-align: center;
   letter-spacing: 2px;
   line-height: 1.5;
@@ -332,8 +332,8 @@ main {
   width: 22px;
 }
 .action-card small {
-  font-size: 0.63rem;
-  letter-spacing: 1.5px;
+  font-size: 0.875rem;
+  letter-spacing: 0;
   color: #6b775d;
 }
 .action-card h2 {
@@ -342,7 +342,7 @@ main {
   font-weight: 600;
 }
 .action-card p {
-  font-size: 0.84rem;
+  font-size: 0.875rem;
   color: var(--muted);
   margin: 0;
 }
@@ -359,7 +359,7 @@ main {
   font-size: 1.02rem;
 }
 .impact .eyebrow {
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   letter-spacing: 1.3px;
 }
 .metric {
@@ -383,12 +383,12 @@ main {
   font-weight: 600;
 }
 .metric strong small {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .metric p {
   margin: 4px 0 0;
-  font-size: 0.79rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .lower-grid {
@@ -412,7 +412,7 @@ main {
   margin: 0;
 }
 .section-heading > span {
-  font-size: 0.73rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .steps {
@@ -437,7 +437,7 @@ main {
   right: -10px;
   top: -5px;
   background: #f6f8f4;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   padding: 3px;
   color: #648252;
 }
@@ -447,7 +447,7 @@ main {
   margin-bottom: 5px;
 }
 .steps p {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .top-card {
@@ -461,7 +461,7 @@ main {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--green);
   min-height: 44px;
   padding: 5px 8px;
@@ -499,13 +499,13 @@ main {
   flex-shrink: 0;
 }
 .mini-rank b {
-  font-size: 0.83rem;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .mini-rank small {
   display: block;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   margin-top: 2px;
 }
 .mini-rank strong {
@@ -527,7 +527,7 @@ footer {
   display: flex;
   justify-content: space-between;
   color: var(--muted);
-  font-size: 0.66rem;
+  font-size: 0.875rem;
   gap: 20px;
 }
 footer > span {
@@ -554,13 +554,13 @@ footer > span {
   display: flex;
   gap: 7px;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--muted);
   min-height: 44px;
   padding: 0;
 }
 .privacy {
-  font-size: 0.73rem;
+  font-size: 0.875rem;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -616,7 +616,7 @@ footer > span {
   position: absolute;
   bottom: 14px;
   right: 18px;
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   letter-spacing: 2px;
   opacity: 0.55;
 }
@@ -626,7 +626,7 @@ footer > span {
 .reward-stock {
   display: flex;
   justify-content: space-between;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--muted);
   margin-bottom: 12px;
 }
@@ -638,7 +638,7 @@ footer > span {
   font-size: 1.2rem;
 }
 .reward-body p {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--muted);
   min-height: 40px;
   line-height: 1.7;
@@ -660,7 +660,7 @@ footer > span {
   color: #a48224;
 }
 .reward-bottom .btn {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   padding: 10px 14px;
 }
 .panel {
@@ -680,7 +680,7 @@ footer > span {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 25px;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .flow-steps .complete {
@@ -705,7 +705,7 @@ footer > span {
   margin-bottom: 7px;
 }
 .upload-zone p {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
 }
 .upload-buttons {
   display: flex;
@@ -763,7 +763,7 @@ textarea::placeholder {
 .category-grid button {
   border: 1px solid var(--line);
   border-radius: 9px;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   min-height: 49px;
   padding: 8px;
 }
@@ -795,7 +795,7 @@ textarea::placeholder {
   gap: 5px;
   align-items: center;
   white-space: nowrap;
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   padding: 6px 11px;
   border-radius: 7px;
   background: #ecefeb;
@@ -851,7 +851,7 @@ textarea::placeholder {
 }
 .wallet .eyebrow {
   color: var(--lime);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
 }
 .wallet h2 {
   margin: 12px 0 5px;
@@ -865,7 +865,7 @@ textarea::placeholder {
   padding-left: 30px;
 }
 .wallet-balance > span {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: #d6e2c9;
 }
 .wallet-balance strong {
@@ -927,7 +927,7 @@ textarea::placeholder {
   display: block;
   color: var(--muted);
   margin-top: 6px;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
 }
 .history-row strong {
   font-weight: 500;
@@ -956,11 +956,11 @@ textarea::placeholder {
   gap: 4px;
 }
 .no-photo small {
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   margin: 0;
 }
 .reason {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: #ae6a54;
   margin: 7px 0 0;
 }
@@ -1060,7 +1060,7 @@ code {
   margin: 14px 0 6px;
 }
 .podium-card p {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--muted);
   margin-bottom: 12px;
 }
@@ -1138,7 +1138,7 @@ code {
 }
 .success-screen .eyebrow {
   justify-content: center;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
 }
 .success-screen h1 {
   font-size: 2.3rem;
@@ -1163,7 +1163,7 @@ code {
 .pickup-code > span,
 .pickup-code > small {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .pickup-code strong {
   display: block;
@@ -1257,7 +1257,7 @@ code {
   text-align: center;
   color: var(--muted);
   margin-top: 18px;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   line-height: 1.8;
 }
 .redemption-summary {
@@ -1320,8 +1320,8 @@ code {
   padding: 20px 0;
 }
 .admin-sidebar > .eyebrow {
-  font-size: 0.64rem;
-  letter-spacing: 1.1px;
+  font-size: 0.75rem;
+  letter-spacing: 0;
 }
 .admin-sidebar h2 {
   margin: 13px 0 25px;
@@ -1386,7 +1386,7 @@ code {
   font-weight: 600;
 }
 .stat-card span {
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .today-stats {
@@ -1400,14 +1400,14 @@ code {
 }
 .today-stats p {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .bar-row {
   display: flex;
   gap: 13px;
   align-items: center;
   margin: 15px 0;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .bar-row > span {
   min-width: 150px;
@@ -1437,19 +1437,60 @@ code {
 .review-card {
   margin: 0;
 }
-.review-card > .photo {
+/* Evidence fills the card: one photo full width, two photos side by side. */
+.review-card .evidence-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.review-card .evidence-pair.two {
+  grid-template-columns: 1fr 1fr;
+}
+.review-card .evidence-pair .photo {
   width: 100%;
-  height: 160px;
-  margin-bottom: 15px;
+  height: 180px;
+}
+.review-category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--green);
+}
+.review-category svg {
+  flex-shrink: 0;
+}
+.review-card .review-count {
+  font-size: 1rem;
+  font-weight: 600;
+  color: inherit;
+  margin: 0 0 12px;
+}
+.review-student {
+  display: grid;
+  gap: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, #dce5dd);
+}
+.review-student span,
+.review-student small {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.review-card .review-note {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  background: #f4f7f1;
+  border-radius: 8px;
 }
 .review-card .no-photo small {
   font-size: 0.8rem;
 }
 .review-card h3 {
-  margin: 14px 0 10px;
+  margin: 0 0 6px;
 }
 .review-card > p {
-  font-size: 0.86rem;
+  font-size: 0.875rem;
   color: var(--muted);
   margin: 10px 0;
 }
@@ -1480,7 +1521,7 @@ code {
   color: #85a166;
 }
 .pickup-row p {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   margin: 7px 0;
   color: var(--muted);
 }
@@ -1488,7 +1529,7 @@ code {
   margin: 0 0 9px;
 }
 .pickup-row small {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .table-wrap {
@@ -1503,7 +1544,7 @@ table {
   border-collapse: collapse;
   min-width: 590px;
   text-align: left;
-  font-size: 0.83rem;
+  font-size: 0.875rem;
 }
 th {
   font-weight: 500;
@@ -1527,7 +1568,7 @@ td input {
   max-width: 80px;
 }
 td .text-button {
-  font-size: 0.77rem;
+  font-size: 0.875rem;
 }
 .admin-rewards {
   grid-template-columns: repeat(2, 1fr);
@@ -1540,7 +1581,7 @@ td .text-button {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   line-height: 1.8;
   margin: 24px 0;
 }
@@ -1554,7 +1595,7 @@ td .text-button {
 .audit-row {
   padding: 17px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
 }
 .audit-row > div:first-child {
   display: flex;
@@ -1562,13 +1603,13 @@ td .text-button {
   gap: 15px;
 }
 .audit-row span {
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .audit-row p {
   margin: 10px 0;
   color: #71855d;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
 }
 .audit-values {
   display: flex;
@@ -1576,7 +1617,7 @@ td .text-button {
   align-items: center;
 }
 .audit-values code {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   background: #f2f5ee;
   padding: 8px;
   border-radius: 5px;
@@ -1594,7 +1635,7 @@ td .text-button {
   background: #f0f5e8;
   padding: 14px;
   border-radius: 10px;
-  font-size: 0.82rem;
+  font-size: 0.875rem;
 }
 .promotion-summary b {
   display: block;
@@ -1846,7 +1887,7 @@ td .text-button {
   }
   .hero-tag {
     font-size: 0.875rem;
-    letter-spacing: 1.4px;
+    letter-spacing: 0;
   }
   .hero p {
     font-size: 0.88rem;
@@ -1876,7 +1917,7 @@ td .text-button {
   }
   .action-card small {
     font-size: 0.875rem;
-    letter-spacing: 1px;
+    letter-spacing: 0;
   }
   .action-card p {
     font-size: 0.875rem;
@@ -2330,16 +2371,13 @@ td .text-button {
   .review-card {
     padding: 13px;
   }
-  .review-card > .photo {
+  .review-card .evidence-pair .photo {
     height: 110px;
   }
   .review-card > p {
     font-size: 0.875rem;
   }
   .review-card > small {
-    font-size: 0.875rem;
-  }
-  .review-card > b {
     font-size: 0.875rem;
   }
   .review-card h3 {
@@ -2693,7 +2731,7 @@ td .text-button {
     font-size: 0.75rem;
   }
   .brand small {
-    font-size: 0.625rem;
+    font-size: 0.75rem;
   }
   .hero {
     min-height: 0;
@@ -2787,7 +2825,7 @@ td .text-button {
   .review-grid {
     grid-template-columns: 1fr;
   }
-  .review-card > .photo {
+  .review-card .evidence-pair .photo {
     height: 220px;
   }
   .review-card .btn {
@@ -2987,7 +3025,7 @@ td .text-button {
 .category-grid button small {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 0.875rem;
   opacity: 0.8;
 }
 .coin-estimate {
@@ -3046,7 +3084,7 @@ td .text-button {
 }
 .home-coin-rates thead th {
   color: var(--muted, #657567);
-  font-size: 13px;
+  font-size: 0.875rem;
 }
 .home-coin-rates th:first-child {
   width: 48%;
@@ -3061,12 +3099,12 @@ td .text-button {
   color: var(--green, #185b3e);
 }
 .home-coin-rates .rate-pending {
-  font-size: 13px;
+  font-size: 0.875rem;
   color: var(--muted, #657567);
 }
 .home-rates-note {
   margin-bottom: 0;
-  font-size: 13px;
+  font-size: 0.875rem;
   line-height: 1.7;
   color: var(--muted, #657567);
 }
@@ -3107,7 +3145,7 @@ td .text-button {
 }
 .waste-guide div {
   padding: 8px 0;
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.7;
 }
@@ -3144,7 +3182,7 @@ td .text-button {
   background: #eef4e8;
   padding: 10px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 0.875rem;
 }
 
 .waste-guide-toggle {
@@ -3246,25 +3284,22 @@ td .text-button {
   }
 }
 
+/* The submit tab is a call to action, but only the current page may look selected. */
 nav button.submit-nav {
-  background: #185b3e;
-  color: #fff;
+  background: transparent;
+  color: var(--green);
   font-weight: 700;
-  border: 1px solid #185b3e;
-  box-shadow: 0 3px 8px #185b3e20;
+  border: 1.5px solid var(--green);
 }
 nav button.submit-nav svg {
-  color: #d6ef94;
+  color: var(--green);
 }
 nav button.submit-nav:hover {
-  background: #10472f;
-  color: #fff;
+  background: #f1f5ed;
 }
 nav button.submit-nav.active {
-  background: #10472f;
-  color: #fff;
-  border-color: #b4d66b;
-  box-shadow: inset 0 0 0 1px #b4d66b;
+  background: #edf3e8;
+  color: var(--green);
 }
 .submit-page-title {
   display: flex;
@@ -3350,7 +3385,7 @@ nav button.submit-nav.active {
   padding: 6px 10px;
   border-radius: 999px;
   background: #eef2ea;
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 .pending .submission-status {
@@ -3377,7 +3412,7 @@ nav button.submit-nav.active {
 .submission-card-body small {
   display: block;
   color: #667467;
-  font-size: 13px;
+  font-size: 0.875rem;
   line-height: 1.6;
 }
 .submission-result {
@@ -3433,7 +3468,7 @@ nav button.submit-nav.active {
   clip-path: inset(50%);
 }
 .submit-layout .upload-buttons label:focus-within { outline: 3px solid #48713c; outline-offset: 3px; }
-.submission-actions > span { display: block; margin-top: 8px; text-align: center; font-size: 0.85rem; color: var(--muted); }
+.submission-actions > span { display: block; margin-top: 8px; text-align: center; font-size: 0.875rem; color: var(--muted); }
 .submission-spinner { animation: submission-spin 1s linear infinite; }
 @keyframes submission-spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) {
@@ -3481,7 +3516,7 @@ nav button.submit-nav.active {
 .correction-comparison > span { display: flex; flex-direction: column; gap: 4px; border: 1px solid #dce7df; padding: 12px; border-radius: 10px; background: #fff; }
 .correction-comparison strong { font-size: 1.12rem; color: #17452c; }
 .field [aria-invalid="true"] { border-color: #b74c38; outline-color: #b74c38; }
-.field > .field-error { color: #963827; font-size: .84rem; line-height: 1.5; }
+.field > .field-error { color: #963827; font-size: 0.875rem; line-height: 1.5; }
 @media (max-width: 720px) {
   .review-modal { padding: 22px 16px; }
   .review-layout { grid-template-columns: 1fr; gap: 18px; }
@@ -3491,3 +3526,155 @@ nav button.submit-nav.active {
 }
 .review-decision { position: sticky; top: 0; background: #fff; }
 @media (max-width: 720px) { .review-decision { position: static; } }
+
+/* Tracking suits short uppercase English labels, never Thai text. */
+.wallet .eyebrow,
+.success-screen .eyebrow,
+.leader-intro .hero-tag {
+  letter-spacing: 1.5px;
+}
+
+/* One-line notice on staff tabs other than the overview. */
+.operations-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 6px 8px 6px 14px;
+  background: #fbf3df;
+  border-left: 4px solid #b88927;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+.operations-strip svg {
+  flex-shrink: 0;
+  color: #8a6416;
+}
+.operations-strip span {
+  flex: 1;
+}
+.operations-strip button {
+  min-height: 44px;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  color: var(--green);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Coin rates: compact cards instead of a full-width table. */
+.rate-grid {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.rate-card {
+  margin: 0;
+}
+.rate-toggle {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  color: inherit;
+  background: #f6f9f3;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.rate-toggle:hover {
+  background: #edf3e8;
+}
+.rate-toggle[aria-expanded="true"] {
+  border-color: var(--green);
+  background: #edf3e8;
+}
+.rate-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--green);
+}
+.rate-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.rate-name {
+  font-weight: 600;
+}
+.rate-unit {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.rate-detail {
+  grid-column: 1 / -1;
+  padding: 4px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+@media (max-width: 900px) {
+  .rate-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 540px) {
+  .rate-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .rate-toggle {
+    min-height: 64px;
+  }
+}
+
+/* Phone: staff menu as an even 3-column grid instead of ragged wrapped chips. */
+@media (max-width: 760px) {
+  .admin-sidebar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .admin-sidebar > .eyebrow,
+  .admin-sidebar > h2,
+  .admin-sidebar > button.logout {
+    grid-column: 1 / -1;
+  }
+  .admin-sidebar > button:not(.logout) {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    gap: 4px;
+    min-height: 64px;
+    padding: 8px 6px;
+    line-height: 1.25;
+    background: #f1f5ed;
+  }
+  .admin-sidebar > button.active:not(.logout) {
+    background: #e6efd9;
+  }
+  .admin-sidebar > button .count {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+  }
+  .admin-sidebar > button.logout {
+    justify-content: center;
+    margin-top: 4px;
+    border: 0;
+  }
+}

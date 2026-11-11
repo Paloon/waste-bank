@@ -591,9 +591,9 @@ function App() {
                     <div className="recycle-mark" aria-hidden="true">
                       <Recycle strokeWidth={1.1} />
                       <span>
-                        MAKE IT
+                        ใช้ซ้ำ
                         <br />
-                        CIRCULAR
+                        วนต่อ
                       </span>
                     </div>
                   </div>
@@ -630,7 +630,7 @@ function App() {
                 </section>
                 <section className="impact">
                   <div>
-                    <span className="eyebrow">OUR COLLECTIVE IMPACT</span>
+                    <span className="eyebrow">ผลงานรวมของพวกเรา</span>
                     <h3>พลังเล็ก ๆ ของพวกเรา</h3>
                   </div>
                   <div className="metric">
@@ -698,7 +698,7 @@ function App() {
                   <div className="top-card">
                     <div className="section-heading">
                       <h2>
-                        <Trophy size={20} /> Eco heroes
+                        <Trophy size={20} /> ฮีโร่รักษ์โลก
                       </h2>
                       <button
                         className="text-button"

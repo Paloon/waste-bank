@@ -125,7 +125,7 @@ try {
       dashboardReads++;
   });
   await button("เข้าสู่ระบบ").click();
-  await page.getByText("STAFF WORKSPACE").waitFor();
+  await page.getByText("พื้นที่เจ้าหน้าที่").waitFor();
   // Advancing timers flushes the old redundant initial effect, if reintroduced.
   await page.clock.fastForward(1000);
   assert.equal(dashboardReads, 1);
