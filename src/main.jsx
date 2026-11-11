@@ -56,6 +56,11 @@ import useKioskSession, {
 } from "./hooks/useKioskSession.js";
 import RecyclingGuide, { WasteIcon, categoryLabel } from "./RecyclingGuide.jsx";
 import { api, invalidateRequests } from "./api.js";
+import {
+  clearPendingKey,
+  loadPendingKey,
+  savePendingKey,
+} from "./pendingRequest.js";
 import { useAdminData } from "./hooks/useAdminData.js";
 import { useLeaderboard } from "./hooks/useLeaderboard.js";
 import {
@@ -262,19 +267,40 @@ function App() {
     }
   }
   const action = async (action, payload) => {
-    const signature = JSON.stringify({ action, payload });
+    // A redemption is identified by student and reward, not by the price on screen, so a
+    // retry after a price change still resolves to the same request.
+    const signature =
+      action === "redeem"
+        ? JSON.stringify({ action, id: payload.id, student: student?.id })
+        : JSON.stringify({ action, payload });
+    const remembers = action === "redeem";
     if (operationKey.current?.signature !== signature)
       operationKey.current = {
         signature,
-        key: Date.now() + ":" + crypto.randomUUID(),
+        key:
+          (remembers && loadPendingKey(signature)) ||
+          Date.now() + ":" + crypto.randomUUID(),
       };
-    let result = await api("action", {
-      action,
-      payload,
-      key: operationKey.current.key,
-      ...(student?.id ? { expectedStudent: student.id } : {}),
-    });
+    if (remembers) savePendingKey(signature, operationKey.current.key);
+    let result;
+    try {
+      result = await api("action", {
+        action,
+        payload,
+        key: operationKey.current.key,
+        ...(student?.id ? { expectedStudent: student.id } : {}),
+      });
+    } catch (error) {
+      // The server answered with a refusal, so nothing was charged under this key.
+      // A lost reply or a 5xx may hide a charge: keep the key for the retry.
+      if (remembers && error.serverError && !error.retryable) {
+        clearPendingKey();
+        operationKey.current = null;
+      }
+      throw error;
+    }
     operationKey.current = null;
+    if (remembers) clearPendingKey();
     return result;
   };
   const done = (title, description, code, pickupInstructions) => {
@@ -495,6 +521,7 @@ function App() {
         </nav>
         <button
           className="staff-link"
+          aria-label={staff ? `พื้นที่เจ้าหน้าที่ ${staff}` : "เจ้าหน้าที่"}
           onClick={() =>
             staff ? setPage("admin") : openModal({ type: "login" })
           }
@@ -1540,9 +1567,28 @@ function App() {
                 </p>
                 <form
                   onSubmit={submitModal(async (v) => {
-                    const result = await action("redeem", {
-                      id: modal.reward.id,
-                    });
+                    let result;
+                    try {
+                      result = await action("redeem", {
+                        id: modal.reward.id,
+                        price: modal.reward.price,
+                      });
+                    } catch (error) {
+                      if (error.code === "PRICE_CHANGED") {
+                        // Show the new price and wait for a fresh confirmation.
+                        try {
+                          const fresh = await api("public");
+                          setData(fresh);
+                          const reward = fresh.rewards?.find(
+                            (r) => r.id === modal.reward.id,
+                          );
+                          if (reward) setModal({ type: "redeem", reward });
+                        } catch {
+                          /* the refusal message below still tells them to check */
+                        }
+                      }
+                      throw error;
+                    }
                     done(
                       "จองรางวัลแล้ว!",
                       "Coins ถูกหักเรียบร้อย สถานะ: รอรับรางวัล",

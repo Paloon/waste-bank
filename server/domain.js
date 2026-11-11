@@ -399,6 +399,13 @@ export function act(s, actor, body) {
       reward?.enabled && !reward.deletedAt && reward.stock > 0,
       "ของรางวัลหมดหรือไม่เปิดให้แลก",
     );
+    // Charge only the price the student saw and confirmed.
+    fail(
+      p.price === undefined || p.price === reward.price,
+      `ราคารางวัลเปลี่ยนเป็น ${reward.price} Coins กรุณาตรวจและกดยืนยันอีกครั้ง`,
+      409,
+      "PRICE_CHANGED",
+    );
     const id = randomUUID();
     tx(actor.id, -reward.price, "redemption", "แลก " + reward.name, id);
     reward.stock--;

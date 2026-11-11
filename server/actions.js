@@ -57,7 +57,13 @@ export async function performAction(
 ) {
   const p = body.payload;
   // PIN changes must not alter a retry fingerprint; never persist a PIN in a receipt.
-  const { pin, ...safePayload } = p;
+  // The confirmed redeem price is a guard, not part of the request's identity: a retry
+  // after a price change must replay the earlier receipt rather than look like new data.
+  const { pin, ...rest } = p;
+  const safePayload =
+    body.action === "redeem"
+      ? Object.fromEntries(Object.entries(rest).filter(([k]) => k !== "price"))
+      : rest;
   body.fingerprint = fingerprint({ action: body.action, payload: safePayload });
   const scope = await actionScope(store, actor, body),
     snapshot = await store.read(scope);
