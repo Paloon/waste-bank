@@ -22,7 +22,12 @@ const schemas = {
     note: text.optional(),
   }),
   cancelSubmission: z.object({ id }),
-  redeem: z.object({ id }),
+  // `price` is the price the student confirmed on screen; the server refuses to
+  // charge a different one. Optional so a tab that loaded before this deploy still works.
+  redeem: z.object({
+    id,
+    price: z.number().int().min(0).max(1000000).optional(),
+  }),
   deleteReward: z.object({
     id,
     version: z.number().int().nonnegative(),

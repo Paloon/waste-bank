@@ -124,7 +124,7 @@ try {
   await page.unroute("**/api/action");
 
   console.log("Testing actual browser Back clears authenticated draft");
-  await page.evaluate(() => history.pushState({}, "", "#kiosk-check"));
+  // The app keeps its own history entry away from home; without it Back leaves the site.
   await page.goBack();
   await home();
   assert.equal(await page.getByAltText("ภาพที่เลือก").count(), 0);
