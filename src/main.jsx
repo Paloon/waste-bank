@@ -125,6 +125,7 @@ function App() {
     operationKey = useRef(null),
     modalRef = useRef(null),
     lastFocus = useRef(null),
+    imageOpener = useRef(null),
     successTimer = useRef(null);
   const refresh = () => api("public").then(setData);
   useEffect(() => {
@@ -184,6 +185,7 @@ function App() {
       api,
       clear,
       home,
+      back: () => navigate("home"),
       setError,
       setNotice,
     });
@@ -397,7 +399,12 @@ function App() {
     setLookup(null);
     setModal({ type: "identify", next, reward });
   }
-  function navigate(target) {
+  function navigate(target, leaveStaffArea = false) {
+    // Student pages end the staff session, so staff confirm before leaving their workspace.
+    if (staff && !leaveStaffArea) {
+      openModal({ type: "leaveStaff", target });
+      return;
+    }
     uiEpoch.current++;
     runVersion.current++;
     inFlight.current = false;
@@ -411,6 +418,7 @@ function App() {
     if (staff) {
       setStaff(null);
       setAdmin(null);
+      setModal(null);
       api("logout", {}).catch(() => {});
     }
     setError("");
@@ -453,8 +461,28 @@ function App() {
         ? current.filter((id) => !visibleStudents.some((s) => s.id === id))
         : [...new Set([...current, ...visibleStudents.map((s) => s.id)])],
     );
+  // The enlarged image remembers what opened it, so closing returns keyboard focus there.
+  const showImage = (value) => {
+    imageOpener.current = document.activeElement;
+    setImage(value);
+  };
+  const closeImage = () => {
+    setImage("");
+    imageOpener.current?.focus?.();
+    imageOpener.current = null;
+  };
+  const imageOpen = Boolean(image);
+  useEffect(() => {
+    if (!imageOpen) return;
+    // Listening on the document keeps Escape working after a click on the picture itself.
+    const onKey = (event) => {
+      if (event.key === "Escape") closeImage();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [imageOpen]);
   const openRewardImage = (images, index) =>
-    setImage({ sources: images.map((item) => item.src), index });
+    showImage({ sources: images.map((item) => item.src), index });
   function startPromotion() {
     run(async () => {
       const result = await api("promotion");
@@ -497,7 +525,7 @@ function App() {
   return (
     <>
       <header>
-        <button className="brand" onClick={home}>
+        <button className="brand" onClick={() => navigate("home")}>
           <span className="brand-icon">
             <Recycle size={27} />
           </span>
@@ -919,7 +947,7 @@ function App() {
                       key={student.id}
                       student={student}
                       rates={data.recyclingRates || recyclingRates}
-                      onPhoto={setImage}
+                      onPhoto={showImage}
                       onCancel={(s) =>
                         openModal({ type: "cancelSubmission", item: s })
                       }
@@ -1245,7 +1273,7 @@ function App() {
                   onTabChange: setAdminTab,
                   onSearch: setQuery,
                   onModal: openModal,
-                  onImage: setImage,
+                  onImage: showImage,
                   onRewardImage: openRewardImage,
                   onToggleVisibleStudents: toggleVisibleStudents,
                   onToggleStudent: toggleStudent,
@@ -1324,7 +1352,8 @@ function App() {
             aria-labelledby="modal-title"
             ref={modalRef}
             onKeyDown={(e) => {
-              if (e.key === "Escape" && !busy) setModal(null);
+              // An enlarged image sits above the dialog; Escape closes that image first.
+              if (e.key === "Escape" && !busy && !image) setModal(null);
               if (e.key === "Tab") {
                 const els = [
                   ...modalRef.current.querySelectorAll(
@@ -1506,6 +1535,32 @@ function App() {
                 >
                   มีบัญชีแล้ว? เข้าสู่ระบบ
                 </button>
+              </>
+            )}
+            {modal.type === "leaveStaff" && (
+              <>
+                <span className="modal-symbol">
+                  <LogOut />
+                </span>
+                <h2 id="modal-title">ออกจากพื้นที่เจ้าหน้าที่?</h2>
+                <p>
+                  หน้าที่เลือกเป็นของนักเรียน ระบบจะออกจากบัญชีเจ้าหน้าที่ก่อน
+                  และต้องใส่ PIN อีกครั้งเมื่อกลับมา
+                </p>
+                <div className="button-row">
+                  <button
+                    className="btn primary"
+                    onClick={() => setModal(null)}
+                  >
+                    อยู่หน้าเจ้าหน้าที่ต่อ
+                  </button>
+                  <button
+                    className="btn secondary"
+                    onClick={() => navigate(modal.target, true)}
+                  >
+                    ออกจากระบบแล้วไปต่อ
+                  </button>
+                </div>
               </>
             )}
             {modal.type === "login" && (
@@ -1715,7 +1770,7 @@ function App() {
                   setError("");
                   setModal((current) => ({ ...current, status }));
                 }}
-                onPhoto={setImage}
+                onPhoto={showImage}
                 onSubmit={submitModal(async (values) => {
                   await action("review", {
                     ...values,
@@ -1984,9 +2039,9 @@ function App() {
                 {modal.p.submissions.map((s) => (
                   <div className="history-row" key={s.id}>
                     <div className="evidence-pair">
-                      <Photo src={s.image} onClick={setImage} />
+                      <Photo src={s.image} onClick={showImage} />
                       {s.disposalImage && (
-                        <Photo src={s.disposalImage} onClick={setImage} />
+                        <Photo src={s.disposalImage} onClick={showImage} />
                       )}
                     </div>
                     <span className="grow">
@@ -2076,8 +2131,21 @@ function App() {
           role="dialog"
           aria-label="ภาพขยาย"
           aria-modal="true"
-          onClick={() => setImage("")}
+          onClick={closeImage}
           onKeyDown={(e) => {
+            if (e.key === "Tab") {
+              // Keep keyboard focus on the image controls while the image covers the page.
+              const controls = [...e.currentTarget.querySelectorAll("button")],
+                first = controls[0],
+                last = controls.at(-1);
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last?.focus();
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first?.focus();
+              }
+            }
             if (
               typeof image === "object" &&
               ["ArrowLeft", "ArrowRight"].includes(e.key)
@@ -2094,7 +2162,7 @@ function App() {
             }
           }}
         >
-          <button autoFocus aria-label="ปิดภาพ" onClick={() => setImage("")}>
+          <button autoFocus aria-label="ปิดภาพ" onClick={closeImage}>
             <X />
           </button>
           {typeof image === "object" && image.sources.length > 1 && (

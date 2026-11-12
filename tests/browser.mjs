@@ -349,7 +349,21 @@ try {
     await page.locator(".staff-system-details").getAttribute("open"),
     null,
   );
+  // A tab that is still loading must not claim that everything has been reviewed.
+  let openReviews;
+  const reviewsHeld = new Promise((resolve) => (openReviews = resolve));
+  await page.route("**/api/admin?tab=reviews*", async (route) => {
+    await reviewsHeld;
+    await route.continue();
+  });
   await page.getByRole("button", { name: /^ตรวจขยะ/ }).click();
+  await page.getByText("กำลังโหลดข้อมูล…", { exact: true }).waitFor();
+  await expect(page.getByText("ตรวจครบแล้ว ขอบคุณที่ช่วยดูแลโลก!")).toHaveCount(
+    0,
+  );
+  openReviews();
+  await byName("อนุมัติ").last().waitFor();
+  await page.unroute("**/api/admin?tab=reviews*");
   await byName("อนุมัติ").last().click();
   const proof = await page.locator(".review-proof").boundingBox();
   const decision = await page.locator(".review-decision").boundingBox();
@@ -540,8 +554,25 @@ try {
   await byName("ยืนยันเลื่อนชั้น").click();
   await page.getByText("เลื่อนชั้นเรียบร้อย ประวัติและ Coins คงเดิม").waitFor();
   await byName("ออกจากระบบ").click();
-  console.log("Testing reward gallery");
+  console.log("Testing staff confirm before student pages end their session");
   await login();
+  await byName("ร้านรางวัล").click();
+  await page
+    .getByRole("heading", { name: "ออกจากพื้นที่เจ้าหน้าที่?" })
+    .waitFor();
+  await byName("อยู่หน้าเจ้าหน้าที่ต่อ").click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await expect(page.locator(".admin-sidebar")).toBeVisible();
+  assert.equal(
+    await page.evaluate(() =>
+      fetch("/api/admin?tab=dashboard&page=0&q=").then(
+        (response) => response.status,
+      ),
+    ),
+    200,
+    "staying keeps the staff session",
+  );
+  console.log("Testing reward gallery");
   await byName("จัดการรางวัล").click();
   await byName("แก้ไขรางวัล").first().click();
   const photo = await page.screenshot();
@@ -554,8 +585,18 @@ try {
   await page.locator(".reward-editor input[type=range]").press("End");
   await byName("บันทึกรางวัล").click();
   await page.getByText("บันทึกรางวัลแล้ว").waitFor();
-  await byName("ออกจากระบบ").click();
   await byName("ร้านรางวัล").click();
+  await byName("ออกจากระบบแล้วไปต่อ").click();
+  await page.getByRole("heading", { name: "ร้านรางวัล" }).waitFor();
+  assert.equal(
+    await page.evaluate(() =>
+      fetch("/api/admin?tab=dashboard&page=0&q=").then(
+        (response) => response.status,
+      ),
+    ),
+    401,
+    "leaving for a student page ends the staff session",
+  );
   await page.getByRole("button", { name: "รูปถัดไป" }).first().click();
   await page
     .getByRole("button", { name: "ดูรูป สมุดรักษ์โลก แบบเต็ม" })
@@ -569,6 +610,14 @@ try {
     .getByRole("dialog", { name: "ภาพขยาย" })
     .getByRole("button", { name: "ปิดภาพ" })
     .click();
+  await page
+    .getByRole("button", { name: "ดูรูป สมุดรักษ์โลก แบบเต็ม" })
+    .click();
+  await page.getByRole("dialog", { name: "ภาพขยาย" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("dialog", { name: "ภาพขยาย" })
+    .waitFor({ state: "hidden" });
   for (const width of [390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     for (const target of ["ร้านรางวัล", "อันดับ", "หน้าหลัก"]) {

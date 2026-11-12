@@ -81,6 +81,19 @@ export default function StaffWorkspace({ view, actions }) {
   } = actions;
   const studentName = (id) =>
     admin.students.find((student) => student.id === id);
+  const ledgerRows = admin.ledger.filter((t) =>
+    [t.student, t.reason, t.type].join(" ").includes(query),
+  );
+  const auditRows = admin.audit.filter(
+    (a) =>
+      JSON.stringify(a).includes(query) &&
+      (!category.startsWith("audit:") ||
+        !category.slice(6) ||
+        a.action === category.slice(6)),
+  );
+  // Lists are empty while a tab loads, so "nothing here" may only be said afterwards.
+  const noRows = (rows) => !adminLoading && !adminFailed && !rows.length;
+  const noMatchText = query ? "ไม่พบรายการที่ตรงกับคำค้น" : "ยังไม่มีรายการ";
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
@@ -370,9 +383,9 @@ export default function StaffWorkspace({ view, actions }) {
                   );
                 })}
             </div>
-            {!admin.submissions.some((s) => s.status === "Pending") && (
-              <Empty text="ตรวจครบแล้ว ขอบคุณที่ช่วยดูแลโลก!" />
-            )}
+            {noRows(
+              admin.submissions.filter((s) => s.status === "Pending"),
+            ) && <Empty text="ตรวจครบแล้ว ขอบคุณที่ช่วยดูแลโลก!" />}
           </>
         )}
         {adminTab === "pickups" && (
@@ -422,9 +435,9 @@ export default function StaffWorkspace({ view, actions }) {
                   </button>
                 </div>
               ))}
-            {!admin.redemptions.some((r) => r.status === "Pending Pickup") && (
-              <Empty />
-            )}
+            {noRows(
+              admin.redemptions.filter((r) => r.status === "Pending Pickup"),
+            ) && <Empty text={noMatchText} />}
           </>
         )}
         {adminTab === "students" && (
@@ -532,6 +545,7 @@ export default function StaffWorkspace({ view, actions }) {
                 </tbody>
               </table>
             </div>
+            {noRows(visibleStudents) && <Empty text={noMatchText} />}
           </>
         )}
         {adminTab === "rewards" && (
@@ -598,30 +612,27 @@ export default function StaffWorkspace({ view, actions }) {
               onChange={(e) => setQuery(e.target.value)}
             />
             <div className="panel">
-              {admin.ledger
-                .filter((t) =>
-                  [t.student, t.reason, t.type].join(" ").includes(query),
-                )
-                .map((t) => (
-                  <div className="ledger-row" key={t.id}>
-                    <Coins />
-                    <div className="grow">
-                      <b>{t.reason}</b>
-                      <small>
-                        {studentName(t.student)?.name} · {t.student} ·{" "}
-                        {date(t.at)}
-                      </small>
-                      <small>
-                        {t.type} · {t.staff || "นักเรียน"}
-                        {t.related ? " · อ้างอิง " + t.related.slice(0, 8) : ""}
-                      </small>
-                    </div>
-                    <strong className={t.amount < 0 ? "danger" : "positive"}>
-                      {t.amount > 0 ? "+" : ""}
-                      {fmt(t.amount)}
-                    </strong>
+              {noRows(ledgerRows) && <Empty text={noMatchText} />}
+              {ledgerRows.map((t) => (
+                <div className="ledger-row" key={t.id}>
+                  <Coins />
+                  <div className="grow">
+                    <b>{t.reason}</b>
+                    <small>
+                      {studentName(t.student)?.name} · {t.student} ·{" "}
+                      {date(t.at)}
+                    </small>
+                    <small>
+                      {t.type} · {t.staff || "นักเรียน"}
+                      {t.related ? " · อ้างอิง " + t.related.slice(0, 8) : ""}
+                    </small>
                   </div>
-                ))}
+                  <strong className={t.amount < 0 ? "danger" : "positive"}>
+                    {t.amount > 0 ? "+" : ""}
+                    {fmt(t.amount)}
+                  </strong>
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -649,37 +660,30 @@ export default function StaffWorkspace({ view, actions }) {
               </select>
             </div>
             <div className="panel">
-              {admin.audit
-                .filter(
-                  (a) =>
-                    JSON.stringify(a).includes(query) &&
-                    (!category.startsWith("audit:") ||
-                      !category.slice(6) ||
-                      a.action === category.slice(6)),
-                )
-                .map((a) => (
-                  <div className="audit-row" key={a.id}>
-                    <div>
-                      <b>{auditLabel(a.action)}</b>
-                      <span>
-                        {a.staff}
-                        {a.actorId && a.actorId !== a.staff
-                          ? ` (${a.actorId})`
-                          : ""}{" "}
-                        · {date(a.at)}
-                      </span>
-                    </div>
-                    <p>
-                      {a.target}
-                      {a.reason ? " · " + a.reason : ""}
-                    </p>
-                    <div className="audit-values">
-                      <code>{JSON.stringify(a.before)}</code>
-                      <ArrowRight size={16} />
-                      <code>{JSON.stringify(a.after)}</code>
-                    </div>
+              {noRows(auditRows) && <Empty text={noMatchText} />}
+              {auditRows.map((a) => (
+                <div className="audit-row" key={a.id}>
+                  <div>
+                    <b>{auditLabel(a.action)}</b>
+                    <span>
+                      {a.staff}
+                      {a.actorId && a.actorId !== a.staff
+                        ? ` (${a.actorId})`
+                        : ""}{" "}
+                      · {date(a.at)}
+                    </span>
                   </div>
-                ))}
+                  <p>
+                    {a.target}
+                    {a.reason ? " · " + a.reason : ""}
+                  </p>
+                  <div className="audit-values">
+                    <code>{JSON.stringify(a.before)}</code>
+                    <ArrowRight size={16} />
+                    <code>{JSON.stringify(a.after)}</code>
+                  </div>
+                </div>
+              ))}
             </div>
           </>
         )}

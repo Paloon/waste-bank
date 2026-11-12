@@ -11,14 +11,17 @@ export default function useKioskSession({
   api,
   clear,
   home,
+  back = home,
   setError,
   setNotice,
 }) {
   const [idleRemaining, setIdleRemaining] = useState(null);
+  const [backPresses, setBackPresses] = useState(0);
   const lastActivity = useRef(Date.now());
   const current = useRef(null);
   const pending = useRef(null);
   const mounted = useRef(true);
+  const historyEntry = useRef(false);
   current.current = {
     active,
     accountKey,
@@ -26,6 +29,7 @@ export default function useKioskSession({
     api,
     clear,
     home,
+    back,
     setError,
     setNotice,
   };
@@ -87,7 +91,10 @@ export default function useKioskSession({
         expired();
     };
     const back = () => {
-      if (current.current.active) current.current.home();
+      historyEntry.current = false;
+      if (current.current.active) current.current.back();
+      // Re-check afterwards: a screen that stays open (staff confirming) needs a new entry.
+      setBackPresses((count) => count + 1);
     };
     const timer = setInterval(() => {
       const remaining = policy.idleMs - (Date.now() - lastActivity.current);
@@ -126,6 +133,13 @@ export default function useKioskSession({
       document.removeEventListener("visibilitychange", visible);
     };
   }, []);
+  // One history entry while away from the home screen makes the browser's Back button
+  // return home instead of leaving the site with the form or account still open.
+  useEffect(() => {
+    if (!active || historyEntry.current) return;
+    window.history.pushState({ wasteBank: "away" }, "");
+    historyEntry.current = true;
+  }, [active, backPresses]);
   useEffect(() => {
     if (!accountKey) return;
     const timer = setInterval(() => {
