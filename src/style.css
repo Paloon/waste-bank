@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap");
+/* Fonts are linked from index.html so they download alongside this file, not after it. */
 :root {
   font-family: "Outfit", "Noto Sans Thai", sans-serif;
   color: #253c31;
@@ -12,6 +12,11 @@
 }
 * {
   box-sizing: border-box;
+}
+/* A pull-to-refresh reloads the page, which ends the session and clears the form. */
+html,
+body {
+  overscroll-behavior-y: contain;
 }
 body {
   margin: 0;
@@ -334,7 +339,7 @@ main {
 .action-card small {
   font-size: 0.875rem;
   letter-spacing: 0;
-  color: #6b775d;
+  color: var(--muted);
 }
 .action-card h2 {
   margin: 5px 0;
@@ -582,7 +587,7 @@ footer > span {
   gap: 10px;
 }
 .shop-banner small {
-  color: #6d7c60;
+  color: var(--muted);
 }
 .rewards-grid {
   display: grid;
@@ -618,7 +623,7 @@ footer > span {
   right: 18px;
   font-size: 0.75rem;
   letter-spacing: 2px;
-  opacity: 0.55;
+  color: var(--muted);
 }
 .reward-body {
   padding: 22px;
@@ -684,7 +689,7 @@ footer > span {
   color: var(--muted);
 }
 .flow-steps .complete {
-  color: #6e9260;
+  color: #48723a;
 }
 .flow-steps .current {
   color: var(--green);
@@ -706,6 +711,11 @@ footer > span {
 }
 .upload-zone p {
   font-size: 0.875rem;
+  color: var(--muted);
+}
+/* The zone's pale green suits the camera icon only; button text needs full contrast. */
+.upload-zone .btn.secondary {
+  color: #253c31;
 }
 .upload-buttons {
   display: flex;
@@ -804,11 +814,11 @@ textarea::placeholder {
 .pending,
 .pending-pickup {
   background: #fff1cf;
-  color: #936b12;
+  color: #805c0d;
 }
 .approved {
   background: #e5f1d9;
-  color: #4d7a30;
+  color: #3f6a32;
 }
 .completed {
   background: #e0eeeb;
@@ -981,7 +991,7 @@ textarea::placeholder {
   color: #4e8134;
 }
 .danger {
-  color: #b05446 !important;
+  color: #a84c3f !important;
 }
 code {
   display: block;
@@ -996,7 +1006,7 @@ code {
   margin: 20px 0 28px;
 }
 .leader-intro .hero-tag {
-  color: #71924e;
+  color: #48723a;
 }
 .leader-intro h2 {
   font-size: 1.65rem;
@@ -1549,7 +1559,7 @@ table {
 th {
   font-weight: 500;
   background: #eef3e8;
-  color: #6f8063;
+  color: var(--muted);
 }
 td,
 th {
@@ -1608,7 +1618,7 @@ td .text-button {
 }
 .audit-row p {
   margin: 10px 0;
-  color: #71855d;
+  color: var(--muted);
   font-size: 0.875rem;
 }
 .audit-values {
@@ -1640,7 +1650,7 @@ td .text-button {
 .promotion-summary b {
   display: block;
   margin-top: 5px;
-  color: #749450;
+  color: #48723a;
 }
 .small-preview {
   height: 100px;
@@ -3023,7 +3033,7 @@ td .text-button {
   display: block;
   margin-top: 4px;
   font-size: 0.875rem;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 .coin-estimate {
   padding: 16px;
@@ -3408,7 +3418,7 @@ nav button.submit-nav.active {
 }
 .submission-card-body small {
   display: block;
-  color: #667467;
+  color: var(--muted);
   font-size: 0.875rem;
   line-height: 1.6;
 }
