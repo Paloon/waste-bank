@@ -161,7 +161,9 @@ export function createApp({
     const p = (await store.read({ staff: { ids: [values.id] } })).staff[0];
     const valid = await verifyAsync(values.pin, p?.pin || dummyPin);
     if (!valid || !p || p.enabled === false) {
-      await report(store, "STAFF_LOGIN_FAILED");
+      // A wrong PIN is a normal 401, not a system fault: don't raise the
+      // "recent error" banner (anyone could trigger it). Rate limiting above
+      // already covers brute force.
       throw new AppError("ชื่อบัญชีหรือ PIN ไม่ถูกต้อง", 401);
     }
     assert(
