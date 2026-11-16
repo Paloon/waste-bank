@@ -15,9 +15,19 @@ import {
   maxRecyclingCount,
 } from "../../../shared/recycling.js";
 import { submissionErrors } from "./submissionValidation.js";
-// Cartoon showing the expected photo. Set to its /public path once the picture
-// is added (e.g. "/examples/submit-example.webp"); empty shows the rules alone.
-const exampleImage = "";
+// Cartoon examples of the two photos (public/examples, 640x480 WebP).
+const examples = [
+  {
+    src: "/examples/hold-by-bin.webp",
+    caption: "รูปที่ 1 ถือขยะยืนข้างถัง",
+    alt: "ตัวอย่างรูปที่ 1: นักเรียนถือขวดพลาสติกยืนข้างถังรีไซเคิล เห็นทั้งขวดและถัง",
+  },
+  {
+    src: "/examples/drop-in-bin.webp",
+    caption: "รูปที่ 2 (ไม่บังคับ) ตอนทิ้งลงถัง",
+    alt: "ตัวอย่างรูปที่ 2: มือกำลังทิ้งขวดพลาสติกลงถังรีไซเคิล",
+  },
+];
 export default function SubmitWaste({
   student,
   data,
@@ -72,15 +82,6 @@ export default function SubmitWaste({
           onSubmit={submit}
         >
           <div className="submission-help photo-example">
-            {exampleImage && (
-              <img
-                src={exampleImage}
-                alt="ตัวอย่างรูป: นักเรียนถือขยะยืนข้างถังขยะที่ถูกประเภท"
-                width="480"
-                height="360"
-                loading="lazy"
-              />
-            )}
             <div>
               <h2>ก่อนถ่ายรูป</h2>
               <ul className="photo-rules">
@@ -93,6 +94,21 @@ export default function SubmitWaste({
               <small>
                 ส่งได้ 1–2 รูป รูปเดียวเห็นไม่ครบ เพิ่มรูปที่ 2 ด้านล่าง
               </small>
+            </div>
+            <div className="example-photos">
+              {examples.map((x) => (
+                <figure key={x.src}>
+                  <img
+                    src={x.src}
+                    alt={x.alt}
+                    width="640"
+                    height="480"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <figcaption>{x.caption}</figcaption>
+                </figure>
+              ))}
             </div>
           </div>
           <div

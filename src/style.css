@@ -4283,19 +4283,9 @@ p.small {
   }
 }
 
-/* Submit page: an example picture (when added) beside the three photo rules. */
-.photo-example {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-.photo-example img {
-  flex: none;
-  width: 42%;
-  max-width: 220px;
-  height: auto;
-  border-radius: 10px;
-  background: #fff;
+/* Submit page: the photo rules, then the two example photos side by side. */
+.photo-example h2 {
+  margin-bottom: 6px;
 }
 .photo-rules {
   margin: 0 0 6px;
@@ -4306,13 +4296,27 @@ p.small {
 .photo-example small {
   color: var(--muted);
 }
-@media (max-width: 540px) {
-  .photo-example {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .photo-example img {
-    width: 100%;
-    max-width: none;
-  }
+.example-photos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.example-photos figure {
+  margin: 0;
+}
+.example-photos img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #dfe8da;
+}
+.example-photos figcaption {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
 }
