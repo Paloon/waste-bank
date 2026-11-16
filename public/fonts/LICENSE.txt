@@ -1,0 +1,3 @@
+outfit.woff2 (Outfit) and noto-sans-thai.woff2 (Noto Sans Thai) are subsets
+downloaded from Google Fonts. Both are licensed under the SIL Open Font
+License 1.1: https://openfontlicense.org

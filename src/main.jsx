@@ -1,4 +1,3 @@
-import ReviewDialog from "./features/staff/ReviewDialog.jsx";
 import RegistrationNameFields from "./features/student/RegistrationNameFields.jsx";
 import { studentName as combinedStudentName } from "../shared/student-name.js";
 import {
@@ -9,7 +8,7 @@ import {
 import ProfileForm from "./components/ProfileForm.jsx";
 import ActionButton from "./components/ActionButton.jsx";
 import { compressImage } from "./images/compress.js";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Recycle,
@@ -48,9 +47,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import "./style.css";
+
 import SubmissionHistory from "./SubmissionHistory.jsx";
-import StaffWorkspace from "./features/staff/StaffWorkspace.jsx";
-import SubmitWaste from "./features/student/SubmitWaste.jsx";
 import useKioskSession, {
   sessionRetryMessage,
 } from "./hooks/useKioskSession.js";
@@ -85,6 +83,22 @@ import {
   Photo,
   RewardImageEditor,
 } from "./components.jsx";
+
+// Staff screens and the submit form load on demand, so the home page only
+// downloads what students see first. Each loader is shared with its prefetch.
+const loadStaffWorkspace = () => import("./features/staff/StaffWorkspace.jsx");
+const loadReviewDialog = () => import("./features/staff/ReviewDialog.jsx");
+const loadSubmitWaste = () => import("./features/student/SubmitWaste.jsx");
+const StaffWorkspace = lazy(loadStaffWorkspace);
+const ReviewDialog = lazy(loadReviewDialog);
+const SubmitWaste = lazy(loadSubmitWaste);
+const pageLoading = (
+  <div className="skeleton">
+    <div />
+    <div />
+    <div />
+  </div>
+);
 function App() {
   const [page, setPage] = useState("home"),
     [data, setData] = useState(null),
@@ -132,7 +146,16 @@ function App() {
     refresh().catch((e) => {
       if (!e.cancelled) setError(e.message);
     });
+    // Submitting waste is the main student task: fetch its code once the home
+    // page has settled so the tap feels instant, without delaying first paint.
+    const prefetch = setTimeout(() => loadSubmitWaste().catch(() => {}), 1500);
+    return () => clearTimeout(prefetch);
   }, []);
+  useEffect(() => {
+    if (!staff) return;
+    loadStaffWorkspace().catch(() => {});
+    loadReviewDialog().catch(() => {});
+  }, [staff]);
   const clear = () => {
     uiEpoch.current++;
     runVersion.current++;
@@ -589,6 +612,91 @@ function App() {
             </button>
           </div>
         )}
+        {page === "home" && (
+          <>
+            <div className="eyebrow">
+              <span className="live-dot" /> พื้นที่เล็ก ๆ เพื่อโลกที่ดีขึ้น{" "}
+              <span className="date">
+                {new Date().toLocaleDateString("th-TH", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+            <section className="home-grid">
+              <div className="hero">
+                <div className="hero-tag">
+                  <Leaf size={16} /> ธนาคารขยะโรงเรียน
+                </div>
+                <h1>
+                  ขยะของเธอ
+                  <br />
+                  มีค่า<span>กว่าที่คิด.</span>
+                </h1>
+                <p>
+                  แยกขยะ สะสม Coins แลกของที่ชอบ
+                  <br />
+                  มาเปลี่ยนโรงเรียนให้น่าอยู่ไปด้วยกัน
+                </p>
+                <button className="btn lime" onClick={() => navigate("submit")}>
+                  เริ่มส่งขยะ <ArrowUpRight size={23} />
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => {
+                    setModal({ type: "register", next: "account" });
+                    setError("");
+                  }}
+                >
+                  สมัครสมาชิกนักเรียน
+                </button>
+                <div className="hero-bottom">
+                  <Leaf size={18} aria-hidden="true" />
+                  <span>ทุกชิ้นที่แยก คืออีกก้าวที่สำคัญ</span>
+                </div>
+                <div className="recycle-mark" aria-hidden="true">
+                  <Recycle strokeWidth={1.1} />
+                  <span>
+                    ใช้ซ้ำ
+                    <br />
+                    วนต่อ
+                  </span>
+                </div>
+              </div>
+              <div className="quick-actions">
+                <button
+                  className="action-card coin-card"
+                  onClick={() => navigate("account")}
+                >
+                  <span className="action-icon">
+                    <Coins />
+                  </span>
+                  <ArrowUpRight className="corner-arrow" />
+                  <div>
+                    <small>บัญชีของฉัน</small>
+                    <h2>ดู Coins และประวัติ</h2>
+                    <p>เช็กยอดสะสมและประวัติของฉัน</p>
+                  </div>
+                </button>
+                <button
+                  className="action-card shop-card"
+                  onClick={() => navigate("shop")}
+                >
+                  <span className="action-icon">
+                    <Gift />
+                  </span>
+                  <ArrowUpRight className="corner-arrow" />
+                  <div>
+                    <small>ร้านรางวัล</small>
+                    <h2>เลือกแลกรางวัล</h2>
+                    <p>เลือกของที่ชอบ แล้วใช้ Coins แลกเลย</p>
+                  </div>
+                </button>
+              </div>
+            </section>
+          </>
+        )}
         {!data ? (
           <div className="skeleton">
             <div />
@@ -599,90 +707,6 @@ function App() {
           <>
             {page === "home" && (
               <>
-                <div className="eyebrow">
-                  <span className="live-dot" /> พื้นที่เล็ก ๆ เพื่อโลกที่ดีขึ้น{" "}
-                  <span className="date">
-                    {new Date().toLocaleDateString("th-TH", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </span>
-                </div>
-                <section className="home-grid">
-                  <div className="hero">
-                    <div className="hero-tag">
-                      <Leaf size={16} /> ธนาคารขยะโรงเรียน
-                    </div>
-                    <h1>
-                      ขยะของเธอ
-                      <br />
-                      มีค่า<span>กว่าที่คิด.</span>
-                    </h1>
-                    <p>
-                      แยกขยะ สะสม Coins แลกของที่ชอบ
-                      <br />
-                      มาเปลี่ยนโรงเรียนให้น่าอยู่ไปด้วยกัน
-                    </p>
-                    <button
-                      className="btn lime"
-                      onClick={() => navigate("submit")}
-                    >
-                      เริ่มส่งขยะ <ArrowUpRight size={23} />
-                    </button>
-                    <button
-                      className="btn secondary"
-                      onClick={() => {
-                        setModal({ type: "register", next: "account" });
-                        setError("");
-                      }}
-                    >
-                      สมัครสมาชิกนักเรียน
-                    </button>
-                    <div className="hero-bottom">
-                      <Leaf size={18} aria-hidden="true" />
-                      <span>ทุกชิ้นที่แยก คืออีกก้าวที่สำคัญ</span>
-                    </div>
-                    <div className="recycle-mark" aria-hidden="true">
-                      <Recycle strokeWidth={1.1} />
-                      <span>
-                        ใช้ซ้ำ
-                        <br />
-                        วนต่อ
-                      </span>
-                    </div>
-                  </div>
-                  <div className="quick-actions">
-                    <button
-                      className="action-card coin-card"
-                      onClick={() => navigate("account")}
-                    >
-                      <span className="action-icon">
-                        <Coins />
-                      </span>
-                      <ArrowUpRight className="corner-arrow" />
-                      <div>
-                        <small>บัญชีของฉัน</small>
-                        <h2>ดู Coins และประวัติ</h2>
-                        <p>เช็กยอดสะสมและประวัติของฉัน</p>
-                      </div>
-                    </button>
-                    <button
-                      className="action-card shop-card"
-                      onClick={() => navigate("shop")}
-                    >
-                      <span className="action-icon">
-                        <Gift />
-                      </span>
-                      <ArrowUpRight className="corner-arrow" />
-                      <div>
-                        <small>ร้านรางวัล</small>
-                        <h2>เลือกแลกรางวัล</h2>
-                        <p>เลือกของที่ชอบ แล้วใช้ Coins แลกเลย</p>
-                      </div>
-                    </button>
-                  </div>
-                </section>
                 <section className="impact">
                   <div>
                     <span className="eyebrow">ผลงานรวมของพวกเรา</span>
@@ -849,39 +873,41 @@ function App() {
               </>
             )}
             {page === "submit" && student && (
-              <SubmitWaste
-                student={student}
-                data={data}
-                photo={photo}
-                disposalPhoto={disposalPhoto}
-                category={category}
-                count={count}
-                note={note}
-                busy={busy}
-                setPhoto={setPhoto}
-                setDisposalPhoto={setDisposalPhoto}
-                setCategory={setCategory}
-                setCount={setCount}
-                setNote={setNote}
-                readImage={readImage}
-                run={run}
-                identify={identify}
-                onSubmit={() =>
-                  run(async () => {
-                    await action("submit", {
-                      image: photo,
-                      disposalImage: disposalPhoto,
-                      category,
-                      count,
-                      note,
-                    });
-                    done(
-                      "ส่งขยะเรียบร้อย!",
-                      "รอเจ้าหน้าที่ตรวจสอบ เมื่ออนุมัติแล้ว Coins จะเข้าในบัญชีของเธอ",
-                    );
-                  })
-                }
-              />
+              <Suspense fallback={pageLoading}>
+                <SubmitWaste
+                  student={student}
+                  data={data}
+                  photo={photo}
+                  disposalPhoto={disposalPhoto}
+                  category={category}
+                  count={count}
+                  note={note}
+                  busy={busy}
+                  setPhoto={setPhoto}
+                  setDisposalPhoto={setDisposalPhoto}
+                  setCategory={setCategory}
+                  setCount={setCount}
+                  setNote={setNote}
+                  readImage={readImage}
+                  run={run}
+                  identify={identify}
+                  onSubmit={() =>
+                    run(async () => {
+                      await action("submit", {
+                        image: photo,
+                        disposalImage: disposalPhoto,
+                        category,
+                        count,
+                        note,
+                      });
+                      done(
+                        "ส่งขยะเรียบร้อย!",
+                        "รอเจ้าหน้าที่ตรวจสอบ เมื่ออนุมัติแล้ว Coins จะเข้าในบัญชีของเธอ",
+                      );
+                    })
+                  }
+                />
+              </Suspense>
             )}
             {page === "account" && student && (
               <>
@@ -1236,52 +1262,58 @@ function App() {
               </div>
             )}
             {page === "admin" && admin && (
-              <StaffWorkspace
-                view={{
-                  data: { admin, publicData: data, staff },
-                  navigation: {
-                    tab: adminTab,
-                    page: adminPage,
-                    query,
-                    auditCategory: category,
-                    reportRefresh,
-                  },
-                  status: { busy, loading: adminLoading, failed: adminFailed },
-                  selection: { ids: selectedStudents, rows: visibleStudents },
-                  promotion: { year, rows: promotion },
-                }}
-                actions={{
-                  onNavigateTab: (key) => {
-                    setQuery("");
-                    key === "promotion" ? startPromotion() : setAdminTab(key);
-                  },
-                  onRefresh: () =>
-                    adminTab === "reports"
-                      ? setReportRefresh((value) => value + 1)
-                      : run(refreshAdmin),
-                  onMaintenance: () =>
-                    run(async () => {
-                      await api("maintenance", {});
-                      await refreshAdmin();
-                    }),
-                  onStudentHistory: (selected) =>
-                    run(async () => {
-                      const profile = await api("student?id=" + selected.id);
-                      openModal({ type: "studentDetail", p: profile });
-                    }),
-                  onLogout: home,
-                  onTabChange: setAdminTab,
-                  onSearch: setQuery,
-                  onModal: openModal,
-                  onImage: showImage,
-                  onRewardImage: openRewardImage,
-                  onToggleVisibleStudents: toggleVisibleStudents,
-                  onToggleStudent: toggleStudent,
-                  onAuditCategoryChange: setCategory,
-                  onPromotionRowsChange: setPromotion,
-                  onPageChange: setAdminPage,
-                }}
-              />
+              <Suspense fallback={pageLoading}>
+                <StaffWorkspace
+                  view={{
+                    data: { admin, publicData: data, staff },
+                    navigation: {
+                      tab: adminTab,
+                      page: adminPage,
+                      query,
+                      auditCategory: category,
+                      reportRefresh,
+                    },
+                    status: {
+                      busy,
+                      loading: adminLoading,
+                      failed: adminFailed,
+                    },
+                    selection: { ids: selectedStudents, rows: visibleStudents },
+                    promotion: { year, rows: promotion },
+                  }}
+                  actions={{
+                    onNavigateTab: (key) => {
+                      setQuery("");
+                      key === "promotion" ? startPromotion() : setAdminTab(key);
+                    },
+                    onRefresh: () =>
+                      adminTab === "reports"
+                        ? setReportRefresh((value) => value + 1)
+                        : run(refreshAdmin),
+                    onMaintenance: () =>
+                      run(async () => {
+                        await api("maintenance", {});
+                        await refreshAdmin();
+                      }),
+                    onStudentHistory: (selected) =>
+                      run(async () => {
+                        const profile = await api("student?id=" + selected.id);
+                        openModal({ type: "studentDetail", p: profile });
+                      }),
+                    onLogout: home,
+                    onTabChange: setAdminTab,
+                    onSearch: setQuery,
+                    onModal: openModal,
+                    onImage: showImage,
+                    onRewardImage: openRewardImage,
+                    onToggleVisibleStudents: toggleVisibleStudents,
+                    onToggleStudent: toggleStudent,
+                    onAuditCategoryChange: setCategory,
+                    onPromotionRowsChange: setPromotion,
+                    onPageChange: setAdminPage,
+                  }}
+                />
+              </Suspense>
             )}
           </>
         )}
@@ -1759,29 +1791,31 @@ function App() {
               </>
             )}
             {modal.type === "review" && (
-              <ReviewDialog
-                key={modal.item.id}
-                item={modal.item}
-                studentName={studentName(modal.item.student)?.name}
-                status={modal.status}
-                rates={data.recyclingRates || recyclingRates}
-                busy={busy}
-                onStatus={(status) => {
-                  setError("");
-                  setModal((current) => ({ ...current, status }));
-                }}
-                onPhoto={showImage}
-                onSubmit={submitModal(async (values) => {
-                  await action("review", {
-                    ...values,
-                    id: modal.item.id,
-                    status: modal.status,
-                  });
-                  await refreshAdmin();
-                  setModal(null);
-                  setNotice("บันทึกผลตรวจแล้ว");
-                })}
-              />
+              <Suspense fallback={null}>
+                <ReviewDialog
+                  key={modal.item.id}
+                  item={modal.item}
+                  studentName={studentName(modal.item.student)?.name}
+                  status={modal.status}
+                  rates={data.recyclingRates || recyclingRates}
+                  busy={busy}
+                  onStatus={(status) => {
+                    setError("");
+                    setModal((current) => ({ ...current, status }));
+                  }}
+                  onPhoto={showImage}
+                  onSubmit={submitModal(async (values) => {
+                    await action("review", {
+                      ...values,
+                      id: modal.item.id,
+                      status: modal.status,
+                    });
+                    await refreshAdmin();
+                    setModal(null);
+                    setNotice("บันทึกผลตรวจแล้ว");
+                  })}
+                />
+              </Suspense>
             )}
             {["handover", "cancelReward"].includes(modal.type) && (
               <>
