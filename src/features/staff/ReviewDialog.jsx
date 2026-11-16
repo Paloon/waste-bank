@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { categoryLabel } from "../../RecyclingGuide.jsx";
 import { CheckCircle2, XCircle, ImageOff } from "lucide-react";
 import ReviewCount from "./ReviewCount.jsx";
 import RejectionReason from "../../RejectionReason.jsx";
@@ -20,7 +21,7 @@ export default function ReviewDialog({
     <>
       <h2 id="modal-title">ตรวจรายการส่งขยะ</h2>
       <p className="review-student">
-        {studentName || item.student} · {item.category}
+        {studentName || item.student} · {categoryLabel(item.category)}
       </p>
       <form onSubmit={onSubmit} className="review-layout">
         <aside className="review-proof" aria-label="รูปสำหรับตรวจรายการ">

@@ -34,7 +34,18 @@ import { audit, report } from "./monitor.js";
 import { readOperationsHealth } from "./operations-health.js";
 import { maintenance } from "./maintenance.js";
 import { deploymentBaseUrl } from "./config.js";
-import { reportRange, selectReportSource, buildReport } from "./reports.js";
+import {
+  reportRange,
+  previousRange,
+  selectReportSource,
+  buildReport,
+} from "./reports.js";
+import {
+  staffChange,
+  staffAccountView,
+  applyStaffChange,
+  isAdmin,
+} from "./staff-admin.js";
 
 export function createApp({
   store,
@@ -176,7 +187,7 @@ export function createApp({
     );
     await security.login(req, res, { ...p, role: "staff" });
     await audit(store, "login", { ...p, role: "staff" }, "staff");
-    res.json({ name: p.name });
+    res.json({ name: p.name, id: p.id, admin: isAdmin(p) });
   });
   app.post("/api/logout", async (req, res) => {
     const actor = await security.actor(req, { required: false });
@@ -239,25 +250,33 @@ export function createApp({
     await security.actor(req, { staff: true });
     await security.limit(req, "reports", { limit: 60 });
     const range = reportRange(req.query.from, req.query.to);
-    const source = store.reportSource
-      ? await store.reportSource(range)
-      : selectReportSource(
-          await store.read({
-            students: {},
-            submissions: {},
-            redemptions: {},
-            ledger: {},
-            audit: {},
-          }),
-          range,
-        );
-    res.json(
-      buildReport(source, range, {
-        group: String(req.query.group || "overview"),
-        day: String(req.query.day || ""),
-        page: Number(req.query.page || 0),
-      }),
-    );
+    const sourceFor = async (r) =>
+      store.reportSource
+        ? store.reportSource(r)
+        : selectReportSource(
+            await store.read({
+              students: {},
+              submissions: {},
+              redemptions: {},
+              ledger: {},
+              audit: {},
+            }),
+            r,
+          );
+    const report = buildReport(await sourceFor(range), range, {
+      group: String(req.query.group || "overview"),
+      day: String(req.query.day || ""),
+      page: Number(req.query.page || 0),
+    });
+    // The summary compares with the period of the same length just before.
+    if (req.query.compare === "1") {
+      const before = previousRange(range);
+      report.previous = {
+        range: { from: before.from, to: before.to },
+        totals: buildReport(await sourceFor(before), before).totals,
+      };
+    }
+    res.json(report);
   });
   app.get("/api/admin", async (req, res) => {
     const actor = await security.actor(req, { staff: true });
@@ -439,6 +458,44 @@ export function createApp({
           }
         : result,
     );
+  });
+  app.get("/api/staff-accounts", async (req, res) => {
+    const actor = await security.actor(req, { staff: true });
+    assert(actor.admin, "เฉพาะผู้ดูแลระบบเท่านั้น", 403);
+    const { staff } = await store.read({ staff: {} });
+    res.json({ accounts: staff.map(staffAccountView), self: actor.id });
+  });
+  app.post("/api/staff-accounts", async (req, res) => {
+    const actor = await security.actor(req, { staff: true, touch: true });
+    await security.limit(req, "confirmation", {
+      account: actor.id,
+      limit: 10,
+      window: 300000,
+    });
+    const change = parse(staffChange, req.body);
+    const me = (await store.read({ staff: { ids: [actor.id] } })).staff[0];
+    assert(await verifyAsync(change.pin, me?.pin), "PIN ของคุณไม่ถูกต้อง", 403);
+    // Hash once, outside the transaction, which may be retried.
+    const pinHash = change.newPin ? hash(change.newPin) : undefined;
+    let result;
+    const staff = await store.transact(
+      (s) => {
+        result = applyStaffChange(s.staff, actor.id, change, pinHash);
+        return s.staff;
+      },
+      { staff: {} },
+    );
+    await audit(store, result.action, actor, result.target, result.after);
+    // Changing your own PIN ends your old session; keep this browser signed in.
+    if (change.op === "ownPin")
+      await security.login(req, res, {
+        ...staff.find((x) => x.id === actor.id),
+        role: "staff",
+      });
+    res.json({
+      accounts: actor.admin ? staff.map(staffAccountView) : [],
+      self: actor.id,
+    });
   });
   app.post("/api/maintenance", async (req, res) => {
     await security.actor(req, { staff: true });

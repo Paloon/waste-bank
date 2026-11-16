@@ -15,6 +15,9 @@ import {
   maxRecyclingCount,
 } from "../../../shared/recycling.js";
 import { submissionErrors } from "./submissionValidation.js";
+// Cartoon showing the expected photo. Set to its /public path once the picture
+// is added (e.g. "/examples/submit-example.webp"); empty shows the rules alone.
+const exampleImage = "";
 export default function SubmitWaste({
   student,
   data,
@@ -68,13 +71,29 @@ export default function SubmitWaste({
           aria-busy={busy}
           onSubmit={submit}
         >
-          <div className="submission-help">
-            <h2>ก่อนถ่ายรูป</h2>
-            <p>
-              แยกขยะตามประเภท ถ่ายให้เห็นขยะ จำนวน
-              และถังหรือจุดทิ้งตามป้ายของโรงเรียน
-              หากรูปเดียวเห็นไม่ครบให้เพิ่มรูปที่ 2
-            </p>
+          <div className="submission-help photo-example">
+            {exampleImage && (
+              <img
+                src={exampleImage}
+                alt="ตัวอย่างรูป: นักเรียนถือขยะยืนข้างถังขยะที่ถูกประเภท"
+                width="480"
+                height="360"
+                loading="lazy"
+              />
+            )}
+            <div>
+              <h2>ก่อนถ่ายรูป</h2>
+              <ul className="photo-rules">
+                <li>ถือขยะ ยืนข้างถังขยะที่ถูกประเภท</li>
+                <li>
+                  <b>ต้องเห็นถังขยะในรูป</b>
+                </li>
+                <li>เห็นขยะชัด ครูนับจำนวนได้</li>
+              </ul>
+              <small>
+                ส่งได้ 1–2 รูป รูปเดียวเห็นไม่ครบ เพิ่มรูปที่ 2 ด้านล่าง
+              </small>
+            </div>
           </div>
           <div
             className="upload-zone"
@@ -91,8 +110,8 @@ export default function SubmitWaste({
             ) : (
               <>
                 <Camera size={46} />
-                <h3>ถ่ายภาพขยะที่แยกแล้ว</h3>
-                <p>ให้เห็นขยะ จำนวน และจุดทิ้งที่ถูกประเภท</p>
+                <h3>ถ่ายรูปตอนทิ้งขยะ</h3>
+                <p>ให้เห็นทั้งขยะและถังขยะ</p>
               </>
             )}
             <div className="upload-buttons">
@@ -138,13 +157,9 @@ export default function SubmitWaste({
           )}
           <details className="disposal-upload" open={Boolean(disposalPhoto)}>
             <summary>
-              <Trash2 size={18} aria-hidden="true" /> เพิ่มรูปถังหรือจุดทิ้ง
-              (รูปที่ 2 ไม่บังคับ)
+              <Trash2 size={18} aria-hidden="true" /> เพิ่มรูปที่ 2 (ไม่บังคับ)
             </summary>
-            <p>
-              ใช้เมื่อรูปแรกเห็นขยะและจุดทิ้งไม่ครบ
-              ถ่ายตามจุดทิ้งจริงของโรงเรียน
-            </p>
+            <p>เช่น วางขยะให้ครูนับง่าย หรือถ่ายถังขยะให้ชัดขึ้น</p>
             {disposalPhoto && (
               <img
                 className="upload-preview"
@@ -257,12 +272,16 @@ export default function SubmitWaste({
               <Coins className="gold-coin-icon" size={25} aria-hidden="true" />
               {(data.recyclingRates || recyclingRates)[category].coins === null
                 ? "Coins รอครูตรวจและกำหนด"
-                : `คาดว่าจะได้ ${estimateCoins(category, count, data.recyclingRates || recyclingRates) ?? "—"} Coins`}
+                : estimateCoins(
+                      category,
+                      count,
+                      data.recyclingRates || recyclingRates,
+                    ) == null
+                  ? "ใส่จำนวนเพื่อดู Coins ที่จะได้"
+                  : `คาดว่าจะได้ ${estimateCoins(category, count, data.recyclingRates || recyclingRates)} Coins`}
             </strong>
             <p>{(data.recyclingRates || recyclingRates)[category].rule}</p>
-            <small>
-              ส่งครั้งละหนึ่งประเภท ครูตรวจและแก้จำนวนตามภาพก่อนอนุมัติ Coins
-            </small>
+            <small>ส่งครั้งละหนึ่งประเภท ครูตรวจจำนวนจากรูปก่อนให้ Coins</small>
           </div>
           <Field label="ฝากข้อความถึงคุณครู (ไม่บังคับ)">
             <textarea
@@ -314,9 +333,8 @@ export default function SubmitWaste({
             </span>
           </div>
           <p className="submission-feedback">
-            ได้รับ Coins หลังครูตรวจรูปและอนุมัติ หากส่งไม่สำเร็จ
-            รูปและจำนวนยังอยู่ กดส่งรายการเดิมอีกครั้งได้ หากไม่แน่ใจจุดทิ้ง
-            ให้สอบถามครูผู้ดูแลก่อนทิ้ง
+            ส่งไม่สำเร็จ? รูปและจำนวนยังอยู่ กดส่งอีกครั้งได้เลย
+            ไม่แน่ใจว่าทิ้งถังไหน ถามครูผู้ดูแลก่อน
           </p>
         </form>
       </section>

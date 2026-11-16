@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Home,
   ClipboardCheck,
   Gift,
   Users,
@@ -8,7 +7,8 @@ import {
   Coins,
   GraduationCap,
   History,
-  TrendingUp,
+  PieChart,
+  Settings,
   LogOut,
   Plus,
   Trash2,
@@ -17,7 +17,8 @@ import {
 import { Empty, Field, Photo, RewardArt } from "../../components.jsx";
 import OperationsStatus from "../../OperationsStatus.jsx";
 import { WasteIcon, categoryLabel } from "../../RecyclingGuide.jsx";
-import Reports from "../../Reports.jsx";
+import Summary from "./Summary.jsx";
+import StaffAccounts from "./StaffAccounts.jsx";
 import ActionButton from "../../components/ActionButton.jsx";
 import { recyclingRates } from "../../../shared/recycling.js";
 import { policy } from "../../../shared/policy.js";
@@ -37,21 +38,44 @@ const date = (value) =>
     timeStyle: "short",
   });
 
+// Each menu item owns the tabs listed after it, so sub-pages keep it highlighted.
 const adminNav = [
-  ["dashboard", Home, "ภาพรวม"],
-  ["reports", TrendingUp, "รายงานตามช่วงเวลา"],
-  ["reviews", ClipboardCheck, "ตรวจขยะ"],
-  ["pickups", Gift, "ส่งมอบรางวัล"],
-  ["students", Users, "นักเรียน"],
-  ["rewards", Package, "จัดการรางวัล"],
-  ["ledger", Coins, "บัญชี Coins"],
-  ["promotion", GraduationCap, "เลื่อนชั้น"],
-  ["audit", History, "ประวัติเจ้าหน้าที่"],
+  ["summary", PieChart, "สรุป", ["summary"]],
+  ["reviews", ClipboardCheck, "ตรวจขยะ", ["reviews"]],
+  ["pickups", Gift, "ส่งมอบรางวัล", ["pickups"]],
+  ["students", Users, "นักเรียน", ["students"]],
+  ["rewards", Package, "รางวัล", ["rewards"]],
+  ["ledger", History, "ประวัติ", ["ledger", "audit"]],
+  ["settings", Settings, "ตั้งค่า", ["settings", "promotion"]],
 ];
+const pageTitles = {
+  summary: "สรุป",
+  reviews: "ตรวจขยะ",
+  pickups: "ส่งมอบรางวัล",
+  students: "นักเรียน",
+  rewards: "รางวัล",
+  ledger: "ประวัติ",
+  audit: "ประวัติ",
+  settings: "ตั้งค่า",
+  promotion: "เลื่อนชั้นประจำปี",
+};
+const ledgerTypes = {
+  recycle: "ได้จากขยะ",
+  redemption: "แลกรางวัล",
+  refund: "คืน Coins",
+  adjustment: "เจ้าหน้าที่ปรับ",
+  opening: "ยอดยกมา",
+};
+const studentStatus = {
+  Active: "กำลังเรียน",
+  Alumni: "จบการศึกษา",
+  Transferred: "ย้ายโรงเรียน",
+  Inactive: "ปิดบัญชี",
+};
 
 /** Controlled staff view; data requests and mutations remain with the application. */
 export default function StaffWorkspace({ view, actions }) {
-  const { admin, publicData: data, staff } = view.data;
+  const { admin, publicData: data, staff, staffAdmin } = view.data;
   const {
     tab: adminTab,
     page: adminPage,
@@ -99,26 +123,29 @@ export default function StaffWorkspace({ view, actions }) {
       <aside className="admin-sidebar">
         <span className="eyebrow">พื้นที่เจ้าหน้าที่</span>
         <h2>{staff}</h2>
-        {adminNav.map(([key, Icon, label]) => (
-          <button
-            key={key}
-            className={adminTab === key ? "active" : ""}
-            onClick={() => onNavigateTab(key)}
-          >
-            <Icon size={20} />
-            {label}
-            {key === "reviews" && (
-              <span className="count">{admin.stats?.pending || 0}</span>
-            )}
-          </button>
-        ))}
+        <nav className="admin-nav" aria-label="เมนูเจ้าหน้าที่">
+          {adminNav.map(([key, Icon, label, owns]) => (
+            <button
+              key={key}
+              className={owns.includes(adminTab) ? "active" : ""}
+              aria-current={owns.includes(adminTab) ? "page" : undefined}
+              onClick={() => onNavigateTab(key)}
+            >
+              <Icon size={20} />
+              {label}
+              {key === "reviews" && (
+                <span className="count">{admin.stats?.pending || 0}</span>
+              )}
+            </button>
+          ))}
+        </nav>
         <button className="logout" onClick={home}>
           <LogOut size={18} /> ออกจากระบบ
         </button>
       </aside>
       <section className="admin-content">
         <div className="page-heading">
-          <h1>{adminNav.find((x) => x[0] === adminTab)?.[2]}</h1>
+          <h1>{pageTitles[adminTab]}</h1>
           <button className="btn secondary" onClick={onRefresh}>
             รีเฟรช
           </button>
@@ -129,16 +156,14 @@ export default function StaffWorkspace({ view, actions }) {
             โหลดข้อมูลไม่สำเร็จ กรุณากดรีเฟรช
           </p>
         )}
-        {adminTab === "reports" && <Reports refreshKey={reportRefresh} />}
         <OperationsStatus
           health={admin.health}
-          compact={adminTab !== "dashboard"}
-          onOpen={() => onNavigateTab("dashboard")}
+          compact={!["summary", "settings"].includes(adminTab)}
+          onOpen={() => onNavigateTab("settings")}
         />
-        {adminTab === "dashboard" && (
+        {adminTab === "summary" && (
           <>
-            <h2 className="staff-task-heading">งานที่ต้องทำ</h2>
-            <div className="dashboard-stats">
+            <div className="task-chips" aria-label="งานที่รออยู่">
               {[
                 [
                   "รอตรวจขยะ",
@@ -148,172 +173,140 @@ export default function StaffWorkspace({ view, actions }) {
                 ],
                 ["รอรับรางวัล", admin.stats?.pickups || 0, Gift, "pickups"],
                 [
-                  "นักเรียนที่ใช้งานอยู่",
-                  admin.stats?.students || 0,
-                  Users,
-                  "students",
-                ],
-                [
-                  "ของใกล้หมด",
-                  admin.rewards.filter((r) => r.stock <= 3).length,
+                  "รางวัลใกล้หมด",
+                  admin.rewards.filter((r) => r.enabled && r.stock <= 3).length,
                   Package,
                   "rewards",
                 ],
               ].map(([label, value, Icon, target]) => (
                 <button
-                  className="stat-card"
+                  className={"task-chip" + (value ? " has-work" : "")}
                   key={label}
                   onClick={() => setAdminTab(target)}
                 >
-                  <Icon />
-                  <strong>{value}</strong>
+                  <Icon size={20} aria-hidden="true" />
                   <span>{label}</span>
+                  <strong>{value}</strong>
                 </button>
               ))}
             </div>
-            <div className="panel">
-              <div className="section-heading">
-                <h2>วันนี้ทำสิ่งดีไปเท่าไหร่?</h2>
-                <TrendingUp />
-              </div>
-              <div className="today-stats">
-                <div>
-                  <strong>{admin.stats?.approvedToday || 0}</strong>
-                  <p>รายการที่อนุมัติวันนี้</p>
-                </div>
-                <div>
-                  <strong>{fmt(admin.stats?.coinsToday || 0)}</strong>
-                  <p>Coins ที่มอบวันนี้</p>
-                </div>
-              </div>
-              <h3>สัดส่วนขยะที่ผ่านการตรวจ</h3>
-              {data.categories.map((c) => {
-                const count = admin.stats?.categories?.[c] || 0;
-                return (
-                  <div className="bar-row" key={c}>
-                    <span>{c}</span>
-                    <div>
-                      <i
-                        style={{
-                          width:
-                            Math.max(
-                              0,
-                              (count /
-                                Math.max(1, admin.stats?.submissions || 0)) *
-                                100,
-                            ) + "%",
-                        }}
-                      />
-                    </div>
-                    <b>{count}</b>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="panel">
-              <h2>กิจกรรมล่าสุด</h2>
-              {admin.audit.slice(0, 5).map((a) => (
-                <div className="ledger-row" key={a.id}>
-                  <History />
-                  <div className="grow">
-                    <b>
-                      {auditLabel(a.action)} · {a.staff}
-                    </b>
-                    <small>
-                      {a.target} · {date(a.at)}
-                    </small>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <details className="staff-system-details">
-              <summary>รายละเอียดระบบและการสำรองข้อมูล</summary>
-              <div className="panel">
-                <h3>Google Drive</h3>
-                <p>
-                  {admin.drive?.connected
-                    ? "เชื่อมแล้ว — รูปใหม่เก็บใน Drive"
-                    : admin.drive?.configured
-                      ? "ตั้งค่า OAuth แล้ว แต่ยังไม่ได้เชื่อมบัญชี"
-                      : "ยังไม่ตั้งค่า OAuth ใน .env — รูปยังเก็บใน SQLite"}
-                </p>
-                {admin.drive?.configured && !admin.drive?.connected && (
-                  <a className="btn secondary" href="/api/drive/connect">
-                    เชื่อมบัญชี Google Drive
-                  </a>
-                )}
-              </div>
-              <div className="panel">
-                <h3>พื้นที่จัดเก็บและข้อมูล</h3>
-                {admin.databaseBytes && (
-                  <p>
-                    ฐานข้อมูล:{" "}
-                    {fmt(Math.ceil(admin.databaseBytes / 1024 / 1024))} MiB{" "}
-                    {admin.databaseBytes > 400 * 1024 * 1024 && (
-                      <strong className="danger">ใกล้ขีดจำกัด Free Plan</strong>
-                    )}
-                  </p>
-                )}
-                {admin.health?.maintenance?.storage && (
-                  <p>
-                    พื้นที่บัญชี Drive ใช้แล้ว{" "}
-                    {fmt(
-                      Math.ceil(
-                        Number(admin.health.maintenance.storage.usage) /
-                          1024 /
-                          1024,
-                      ),
-                    )}{" "}
-                    MiB{" "}
-                    {admin.health.maintenance.storage.limit &&
-                      Number(admin.health.maintenance.storage.usage) >
-                        Number(admin.health.maintenance.storage.limit) *
-                          0.8 && (
-                        <strong className="danger">พื้นที่เหลือน้อย</strong>
-                      )}
-                  </p>
-                )}
-                {admin.health?.maintenance?.reconciliation?.ok === false && (
-                  <p className="danger">
-                    พบยอดบัญชีหรือรายการที่ไม่สอดคล้องกัน กรุณาให้ผู้ดูแลตรวจสอบ
-                  </p>
-                )}
-                <p>
-                  ล้างรูปครั้งล่าสุด:{" "}
-                  {admin.health?.maintenance?.at
-                    ? date(admin.health.maintenance.at)
-                    : "ยังไม่มีผลการทำงาน"}
-                </p>
-                <p>
-                  งานรูปค้างเกิน 1 วัน:{" "}
-                  {admin.health?.maintenance?.overdue || 0} · ผิดพลาด:{" "}
-                  {admin.health?.maintenance?.failures || 0}
-                </p>
-                <p>
-                  สำรองข้อมูลครั้งล่าสุด:{" "}
-                  {admin.health?.backup?.at
-                    ? date(admin.health.backup.at)
-                    : "ยังไม่มีหลักฐานการสำรองข้อมูล"}
-                </p>
-                {admin.health?.error && (
-                  <p className="danger">
-                    เหตุขัดข้องล่าสุด: {admin.health.error.code} ·{" "}
-                    {date(admin.health.error.at)}
-                    {admin.health.error.eventId && (
-                      <small>รหัสเหตุการณ์: {admin.health.error.eventId}</small>
-                    )}
-                  </p>
-                )}
-                <button
-                  className="btn secondary"
-                  disabled={busy}
-                  onClick={onMaintenance}
-                >
-                  ตรวจและล้างรูปที่ค้าง
-                </button>
-              </div>
-            </details>
+            <Summary refreshKey={reportRefresh} />
           </>
+        )}
+        {adminTab === "settings" && (
+          <>
+            <StaffAccounts admin={staffAdmin} />
+            <section className="panel settings-section">
+              <h2>
+                <GraduationCap size={20} aria-hidden="true" /> เลื่อนชั้นประจำปี
+              </h2>
+              <p className="muted">
+                ทำปีละครั้งก่อนเปิดภาคเรียนแรก ตรวจชั้นและห้องรายคนก่อนยืนยัน
+                Coins และประวัติทั้งหมดจะคงอยู่
+              </p>
+              <button
+                className="btn secondary"
+                onClick={() => onNavigateTab("promotion")}
+              >
+                เริ่มตรวจรายชื่อเลื่อนชั้น
+              </button>
+            </section>
+            <section className="panel settings-section">
+              <h2>ระบบและการสำรองข้อมูล</h2>
+              <p>
+                Google Drive:{" "}
+                {admin.drive?.connected
+                  ? "เชื่อมแล้ว รูปใหม่เก็บใน Drive"
+                  : admin.drive?.configured
+                    ? "ตั้งค่าแล้ว แต่ยังไม่ได้เชื่อมบัญชี"
+                    : "ยังไม่ได้ตั้งค่า"}
+              </p>
+              {admin.drive?.configured && !admin.drive?.connected && (
+                <a className="btn secondary" href="/api/drive/connect">
+                  เชื่อมบัญชี Google Drive
+                </a>
+              )}
+              {admin.databaseBytes && (
+                <p>
+                  ฐานข้อมูล: {fmt(Math.ceil(admin.databaseBytes / 1024 / 1024))}{" "}
+                  MiB จาก 500 MiB{" "}
+                  {admin.databaseBytes > 400 * 1024 * 1024 && (
+                    <strong className="danger">ใกล้เต็ม</strong>
+                  )}
+                </p>
+              )}
+              {admin.health?.maintenance?.storage && (
+                <p>
+                  พื้นที่ Drive ใช้แล้ว{" "}
+                  {fmt(
+                    Math.ceil(
+                      Number(admin.health.maintenance.storage.usage) /
+                        1024 /
+                        1024,
+                    ),
+                  )}{" "}
+                  MiB{" "}
+                  {admin.health.maintenance.storage.limit &&
+                    Number(admin.health.maintenance.storage.usage) >
+                      Number(admin.health.maintenance.storage.limit) * 0.8 && (
+                      <strong className="danger">พื้นที่เหลือน้อย</strong>
+                    )}
+                </p>
+              )}
+              {admin.health?.maintenance?.reconciliation?.ok === false && (
+                <p className="danger">
+                  พบยอดบัญชีหรือรายการที่ไม่สอดคล้องกัน กรุณาให้ผู้ดูแลตรวจสอบ
+                </p>
+              )}
+              <p>
+                ล้างรูปครั้งล่าสุด:{" "}
+                {admin.health?.maintenance?.at
+                  ? date(admin.health.maintenance.at)
+                  : "ยังไม่มีผลการทำงาน"}{" "}
+                · งานรูปค้างเกิน 1 วัน {admin.health?.maintenance?.overdue || 0}{" "}
+                · ผิดพลาด {admin.health?.maintenance?.failures || 0}
+              </p>
+              <p>
+                สำรองข้อมูลครั้งล่าสุด:{" "}
+                {admin.health?.backup?.at
+                  ? date(admin.health.backup.at)
+                  : "ยังไม่มีหลักฐานการสำรองข้อมูล"}
+              </p>
+              {admin.health?.error && (
+                <p className="danger">
+                  เหตุขัดข้องล่าสุด: {admin.health.error.code} ·{" "}
+                  {date(admin.health.error.at)}
+                  {admin.health.error.eventId && (
+                    <small>รหัสเหตุการณ์: {admin.health.error.eventId}</small>
+                  )}
+                </p>
+              )}
+              <button
+                className="btn secondary"
+                disabled={busy}
+                onClick={onMaintenance}
+              >
+                ตรวจและล้างรูปที่ค้าง
+              </button>
+            </section>
+          </>
+        )}
+        {["ledger", "audit"].includes(adminTab) && (
+          <div className="segmented" role="group" aria-label="ประเภทประวัติ">
+            {[
+              ["ledger", "Coins นักเรียน"],
+              ["audit", "การใช้งานระบบ"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                aria-pressed={adminTab === key}
+                className={adminTab === key ? "active" : ""}
+                onClick={() => onNavigateTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         )}
         {adminTab === "reviews" && (
           <>
@@ -465,7 +458,7 @@ export default function StaffWorkspace({ view, actions }) {
                 <Trash2 size={17} /> ลบที่เลือก ({selectedStudents.length})
               </button>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap student-table">
               <table>
                 <thead>
                   <tr>
@@ -510,7 +503,7 @@ export default function StaffWorkspace({ view, actions }) {
                       <td>
                         ม.{s.grade}/{s.room}
                       </td>
-                      <td>{s.status}</td>
+                      <td>{studentStatus[s.status] || s.status}</td>
                       <td>{fmt(s.balance)}</td>
                       <td>
                         <div className="button-row">
@@ -623,7 +616,7 @@ export default function StaffWorkspace({ view, actions }) {
                       {date(t.at)}
                     </small>
                     <small>
-                      {t.type} · {t.staff || "นักเรียน"}
+                      {ledgerTypes[t.type] || t.type} · {t.staff || "นักเรียน"}
                       {t.related ? " · อ้างอิง " + t.related.slice(0, 8) : ""}
                     </small>
                   </div>
@@ -689,6 +682,12 @@ export default function StaffWorkspace({ view, actions }) {
         )}
         {adminTab === "promotion" && (
           <>
+            <button
+              className="text-button"
+              onClick={() => onNavigateTab("settings")}
+            >
+              ← กลับไปหน้าตั้งค่า
+            </button>
             <div className="panel">
               <h2>ตรวจสอบก่อนขึ้นปีการศึกษาใหม่</h2>
               <p>
@@ -796,7 +795,9 @@ export default function StaffWorkspace({ view, actions }) {
                               "Transferred",
                               "Inactive",
                             ].map((t) => (
-                              <option key={t}>{t}</option>
+                              <option key={t} value={t}>
+                                {studentStatus[t]}
+                              </option>
                             ))}
                           </select>
                         </td>

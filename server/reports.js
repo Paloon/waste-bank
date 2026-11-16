@@ -52,6 +52,15 @@ export function reportRange(from, to) {
   ).toISOString();
   return { from, to, start, end };
 }
+/** The range of the same length that ends the day before `range` starts. */
+export function previousRange(range) {
+  const days = Math.round(
+    (Date.parse(range.to) - Date.parse(range.from)) / dayMs,
+  );
+  const day = (t) => new Date(t).toISOString().slice(0, 10);
+  const to = day(Date.parse(range.from) - dayMs);
+  return reportRange(day(Date.parse(to) - days * dayMs), to);
+}
 const within = (at, range) =>
   Number.isFinite(Date.parse(at)) &&
   Date.parse(at) >= Date.parse(range.start) &&
@@ -371,6 +380,16 @@ export function buildReport(
     people = [...selected.values()].map(cleanMetrics);
   }
   people.sort((a, b) => a.id.localeCompare(b.id));
+  // Who took part, by current grade: students who sent waste in the range.
+  const grades = new Map();
+  for (const person of students.values()) {
+    if (!person.submitted) continue;
+    const grade = person.grade ? String(person.grade) : "";
+    if (!grades.has(grade))
+      grades.set(grade, { grade, students: 0, pieces: 0 });
+    grades.get(grade).students++;
+    grades.get(grade).pieces += person.pieces;
+  }
   const rows = group === "students" ? people : matches;
   return {
     range: { from: range.from, to: range.to },
@@ -382,6 +401,9 @@ export function buildReport(
     cohort,
     categories: [...categories.values()],
     rewards: [...rewards.values()],
+    grades: [...grades.values()].sort((a, b) =>
+      (a.grade || "9").localeCompare(b.grade || "9"),
+    ),
     daily: [...daily]
       .map(([date, metrics]) => ({ date, ...cleanMetrics(metrics) }))
       .reverse(),

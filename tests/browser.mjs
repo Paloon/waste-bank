@@ -77,7 +77,7 @@ try {
     await page.getByText("พื้นที่เจ้าหน้าที่").waitFor();
   };
   console.log("Testing self-registration");
-  await byName("Coins ของฉัน").click();
+  await byName("Coins").click();
   await byName("สมัครสมาชิกใหม่").click();
   await expect(
     page.getByLabel("คำนำหน้า").locator("option:not([disabled])"),
@@ -228,7 +228,7 @@ try {
   await page.clock.fastForward(20000);
   await heartbeatArrived;
   await byName("หน้าหลัก").click();
-  await byName("Coins ของฉัน").click();
+  await byName("Coins").click();
   await page.getByLabel("เลขประจำตัวนักเรียน", { exact: true }).fill("70001");
   await byName("ใช่ นี่คือบัญชีของฉัน").click();
   await page.getByText("ดารา ใจดี").waitFor();
@@ -261,9 +261,7 @@ try {
       buffer: await page.screenshot(),
     });
   await page.getByAltText("ภาพที่เลือก").waitFor();
-  await page
-    .getByText("เพิ่มรูปถังหรือจุดทิ้ง (รูปที่ 2 ไม่บังคับ)", { exact: true })
-    .click();
+  await page.getByText("เพิ่มรูปที่ 2 (ไม่บังคับ)", { exact: true }).click();
   await page.getByLabel("เลือกรูปจุดทิ้ง", { exact: true }).setInputFiles({
     name: "bin.png",
     mimeType: "image/png",
@@ -303,7 +301,7 @@ try {
       ),
   );
   await page.getByLabel("จำนวน (ขวด)", { exact: true }).fill("3");
-  await page.getByText("คาดว่าจะได้ 15 Coins", { exact: true }).waitFor();
+  await page.getByText("คาดว่าจะได้ 9 Coins", { exact: true }).waitFor();
   let lostSubmit = false;
   await page.route("**/api/action", async (route) => {
     if (!lostSubmit && route.request().postDataJSON()?.action === "submit") {
@@ -341,14 +339,12 @@ try {
   await login();
   await expect(
     page
-      .locator(".stat-card")
+      .locator(".task-chip")
       .filter({ hasText: "รอตรวจขยะ" })
       .locator("strong"),
   ).toHaveText("5");
-  assert.equal(
-    await page.locator(".staff-system-details").getAttribute("open"),
-    null,
-  );
+  // System details live under Settings, not on the summary.
+  assert.equal(await page.locator(".settings-section").count(), 0);
   // A tab that is still loading must not claim that everything has been reviewed.
   let openReviews;
   const reviewsHeld = new Promise((resolve) => (openReviews = resolve));
@@ -405,7 +401,7 @@ try {
     .getByRole("button", { name: "อนุมัติ", exact: true })
     .click();
   await expect(page.getByLabel("จำนวนที่ครูตรวจพบ")).toHaveValue("2");
-  await page.getByText("มอบให้ 10 Coins", { exact: true }).waitFor();
+  await page.getByText("มอบให้ 6 Coins", { exact: true }).waitFor();
   await byName("ยืนยันผลการตรวจ").click();
   await page.getByText("บันทึกผลตรวจแล้ว").waitFor();
   console.log("Testing rejection presets and student statuses");
@@ -428,7 +424,7 @@ try {
   await byName("ยืนยันผลการตรวจ").click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   await byName("ออกจากระบบ").click();
-  await byName("Coins ของฉัน").click();
+  await byName("Coins").click();
   await identify();
   await page
     .getByRole("heading", { name: "สถานะรายการของฉัน", exact: true })
@@ -439,7 +435,7 @@ try {
   await byName("อัปเดตสถานะ").click();
   await page.getByText(rejection, { exact: true }).waitFor();
   await page.getByRole("button", { name: /^อนุมัติแล้ว / }).click();
-  await page.getByText("+10 Coins", { exact: true }).waitFor();
+  await page.getByText("+6 Coins", { exact: true }).waitFor();
   await page.getByText("ครูปรับข้อมูลให้ตรงกับรูป", { exact: true }).waitFor();
   await expect(page.locator(".correction-comparison")).toContainText("3 ขวด");
   await expect(page.locator(".correction-comparison")).toContainText("2 ขวด");
@@ -455,9 +451,11 @@ try {
   await byName("หน้าหลัก").click();
   await login();
   console.log("Testing period reports");
-  await byName("รายงานตามช่วงเวลา").click();
-  await page.locator(".report-metrics").waitFor();
+  await byName("สรุป").click();
+  await page.locator(".kpi-grid").waitFor();
   await byName("วันนี้").click();
+  await page.locator(".kpi-grid").waitFor();
+  await page.getByText("ดูตารางและรายการละเอียด", { exact: true }).click();
   await page.locator(".report-metrics").waitFor();
   await page
     .locator(".report-tabs")
@@ -493,9 +491,10 @@ try {
   await byName("ดูทั้งช่วง").waitFor();
   await byName("ดูทั้งช่วง").click();
   await page.locator(".report-metrics").waitFor();
-  await page.getByLabel("วันเริ่มรายงาน").fill("2001-01-01");
-  await page.getByLabel("วันสิ้นสุดรายงาน").fill("2001-01-01");
-  await byName("ดูรายงาน").click();
+  await byName("เลือกวัน").click();
+  await page.getByLabel("ตั้งแต่").fill("2001-01-01");
+  await page.getByLabel("ถึง", { exact: true }).fill("2001-01-01");
+  await byName("ดูสรุป").click();
   await page.getByText("ไม่พบรายการในช่วงที่เลือก", { exact: true }).waitFor();
   await byName("รีเฟรช").click();
   await page.locator(".report-metrics").waitFor();
@@ -530,7 +529,7 @@ try {
   await page.clock.fastForward(11000);
   await byName("เริ่มส่งขยะ").waitFor();
   assert.equal(await page.locator(".pickup-code").count(), 0);
-  await byName("Coins ของฉัน").click();
+  await byName("Coins").click();
   await identify();
   await byName("ประวัติ Coins").click();
   assert.ok(await page.getByText("แลก สมุดรักษ์โลก", { exact: true }).count());
@@ -549,14 +548,16 @@ try {
   await page.getByLabel("เหตุผล", { exact: true }).fill("กิจกรรมโรงเรียน");
   await byName("ยืนยันและบันทึกในบัญชี").click();
   await page.getByText("สร้างรายการปรับ Coins แล้ว").waitFor();
-  await byName("เลื่อนชั้น").click();
+  await byName("ตั้งค่า").click();
+  await byName("เริ่มตรวจรายชื่อเลื่อนชั้น").click();
   await page.getByRole("button", { name: /ตรวจสอบครบแล้ว/ }).click();
   await byName("ยืนยันเลื่อนชั้น").click();
   await page.getByText("เลื่อนชั้นเรียบร้อย ประวัติและ Coins คงเดิม").waitFor();
   await byName("ออกจากระบบ").click();
   console.log("Testing staff confirm before student pages end their session");
   await login();
-  await byName("ร้านรางวัล").click();
+  // Staff pages hide the student menu; the logo is the way out.
+  await page.locator("header .brand").click();
   await page
     .getByRole("heading", { name: "ออกจากพื้นที่เจ้าหน้าที่?" })
     .waitFor();
@@ -573,7 +574,7 @@ try {
     "staying keeps the staff session",
   );
   console.log("Testing reward gallery");
-  await byName("จัดการรางวัล").click();
+  await byName("รางวัล").click();
   await byName("แก้ไขรางวัล").first().click();
   const photo = await page.screenshot();
   await page.locator(".reward-editor input[type=file]").setInputFiles([
@@ -585,8 +586,9 @@ try {
   await page.locator(".reward-editor input[type=range]").press("End");
   await byName("บันทึกรางวัล").click();
   await page.getByText("บันทึกรางวัลแล้ว").waitFor();
-  await byName("ร้านรางวัล").click();
+  await page.locator("header .brand").click();
   await byName("ออกจากระบบแล้วไปต่อ").click();
+  await byName("ร้านรางวัล").click();
   await page.getByRole("heading", { name: "ร้านรางวัล" }).waitFor();
   assert.equal(
     await page.evaluate(() =>
@@ -631,7 +633,7 @@ try {
       );
     }
   }
-  await byName("Coins ของฉัน").click();
+  await byName("Coins").click();
   await identify();
   await page
     .getByRole("heading", { name: "Coins ของฉัน", exact: true })
@@ -702,7 +704,7 @@ try {
   console.log("Testing full student history filters beyond 50 entries");
   await byName("ออกจากระบบ").click();
   await page.clock.setSystemTime(new Date());
-  await byName("Coins ของฉัน").click();
+  await byName("Coins").click();
   await page.getByLabel("เลขประจำตัวนักเรียน", { exact: true }).fill("80001");
   await byName("ใช่ นี่คือบัญชีของฉัน").click();
   await byName("ทั้งหมด 120").waitFor();

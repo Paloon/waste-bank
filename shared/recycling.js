@@ -1,6 +1,6 @@
 // Initial school incentive rates, not resale prices. One submission per category.
 export const recyclingRates = Object.freeze({
-  ขวดพลาสติก: { coins: 5, unit: "ขวด", rule: "ขวดเปล่าที่ล้างแล้ว" },
+  ขวดพลาสติก: { coins: 3, unit: "ขวด", rule: "ขวดเปล่าที่ล้างแล้ว" },
   แก้วพลาสติก: { coins: 2, unit: "ใบ", rule: "แก้วเปล่าที่ล้างแล้ว" },
   กระป๋องอะลูมิเนียม: {
     coins: 5,

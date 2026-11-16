@@ -35,7 +35,7 @@ test("approval creates exactly one ledger entry; stale decisions are rejected", 
   });
   act(s, staff, r);
   act(s, staff, r);
-  assert.equal(balance(s, "65001"), before + 50);
+  assert.equal(balance(s, "65001"), before + 30);
   assert.equal(s.ledger.filter((x) => x.related === item.id).length, 1);
   assert.throws(() => act(s, staff, request("review", r.payload)));
 });
@@ -313,7 +313,7 @@ test("piece count approval corrects 3 bottles to 2, calculates server Coins and 
     }),
   );
   const item = s.submissions.find((x) => x.id === result.id);
-  assert.equal(item.estimatedCoins, 15);
+  assert.equal(item.estimatedCoins, 9);
   assert.equal(balance(s, student.id), before);
   const decision = request("review", {
     id: item.id,
@@ -326,9 +326,9 @@ test("piece count approval corrects 3 bottles to 2, calculates server Coins and 
   act(s, staff, decision);
   assert.equal(item.count, 2);
   assert.equal(item.submittedCount, 3);
-  assert.equal(item.coins, 10);
+  assert.equal(item.coins, 6);
   assert.equal(item.weight, undefined);
-  assert.equal(balance(s, student.id), before + 10);
+  assert.equal(balance(s, student.id), before + 6);
   assert.equal(s.ledger.filter((x) => x.related === item.id).length, 1);
   assert.equal(item.reviewCorrection.before.count, 3);
 });

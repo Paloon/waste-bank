@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { categoryLabel } from "../../RecyclingGuide.jsx";
 import { Coins } from "lucide-react";
 import { Field } from "../../components.jsx";
 import { estimateCoins, maxRecyclingCount } from "../../../shared/recycling.js";
@@ -15,7 +16,7 @@ export default function ReviewCount({ item, rates }) {
   return (
     <>
       <p>
-        นักเรียนแจ้ง: {item.submittedCategory || item.category} ·{" "}
+        นักเรียนแจ้ง: {categoryLabel(item.submittedCategory || item.category)} ·{" "}
         {item.submittedCount ?? "ไม่ได้ระบุจำนวน"}
         {item.submittedCount
           ? ` ${rates[item.submittedCategory || item.category].unit}`
@@ -30,7 +31,9 @@ export default function ReviewCount({ item, rates }) {
           {Object.keys(rates)
             .filter((c) => !rates[c].legacy || c === item.category)
             .map((c) => (
-              <option key={c}>{c}</option>
+              <option key={c} value={c}>
+                {categoryLabel(c)}
+              </option>
             ))}
         </select>
       </Field>

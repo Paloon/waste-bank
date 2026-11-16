@@ -5,11 +5,13 @@ import { emptyState } from "../server/state.js";
 // PIN is read from the environment, never a command argument or log output.
 const [command, id, name] = process.argv.slice(2);
 if (
-  !["create", "reset", "disable", "enable"].includes(command) ||
+  !["create", "reset", "disable", "enable", "admin", "staff"].includes(
+    command,
+  ) ||
   !/^[a-zA-Z0-9._-]{3,80}$/.test(id || "")
 )
   throw Error(
-    "Usage: npm run staff -- create|reset|disable|enable ACCOUNT [NAME]",
+    "Usage: npm run staff -- create|reset|disable|enable|admin|staff ACCOUNT [NAME]",
   );
 if (
   ["create", "reset"].includes(command) &&
@@ -37,6 +39,8 @@ try {
         if (pin) account.pin = pin;
         if (command === "disable") account.enabled = false;
         if (command === "enable") account.enabled = true;
+        // admin/staff set the web role; admins manage staff accounts in Settings.
+        if (command === "admin" || command === "staff") account.role = command;
       }
       if (!s.staff.some((x) => x.enabled !== false))
         throw Error("Cannot disable the last active staff account");

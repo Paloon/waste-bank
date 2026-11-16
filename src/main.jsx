@@ -92,6 +92,9 @@ const loadSubmitWaste = () => import("./features/student/SubmitWaste.jsx");
 const StaffWorkspace = lazy(loadStaffWorkspace);
 const ReviewDialog = lazy(loadReviewDialog);
 const SubmitWaste = lazy(loadSubmitWaste);
+// Pages built from the overview data load the server's "dashboard" read.
+const serverTab = (tab) =>
+  ["summary", "settings", "promotion"].includes(tab) ? "dashboard" : tab;
 const pageLoading = (
   <div className="skeleton">
     <div />
@@ -104,9 +107,10 @@ function App() {
     [data, setData] = useState(null),
     [student, setStudent] = useState(null),
     [staff, setStaff] = useState(null),
+    [staffAdmin, setStaffAdmin] = useState(false),
     [adminData, setAdmin] = useState(null),
     [tab, setTab] = useState("trash"),
-    [adminTab, setAdminTab] = useState("dashboard");
+    [adminTab, setAdminTab] = useState("summary");
   const [modal, setModal] = useState(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -167,6 +171,7 @@ function App() {
     setPage("home");
     setStudent(null);
     setStaff(null);
+    setStaffAdmin(false);
     setTab("trash");
     setAdmin(null);
     setLookup(null);
@@ -353,7 +358,7 @@ function App() {
     failed: adminFailed,
   } = useAdminData({
     enabled: Boolean(staff) && page === "admin",
-    tab: ["reports", "promotion"].includes(adminTab) ? "dashboard" : adminTab,
+    tab: serverTab(adminTab),
     page: adminPage,
     query,
     epoch: uiEpoch,
@@ -379,11 +384,7 @@ function App() {
     offset = adminPage,
     search = query,
   ) {
-    return readAdmin(
-      ["reports", "promotion"].includes(target) ? "dashboard" : target,
-      offset,
-      search,
-    );
+    return readAdmin(serverTab(target), offset, search);
   }
   useEffect(() => {
     setAdminPage(0);
@@ -440,6 +441,7 @@ function App() {
     }
     if (staff) {
       setStaff(null);
+      setStaffAdmin(false);
       setAdmin(null);
       setModal(null);
       api("logout", {}).catch(() => {});
@@ -535,7 +537,7 @@ function App() {
   const navItems = [
     ["home", Home, "หน้าหลัก"],
     ["submit", Recycle, "ส่งขยะ"],
-    ["account", Coins, "Coins ของฉัน"],
+    ["account", Coins, "Coins"],
     ["shop", Gift, "ร้านรางวัล"],
     ["leaderboard", Trophy, "อันดับ"],
   ];
@@ -557,19 +559,22 @@ function App() {
             <small>SCHOOL RECYCLING CLUB</small>
           </span>
         </button>
-        <nav aria-label="เมนูหลัก">
-          {navItems.map(([key, Icon, label]) => (
-            <button
-              key={key}
-              className={`${page === key ? "active" : ""} ${key === "submit" ? "submit-nav" : ""}`}
-              aria-current={page === key ? "page" : undefined}
-              onClick={() => navigate(key)}
-            >
-              <Icon size={key === "submit" ? 23 : 19} aria-hidden="true" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        {/* Staff pages have their own menu; the student menu would be a second one. */}
+        {page !== "admin" && (
+          <nav aria-label="เมนูหลัก">
+            {navItems.map(([key, Icon, label]) => (
+              <button
+                key={key}
+                className={`${page === key ? "active" : ""} ${key === "submit" ? "submit-nav" : ""}`}
+                aria-current={page === key ? "page" : undefined}
+                onClick={() => navigate(key)}
+              >
+                <Icon size={key === "submit" ? 17 : 19} aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
         <button
           className="staff-link"
           aria-label={staff ? `พื้นที่เจ้าหน้าที่ ${staff}` : "เจ้าหน้าที่"}
@@ -1265,7 +1270,7 @@ function App() {
               <Suspense fallback={pageLoading}>
                 <StaffWorkspace
                   view={{
-                    data: { admin, publicData: data, staff },
+                    data: { admin, publicData: data, staff, staffAdmin },
                     navigation: {
                       tab: adminTab,
                       page: adminPage,
@@ -1287,7 +1292,7 @@ function App() {
                       key === "promotion" ? startPromotion() : setAdminTab(key);
                     },
                     onRefresh: () =>
-                      adminTab === "reports"
+                      adminTab === "summary"
                         ? setReportRefresh((value) => value + 1)
                         : run(refreshAdmin),
                     onMaintenance: () =>
@@ -1606,9 +1611,10 @@ function App() {
                   onSubmit={submitModal(async (v) => {
                     const result = await api("login", v);
                     setStaff(result.name);
-                    await refreshAdmin("dashboard", 0, "");
+                    setStaffAdmin(Boolean(result.admin));
+                    await refreshAdmin("summary", 0, "");
                     setPage("admin");
-                    setAdminTab("dashboard");
+                    setAdminTab("summary");
                     setModal(null);
                   })}
                 >
@@ -1702,7 +1708,8 @@ function App() {
               <>
                 <h2 id="modal-title">ยกเลิกการส่งขยะ?</h2>
                 <p>
-                  {modal.item.category} · รายการนี้จะไม่ถูกตรวจเพื่อรับ Coins
+                  {categoryLabel(modal.item.category)} ·
+                  รายการนี้จะไม่ถูกตรวจเพื่อรับ Coins
                 </p>
                 <form
                   onSubmit={submitModal(async (v) => {
@@ -2079,7 +2086,7 @@ function App() {
                       )}
                     </div>
                     <span className="grow">
-                      {s.category}
+                      {categoryLabel(s.category)}
                       <small>{date(s.at)}</small>
                       {s.reason && <small>{s.reason}</small>}
                     </span>

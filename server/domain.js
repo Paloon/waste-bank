@@ -92,7 +92,14 @@ export function seed() {
   const staffPin = String(randomInt(100000, 1000000));
   const s = {
     students,
-    staff: [{ id: "teacher.mali", name: "ครูมะลิ", pin: hash(staffPin) }],
+    staff: [
+      {
+        id: "teacher.mali",
+        name: "ครูมะลิ",
+        role: "admin",
+        pin: hash(staffPin),
+      },
+    ],
     rewards: [
       {
         id: "r1",

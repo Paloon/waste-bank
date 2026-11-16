@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { categoryLabel } from "./RecyclingGuide.jsx";
 import { CalendarDays, ArrowRight, AlertCircle } from "lucide-react";
 import { api } from "./api.js";
 import { schoolDate } from "../shared/time.js";
@@ -71,14 +72,20 @@ function Metrics({ items, total }) {
     </div>
   );
 }
-export default function Reports({ refreshKey = 0 }) {
+// With `range` the summary page owns the dates and this shows only the details.
+export default function Reports({ refreshKey = 0, range: fixed = null }) {
   const today = schoolDate(Date.now());
   const [from, setFrom] = useState(today.slice(0, 8) + "01"),
     [to, setTo] = useState(today);
-  const [range, setRange] = useState({
-    from: today.slice(0, 8) + "01",
-    to: today,
-  });
+  const [range, setRange] = useState(
+    fixed || { from: today.slice(0, 8) + "01", to: today },
+  );
+  useEffect(() => {
+    if (!fixed) return;
+    setRange(fixed);
+    setDay("");
+    setPage(0);
+  }, [fixed?.from, fixed?.to]);
   const [group, setGroup] = useState("overview"),
     [day, setDay] = useState(""),
     [page, setPage] = useState(0);
@@ -185,57 +192,59 @@ export default function Reports({ refreshKey = 0 }) {
   const dailyColumns = metrics[group];
   return (
     <div className="reports">
-      <div className="panel report-controls">
-        <p>
-          เลือกช่วงวันเพื่อดูรายการขยะ Coins นักเรียน และรางวัล ·
-          ใช้เวลาโรงเรียน (ประเทศไทย)
-        </p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            apply(from, to);
-          }}
-          className="report-date-form"
-        >
-          <label className="field">
-            <span>วันเริ่มรายงาน</span>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              required
-            />
-          </label>
-          <label className="field">
-            <span>วันสิ้นสุดรายงาน</span>
-            <input
-              type="date"
-              value={to}
-              min={from}
-              onChange={(e) => setTo(e.target.value)}
-              required
-            />
-          </label>
-          <button className="btn primary" type="submit">
-            <CalendarDays size={18} /> ดูรายงาน
-          </button>
-        </form>
-        <div className="report-shortcuts">
-          {[
-            ["today", "วันนี้"],
-            ["week", "7 วันล่าสุด"],
-            ["month", "เดือนนี้"],
-          ].map(([key, label]) => (
-            <button
-              className="btn secondary"
-              key={key}
-              onClick={() => shortcut(key)}
-            >
-              {label}
+      {!fixed && (
+        <div className="panel report-controls">
+          <p>
+            เลือกช่วงวันเพื่อดูรายการขยะ Coins นักเรียน และรางวัล ·
+            ใช้เวลาโรงเรียน (ประเทศไทย)
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              apply(from, to);
+            }}
+            className="report-date-form"
+          >
+            <label className="field">
+              <span>วันเริ่มรายงาน</span>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>วันสิ้นสุดรายงาน</span>
+              <input
+                type="date"
+                value={to}
+                min={from}
+                onChange={(e) => setTo(e.target.value)}
+                required
+              />
+            </label>
+            <button className="btn primary" type="submit">
+              <CalendarDays size={18} /> ดูรายงาน
             </button>
-          ))}
+          </form>
+          <div className="report-shortcuts">
+            {[
+              ["today", "วันนี้"],
+              ["week", "7 วันล่าสุด"],
+              ["month", "เดือนนี้"],
+            ].map(([key, label]) => (
+              <button
+                className="btn secondary"
+                key={key}
+                onClick={() => shortcut(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <div className="tabs report-tabs" aria-label="หมวดรายงาน">
         {groups.map(([key, label]) => (
           <button
@@ -317,7 +326,7 @@ export default function Reports({ refreshKey = 0 }) {
               >
                 {report.categories.map((c) => (
                   <tr key={c.category}>
-                    <td>{c.category}</td>
+                    <td>{categoryLabel(c.category)}</td>
                     <td>{fmt(c.submitted)}</td>
                     <td>{fmt(c.approved)}</td>
                     <td>{fmt(c.pieces)}</td>
@@ -475,7 +484,10 @@ export default function Reports({ refreshKey = 0 }) {
                       <small className="report-student-id">{e.student}</small>
                     </td>
                     <td>
-                      {e.category || e.reward || e.reason || "—"}
+                      {(e.category && categoryLabel(e.category)) ||
+                        e.reward ||
+                        e.reason ||
+                        "—"}
                       {e.status && (
                         <small className="report-student-id">
                           สถานะปัจจุบัน: {statusLabels[e.status] || e.status}

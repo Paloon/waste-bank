@@ -51,6 +51,7 @@ export function createSecurity(
           role: session.role,
           id: session.id,
           name: account.name,
+          admin: kind === "staff" && account.role === "admin",
           sessionKey: id,
         };
     }
