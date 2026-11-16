@@ -15,17 +15,17 @@ import {
   maxRecyclingCount,
 } from "../../../shared/recycling.js";
 import { submissionErrors } from "./submissionValidation.js";
-// Cartoon examples of the two photos (public/examples, 640x480 WebP).
+// Two acceptable ways to take the photo (public/examples, 640x480 WebP).
 const examples = [
   {
     src: "/examples/hold-by-bin.webp",
-    caption: "รูปที่ 1 ถือขยะยืนข้างถัง",
-    alt: "ตัวอย่างรูปที่ 1: นักเรียนถือขวดพลาสติกยืนข้างถังรีไซเคิล เห็นทั้งขวดและถัง",
+    caption: "แบบที่ 1 ถือขยะยืนข้างถัง",
+    alt: "ตัวอย่างแบบที่ 1: นักเรียนถือขวดพลาสติกยืนข้างถังรีไซเคิล เห็นทั้งขวดและถัง",
   },
   {
     src: "/examples/drop-in-bin.webp",
-    caption: "รูปที่ 2 (ไม่บังคับ) ตอนทิ้งลงถัง",
-    alt: "ตัวอย่างรูปที่ 2: มือกำลังทิ้งขวดพลาสติกลงถังรีไซเคิล",
+    caption: "แบบที่ 2 ถ่ายตอนทิ้งลงถัง",
+    alt: "ตัวอย่างแบบที่ 2: มือกำลังทิ้งขวดพลาสติกลงถังรีไซเคิล",
   },
 ];
 export default function SubmitWaste({
@@ -85,15 +85,13 @@ export default function SubmitWaste({
             <div>
               <h2>ก่อนถ่ายรูป</h2>
               <ul className="photo-rules">
-                <li>ถือขยะ ยืนข้างถังขยะที่ถูกประเภท</li>
+                <li>ถ่ายแบบไหนก็ได้ตามตัวอย่างด้านล่าง</li>
                 <li>
                   <b>ต้องเห็นถังขยะในรูป</b>
                 </li>
-                <li>เห็นขยะชัด ครูนับจำนวนได้</li>
+                <li>เห็นขยะชัด ครูนับจำนวนได้ และทิ้งถูกถัง</li>
               </ul>
-              <small>
-                ส่งได้ 1–2 รูป รูปเดียวเห็นไม่ครบ เพิ่มรูปที่ 2 ด้านล่าง
-              </small>
+              <small>รูปเดียวเห็นไม่ครบ เพิ่มรูปที่ 2 ด้านล่างได้</small>
             </div>
             <div className="example-photos">
               {examples.map((x) => (
