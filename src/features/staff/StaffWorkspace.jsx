@@ -575,22 +575,30 @@ export default function StaffWorkspace({ view, actions }) {
                     </p>
                     <p>
                       {r.enabled ? "เปิดให้แลก" : "ปิดให้แลก"}
-                      {r.stock <= 3 ? " · สต็อกต่ำ" : ""}
+                      {!r.stock
+                        ? " · หมดแล้ว"
+                        : r.stock <= 3
+                          ? " · สต็อกต่ำ"
+                          : ""}
                     </p>
-                    <button
-                      className="btn secondary"
-                      onClick={() => openModal({ type: "reward", item: r })}
-                    >
-                      แก้ไขรางวัล
-                    </button>
-                    <button
-                      className="btn secondary"
-                      onClick={() =>
-                        openModal({ type: "deleteReward", item: r })
-                      }
-                    >
-                      <Trash2 size={17} /> ลบรางวัล
-                    </button>
+                    <div className="reward-admin-actions">
+                      <button
+                        className="btn secondary"
+                        aria-label={`แก้ไขรางวัล ${r.name}`}
+                        onClick={() => openModal({ type: "reward", item: r })}
+                      >
+                        แก้ไข
+                      </button>
+                      <button
+                        className="btn secondary danger"
+                        aria-label={`ลบรางวัล ${r.name}`}
+                        onClick={() =>
+                          openModal({ type: "deleteReward", item: r })
+                        }
+                      >
+                        <Trash2 size={17} /> ลบ
+                      </button>
+                    </div>
                   </div>
                 </article>
               ))}

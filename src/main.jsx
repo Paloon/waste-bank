@@ -848,7 +848,13 @@ function App() {
                             className="btn primary"
                             onClick={() => identify("redeem", reward)}
                           >
-                            แลกรางวัล <ArrowUpRight size={18} />
+                            {reward.stock ? (
+                              <>
+                                แลกรางวัล <ArrowUpRight size={18} />
+                              </>
+                            ) : (
+                              "หมดแล้ว"
+                            )}
                           </button>
                         </div>
                       </div>
@@ -1337,13 +1343,15 @@ function App() {
                     <ArrowRight size={18} />
                   </ActionButton>
                 </form>
-                <p className="muted">ยังไม่มีบัญชี?</p>
-                <button
-                  className="btn secondary"
-                  onClick={() => setModal({ ...modal, type: "register" })}
-                >
-                  สมัครสมาชิกใหม่
-                </button>
+                <div className="modal-alt">
+                  <p className="muted">ยังไม่มีบัญชี?</p>
+                  <button
+                    className="btn secondary"
+                    onClick={() => setModal({ ...modal, type: "register" })}
+                  >
+                    สมัครสมาชิกใหม่
+                  </button>
+                </div>
               </>
             )}
             {modal.type === "register" && (

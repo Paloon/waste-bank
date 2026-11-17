@@ -140,7 +140,7 @@ export default function LeaderboardPage({
             aria-label="ค้นหาอันดับ"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ค้นหาอันดับของเธอด้วยชื่อหรือรหัสนักเรียน"
+            placeholder="ค้นหาด้วยชื่อหรือรหัสนักเรียน"
             required
           />
           <button className="btn primary">ค้นหา</button>

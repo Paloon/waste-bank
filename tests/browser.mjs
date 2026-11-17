@@ -575,7 +575,10 @@ try {
   );
   console.log("Testing reward gallery");
   await byName("รางวัล").click();
-  await byName("แก้ไขรางวัล").first().click();
+  await page
+    .getByRole("button", { name: /^แก้ไขรางวัล / })
+    .first()
+    .click();
   const photo = await page.screenshot();
   await page.locator(".reward-editor input[type=file]").setInputFiles([
     { name: "front.png", mimeType: "image/png", buffer: photo },

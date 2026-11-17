@@ -4320,3 +4320,59 @@ p.small {
   line-height: 1.4;
   color: var(--muted);
 }
+
+/* Student history pager: same spacing as the staff pagination. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+/* Identify dialog: keep "no account yet?" visibly apart from the main action. */
+.modal-alt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.modal-alt p {
+  margin: 0;
+}
+/* Staff reward cards: edit and delete side by side, same width. */
+.reward-admin-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.reward-admin-actions .btn {
+  justify-content: center;
+  padding-inline: 10px;
+}
+/* Phones: the three school totals sit in one row instead of a tall list. */
+@media (max-width: 760px) {
+  .impact {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .impact > div:first-child {
+    grid-column: 1 / -1;
+  }
+  .metric {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .metric strong {
+    font-size: 1.35rem;
+  }
+  .metric p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+}
