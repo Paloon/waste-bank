@@ -144,3 +144,34 @@ test("server rejects fake images and removes metadata from real images", async (
   assert.equal(result.format, "jpeg");
   assert.equal(result.exif, undefined);
 });
+
+test("only admins may bulk-delete students or run promotion", () => {
+  const { s } = seed();
+  s.staff.push({ id: "teacher.plain", name: "ครูทั่วไป", role: "staff" });
+  const plain = { role: "staff", id: "teacher.plain" };
+  assert.throws(
+    () =>
+      act(
+        structuredClone(s),
+        plain,
+        request("deleteStudents", { ids: ["65001"], confirm: true }),
+      ),
+    /เฉพาะผู้ดูแลระบบ/,
+  );
+  assert.throws(
+    () =>
+      act(
+        structuredClone(s),
+        plain,
+        request("promote", {
+          year: schoolYear(),
+          previewVersion: promotionVersion(s),
+          confirm: true,
+          students: structuredClone(s.students),
+        }),
+      ),
+    /เฉพาะผู้ดูแลระบบ/,
+  );
+  // Ordinary staff work is unchanged.
+  act(s, plain, request("adjust", { id: "65001", amount: 5, reason: "ทดสอบ" }));
+});

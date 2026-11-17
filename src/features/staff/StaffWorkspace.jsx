@@ -443,20 +443,22 @@ export default function StaffWorkspace({ view, actions }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <button
-                className="btn secondary danger"
-                disabled={!selectedStudents.length || busy}
-                onClick={() =>
-                  openModal({
-                    type: "deleteStudents",
-                    ids: selectedStudents.filter((id) =>
-                      admin.students.some((s) => s.id === id),
-                    ),
-                  })
-                }
-              >
-                <Trash2 size={17} /> ลบที่เลือก ({selectedStudents.length})
-              </button>
+              {staffAdmin && (
+                <button
+                  className="btn secondary danger"
+                  disabled={!selectedStudents.length || busy}
+                  onClick={() =>
+                    openModal({
+                      type: "deleteStudents",
+                      ids: selectedStudents.filter((id) =>
+                        admin.students.some((s) => s.id === id),
+                      ),
+                    })
+                  }
+                >
+                  <Trash2 size={17} /> ลบที่เลือก ({selectedStudents.length})
+                </button>
+              )}
             </div>
             <div className="table-wrap student-table">
               <table>
@@ -806,13 +808,17 @@ export default function StaffWorkspace({ view, actions }) {
                   </tbody>
                 </table>
               </div>
-              <ActionButton
-                busy={busy}
-                onClick={() => openModal({ type: "promote" })}
-                disabled={!promotion.length || busy}
-              >
-                ตรวจสอบครบแล้ว · เลื่อนชั้น {promotion.length} คน
-              </ActionButton>
+              {staffAdmin ? (
+                <ActionButton
+                  busy={busy}
+                  onClick={() => openModal({ type: "promote" })}
+                  disabled={!promotion.length || busy}
+                >
+                  ตรวจสอบครบแล้ว · เลื่อนชั้น {promotion.length} คน
+                </ActionButton>
+              ) : (
+                <p className="muted">การเลื่อนชั้นทำได้เฉพาะผู้ดูแลระบบ</p>
+              )}
             </div>
           </>
         )}

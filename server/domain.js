@@ -309,6 +309,11 @@ export function act(s, actor, body) {
   const staff = s.staff.find((x) => x.id === actor.id);
   const isStaff = actor.role === "staff" && staff;
   const requireStaff = () => fail(isStaff, "ต้องเข้าสู่ระบบเจ้าหน้าที่");
+  // Bulk deletion and promotion rewrite many students at once: admins only.
+  const requireAdmin = () => {
+    requireStaff();
+    fail(staff.role === "admin", "เฉพาะผู้ดูแลระบบเท่านั้น", 403);
+  };
   const student = s.students.find((x) => x.id === actor.id);
   const requireStudent = () =>
     fail(
@@ -580,7 +585,7 @@ export function act(s, actor, body) {
     tx(p.id, amount, "adjustment", clean(p.reason));
     log(p.id, before, balance(s, p.id), clean(p.reason));
   } else if (action === "deleteStudents") {
-    requireStaff();
+    requireAdmin();
     fail(p.confirm === true, "กรุณายืนยันการลบนักเรียน");
     fail(
       Array.isArray(p.ids) && p.ids.length > 0 && p.ids.length <= 5000,
@@ -774,7 +779,7 @@ export function act(s, actor, body) {
       },
     );
   } else if (action === "promote") {
-    requireStaff();
+    requireAdmin();
     const year = integer(p.year, 2000, 2200);
     fail(year === schoolYear(), "ปีการศึกษาไม่ตรงกับที่โรงเรียนตั้งค่าไว้");
     fail(

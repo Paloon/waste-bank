@@ -1,6 +1,10 @@
 import { schoolDate } from "../shared/time.js";
 import { policy } from "../shared/policy.js";
 import { totals } from "./state.js";
+import { createHash } from "node:crypto";
+// Short content tag so a cached reward image URL changes whenever the image does.
+const imageTag = (src) =>
+  createHash("sha256").update(String(src)).digest("hex").slice(0, 12);
 export async function summary(store) {
   if (store.summary) return store.summary();
   const s = await store.read(),
@@ -65,7 +69,7 @@ export const rewardView = (r) => {
   const images = rewardImages(r).map((item, index) => ({
     ...item,
     src: item.src?.startsWith("drive:")
-      ? `/api/media/reward/${encodeURIComponent(r.id)}?index=${index}`
+      ? `/api/media/reward/${encodeURIComponent(r.id)}?index=${index}&v=${imageTag(item.src)}`
       : item.src,
   }));
   return { ...r, version: r.version || 0, image: images[0]?.src || "", images };

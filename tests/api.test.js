@@ -114,7 +114,11 @@ test("HTTP sessions, retained student access, authorization, validation and sens
     login = await call("login", { id: "teacher.mali", pin });
     cookie = getCookie(login);
     assert.equal(login.status, 200);
-    const loginAudit = store.read().audit.find((event) => event.action === "login" && event.actorId === "teacher.mali");
+    const loginAudit = store
+      .read()
+      .audit.find(
+        (event) => event.action === "login" && event.actorId === "teacher.mali",
+      );
     assert.equal(loginAudit.actorRole, "staff");
     assert.equal((await call("admin", null, cookie)).status, 200);
     store.transact((s) => {
@@ -157,6 +161,87 @@ test("HTTP sessions, retained student access, authorization, validation and sens
   } finally {
     await new Promise((r) => server.close(r));
     store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("wrong staff PINs from one address do not lock the account for other addresses; cron needs the exact secret", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "wb-lock-")),
+    store = createStore(dir, { demo: true }),
+    drive = { configured: false, connected: async () => false };
+  const trust = process.env.TRUST_PROXY,
+    cron = process.env.CRON_SECRET;
+  process.env.TRUST_PROXY = "1";
+  process.env.CRON_SECRET = "c".repeat(40);
+  const server = createApp({ store, drive }).listen(0, "127.0.0.1");
+  await new Promise((r) => server.once("listening", r));
+  const base = `http://127.0.0.1:${server.address().port}/api/`;
+  const login = (ip, pin = "00000000") =>
+    fetch(base + "login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Forwarded-For": ip },
+      body: JSON.stringify({ id: "teacher.mali", pin }),
+    });
+  try {
+    for (let i = 0; i < 10; i++)
+      assert.equal((await login("203.0.113.9")).status, 401);
+    assert.equal((await login("203.0.113.9")).status, 429);
+    const pin = readFileSync(join(dir, "demo-credentials.txt"), "utf8").match(
+      /PIN: (\d+)/,
+    )[1];
+    assert.equal((await login("198.51.100.7", pin)).status, 200);
+    const prune = (authorization) =>
+      fetch(base + "cron/prune", {
+        headers: authorization ? { authorization } : {},
+      });
+    assert.equal((await prune()).status, 401);
+    assert.equal((await prune("Bearer " + "c".repeat(39))).status, 401);
+  } finally {
+    server.close();
+    if (trust === undefined) delete process.env.TRUST_PROXY;
+    else process.env.TRUST_PROXY = trust;
+    if (cron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = cron;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("public reward images are cacheable with a content-tagged URL; student evidence is not", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "wb-media-")),
+    store = createStore(dir, { demo: true });
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+    "base64",
+  );
+  const drive = {
+    configured: true,
+    connected: async () => true,
+    download: async () =>
+      new Response(png, { headers: { "content-type": "image/png" } }),
+  };
+  const { rewards } = await store.read({ rewards: {} });
+  const id = rewards.find((r) => r.enabled).id;
+  await store.transact(
+    (s) => {
+      const r = s.rewards.find((x) => x.id === id);
+      r.images = [{ src: "drive:reward-file-1", zoom: 1, x: 0, y: 0 }];
+    },
+    { rewards: { ids: [id] } },
+  );
+  const server = createApp({ store, drive }).listen(0, "127.0.0.1");
+  await new Promise((r) => server.once("listening", r));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const listed = await (await fetch(origin + "/api/public")).json();
+    const src = listed.rewards.find((r) => r.id === id).images[0].src;
+    assert.match(src, /\?index=0&v=[a-f0-9]{12}$/);
+    const image = await fetch(origin + src);
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get("cache-control"), "public, max-age=86400");
+    const evidence = await fetch(origin + "/api/media/submission/none");
+    assert.equal(evidence.headers.get("cache-control"), "no-store");
+  } finally {
+    server.close();
     rmSync(dir, { recursive: true, force: true });
   }
 });

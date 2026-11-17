@@ -13,7 +13,6 @@ import {
   createStore,
   verify,
   registerStudent,
-  categories,
 } from "../server/store.js";
 const staff = { role: "staff", id: "teacher.mali" },
   student = { role: "student", id: "65001" };

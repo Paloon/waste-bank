@@ -57,7 +57,9 @@ test("domain functions remain compatible with established store imports", () => 
 test("deleting students removes their audit actor identifiers and preserves other identities", () => {
   const state = emptyState();
   state.students = [student("54321", 1), student("54322", 2)];
-  state.staff = [{ id: "teacher.synthetic", name: "Synthetic Teacher" }];
+  state.staff = [
+    { id: "teacher.synthetic", name: "Synthetic Teacher", role: "admin" },
+  ];
   state.ledger = [
     {
       id: "opening",

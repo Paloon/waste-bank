@@ -8,7 +8,7 @@ import sharp from "sharp";
 import { createStore } from "../server/store.js";
 import { performAction } from "../server/actions.js";
 import { maintenance } from "../server/maintenance.js";
-import { backup, readBackup, restoreLocal, unseal } from "../server/backup.js";
+import { backup, readBackup, restoreLocal } from "../server/backup.js";
 import { reconcile } from "../server/reconcile.js";
 const fixture = () => {
   const dir = mkdtempSync(join(tmpdir(), "wb-ops-"));

@@ -465,7 +465,7 @@ main {
   padding: 3px;
   color: #648252;
 }
-.steps h4 {
+.steps h3 {
   font-weight: 600;
   font-size: 0.93rem;
   margin-bottom: 5px;
@@ -2009,7 +2009,7 @@ td .text-button {
   .steps {
     gap: 12px;
   }
-  .steps h4 {
+  .steps h3 {
     font-size: 0.875rem;
   }
   .steps p {
@@ -2829,7 +2829,7 @@ td .text-button {
     margin: 0;
     border-radius: 12px;
   }
-  .steps h4,
+  .steps h3,
   .steps p {
     margin: 0;
   }

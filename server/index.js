@@ -39,6 +39,9 @@ const app = createApp({
 });
 if (!process.env.VERCEL) {
   if (process.argv.includes("--production")) {
+    // Vercel compresses for us; a self-hosted server must do it itself.
+    const { default: compression } = await import("compression");
+    app.use(compression());
     app.use(express.static(resolve("dist")));
     app.get("/{*path}", (req, res) => res.sendFile(resolve("dist/index.html")));
   } else {

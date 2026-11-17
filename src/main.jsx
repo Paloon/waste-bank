@@ -22,37 +22,18 @@ import {
   ShieldCheck,
   Home,
   Camera,
-  Upload,
   CheckCircle2,
   X,
   LogOut,
-  Search,
-  Clock,
   Users,
-  Package,
-  ClipboardCheck,
-  Settings,
-  BookOpen,
-  History,
-  TrendingUp,
-  GraduationCap,
-  Plus,
-  Trash2,
-  NotebookPen,
-  Milk,
-  ShoppingBag,
-  PenTool,
-  Award,
-  Image as ImageIcon,
   AlertCircle,
 } from "lucide-react";
 import "./style.css";
 
-import SubmissionHistory from "./SubmissionHistory.jsx";
 import useKioskSession, {
   sessionRetryMessage,
 } from "./hooks/useKioskSession.js";
-import RecyclingGuide, { WasteIcon, categoryLabel } from "./RecyclingGuide.jsx";
+import RecyclingGuide, { categoryLabel } from "./RecyclingGuide.jsx";
 import { api, invalidateRequests } from "./api.js";
 import {
   clearPendingKey,
@@ -61,12 +42,7 @@ import {
 } from "./pendingRequest.js";
 import { useAdminData } from "./hooks/useAdminData.js";
 import { useLeaderboard } from "./hooks/useLeaderboard.js";
-import {
-  recyclingRates,
-  estimateCoins,
-  maxRecyclingCount,
-  validCount,
-} from "../shared/recycling.js";
+import { recyclingRates } from "../shared/recycling.js";
 import { policy } from "../shared/policy.js";
 
 const fmt = (n) => Number(n || 0).toLocaleString("th-TH");
@@ -92,6 +68,10 @@ const loadSubmitWaste = () => import("./features/student/SubmitWaste.jsx");
 const StaffWorkspace = lazy(loadStaffWorkspace);
 const ReviewDialog = lazy(loadReviewDialog);
 const SubmitWaste = lazy(loadSubmitWaste);
+const SubmissionHistory = lazy(() => import("./SubmissionHistory.jsx"));
+const LeaderboardPage = lazy(
+  () => import("./features/leaderboard/LeaderboardPage.jsx"),
+);
 // Pages built from the overview data load the server's "dashboard" read.
 const serverTab = (tab) =>
   ["summary", "settings", "promotion"].includes(tab) ? "dashboard" : tab;
@@ -773,7 +753,7 @@ function App() {
                             <Icon />
                             <b>0{i + 1}</b>
                           </span>
-                          <h4>{title}</h4>
+                          <h3>{title}</h3>
                           <p>{desc}</p>
                         </div>
                       ))}
@@ -974,26 +954,28 @@ function App() {
                 </div>
                 <div className="panel">
                   {tab === "trash" && (
-                    <SubmissionHistory
-                      key={student.id}
-                      student={student}
-                      rates={data.recyclingRates || recyclingRates}
-                      onPhoto={showImage}
-                      onCancel={(s) =>
-                        openModal({ type: "cancelSubmission", item: s })
-                      }
-                      busy={busy}
-                      onRefresh={() => refreshStudentHistory()}
-                      onFilter={(submissionStatus) =>
-                        refreshStudentHistory({
-                          submissionStatus,
-                          submissionPage: 0,
-                        })
-                      }
-                      onPage={(submissionPage) =>
-                        refreshStudentHistory({ submissionPage })
-                      }
-                    />
+                    <Suspense fallback={pageLoading}>
+                      <SubmissionHistory
+                        key={student.id}
+                        student={student}
+                        rates={data.recyclingRates || recyclingRates}
+                        onPhoto={showImage}
+                        onCancel={(s) =>
+                          openModal({ type: "cancelSubmission", item: s })
+                        }
+                        busy={busy}
+                        onRefresh={() => refreshStudentHistory()}
+                        onFilter={(submissionStatus) =>
+                          refreshStudentHistory({
+                            submissionStatus,
+                            submissionPage: 0,
+                          })
+                        }
+                        onPage={(submissionPage) =>
+                          refreshStudentHistory({ submissionPage })
+                        }
+                      />
+                    </Suspense>
                   )}
                   {tab === "coins" && (
                     <>
@@ -1052,162 +1034,37 @@ function App() {
               </>
             )}
             {page === "leaderboard" && (
-              <>
-                <div className="leader-intro">
-                  <span className="hero-tag">
-                    <Trophy size={17} /> EVERY LITTLE ACTION COUNTS
-                  </span>
-                  <h2>เก่งมากเลย เหล่าฮีโร่รักษ์โลก!</h2>
-                  <p>
-                    อันดับจาก Coins ที่สะสมได้ · ใช้ Coins
-                    แลกรางวัลแล้วอันดับไม่ลด
-                  </p>
-                </div>
-                <div className="filters">
-                  <div className="tabs compact">
-                    {[
-                      ["overall", "ทั้งหมด"],
-                      ["month", "เดือนนี้"],
-                      ["grade", "ระดับชั้น"],
-                      ["class", "ห้องเรียน"],
-                    ].map(([t, label]) => (
-                      <button
-                        className={period === t ? "active" : ""}
-                        key={t}
-                        onClick={() => {
-                          setPeriod(t);
-                          setRanks(null);
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <select
-                    aria-label="กรองระดับชั้น"
-                    value={grade}
-                    onChange={(e) => {
-                      setGrade(e.target.value);
-                      setRanks(null);
-                    }}
-                  >
-                    <option value="">ทุกระดับชั้น</option>
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <option key={n} value={n}>
-                        ม.{n}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="กรองห้อง"
-                    value={room}
-                    onChange={(e) => {
-                      setRoom(e.target.value);
-                      setRanks(null);
-                    }}
-                  >
-                    <option value="">ทุกห้อง</option>
-                    {Array.from(
-                      { length: policy.maxRoom },
-                      (_, i) => i + 1,
-                    ).map((n) => (
-                      <option key={n} value={n}>
-                        ห้อง {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="podium">
-                  {ranked.slice(0, 3).map((p, i) => (
-                    <div className={"podium-card podium-" + i} key={p.name}>
-                      <span className="medal">{["🥇", "🥈", "🥉"][i]}</span>
-                      <div className="avatar large">{p.name[0]}</div>
-                      <h3>{p.name}</h3>
-                      <p>
-                        ม.{p.grade}/{p.room}
-                      </p>
-                      <strong>
-                        {fmt(period === "month" ? p.monthly : p.earned)}{" "}
-                        <Coins size={20} />
-                      </strong>
-                    </div>
-                  ))}
-                </div>
-                <div className="panel">
-                  {leaderboard.loading && <p role="status">กำลังโหลดอันดับ…</p>}
-                  {leaderboard.error && (
-                    <p role="alert" className="danger">
-                      {leaderboard.error}
-                    </p>
-                  )}
-                  <div className="section-heading">
-                    <h2>10 อันดับรักษ์โลก</h2>
-                    <span>
-                      {period === "month"
-                        ? "เฉพาะเดือนนี้ ไม่รีเซ็ตยอด Coins"
-                        : "ยอดสะสมตลอดกิจกรรม"}
-                    </span>
-                  </div>
-                  {ranked.slice(0, 10).map((p, i) => (
-                    <div className="leader-row" key={p.name}>
-                      <b className="rank-number">{i + 1}</b>
-                      <span className="avatar">{p.name[0]}</span>
-                      <b className="grow">{p.name}</b>
-                      <span>
-                        ม.{p.grade}/{p.room}
-                      </span>
-                      <strong>
-                        {fmt(period === "month" ? p.monthly : p.earned)}{" "}
-                        <Coins size={17} />
-                      </strong>
-                    </div>
-                  ))}
-                  {!ranked.length && <Empty />}
-                  <form
-                    className="search-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      run(async () =>
-                        setRanks(
-                          await api(
-                            "rank?" +
-                              new URLSearchParams({
-                                q: query,
-                                period,
-                                grade,
-                                room,
-                              }),
-                          ),
+              <Suspense fallback={pageLoading}>
+                <LeaderboardPage
+                  period={period}
+                  setPeriod={setPeriod}
+                  grade={grade}
+                  setGrade={setGrade}
+                  room={room}
+                  setRoom={setRoom}
+                  ranked={ranked}
+                  ranks={ranks}
+                  setRanks={setRanks}
+                  leaderboard={leaderboard}
+                  query={query}
+                  setQuery={setQuery}
+                  onSearch={() =>
+                    run(async () =>
+                      setRanks(
+                        await api(
+                          "rank?" +
+                            new URLSearchParams({
+                              q: query,
+                              period,
+                              grade,
+                              room,
+                            }),
                         ),
-                      );
-                    }}
-                  >
-                    <Search />
-                    <input
-                      aria-label="ค้นหาอันดับ"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="ค้นหาอันดับของเธอด้วยชื่อหรือรหัสนักเรียน"
-                      required
-                    />
-                    <button className="btn primary">ค้นหา</button>
-                  </form>
-                  {ranks &&
-                    (!ranks.length ? (
-                      <Empty text="ไม่พบชื่อในเงื่อนไขนี้" />
-                    ) : (
-                      ranks.map((p) => (
-                        <div className="leader-row" key={p.rank}>
-                          <b>#{p.rank}</b>
-                          <span className="grow">
-                            {p.name} · ม.{p.grade}/{p.room}
-                          </span>
-                          <strong>{fmt(p.earned)} Coins</strong>
-                        </div>
-                      ))
-                    ))}
-                </div>
-              </>
+                      ),
+                    )
+                  }
+                />
+              </Suspense>
             )}
             {page === "success" && success && (
               <div className="success-screen">
@@ -1659,7 +1516,7 @@ function App() {
                     "กรุณาติดต่อเจ้าหน้าที่ที่จุดรับรางวัล"}
                 </p>
                 <form
-                  onSubmit={submitModal(async (v) => {
+                  onSubmit={submitModal(async () => {
                     let result;
                     try {
                       result = await action("redeem", {
@@ -1712,7 +1569,7 @@ function App() {
                   รายการนี้จะไม่ถูกตรวจเพื่อรับ Coins
                 </p>
                 <form
-                  onSubmit={submitModal(async (v) => {
+                  onSubmit={submitModal(async () => {
                     await action("cancelSubmission", { id: modal.item.id });
                     done(
                       "ยกเลิกรายการแล้ว",

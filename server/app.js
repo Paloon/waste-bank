@@ -6,7 +6,7 @@ import {
   leaderboard,
 } from "./read-queries.js";
 import express from "express";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { policy } from "../shared/policy.js";
 import { createSecurity } from "./security.js";
 import { AppError, assert } from "./errors.js";
@@ -46,6 +46,13 @@ import {
   applyStaffChange,
   isAdmin,
 } from "./staff-admin.js";
+
+// Compare fixed-length digests so neither content nor length leaks through timing.
+const sameSecret = (given, expected) =>
+  timingSafeEqual(
+    createHash("sha256").update(given).digest(),
+    createHash("sha256").update(expected).digest(),
+  );
 
 export function createApp({
   store,
@@ -426,6 +433,10 @@ export function createApp({
       "ไฟล์ภาพไม่ถูกต้อง",
       502,
     );
+    // Public reward images are safe to cache (the URL carries a content tag).
+    // Student evidence stays no-store so a shared kiosk never keeps it after logout.
+    if (kind === "rewards" && item.enabled && !item.deletedAt)
+      res.set("Cache-Control", "public, max-age=86400");
     res.type(mime).send(Buffer.from(await response.arrayBuffer()));
   });
   app.post("/api/action", async (req, res) => {
@@ -505,7 +516,10 @@ export function createApp({
   app.get("/api/cron/prune", async (req, res) => {
     assert(
       process.env.CRON_SECRET &&
-        req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`,
+        sameSecret(
+          req.headers.authorization || "",
+          `Bearer ${process.env.CRON_SECRET}`,
+        ),
       "ไม่มีสิทธิ์",
       401,
     );

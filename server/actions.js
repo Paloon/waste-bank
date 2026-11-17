@@ -83,12 +83,14 @@ export async function performAction(
     const existing = snapshot.rewards.find((x) => x.id === p.id),
       old = existing ? rewardImages(existing) : [];
     p.images = (p.images ?? (p.image ? [{ src: p.image }] : [])).map((item) => {
+      // Existing images come back as their media URL (with a cache tag `&v=`).
+      const given = String(item.src || "").replace(/&v=[a-f0-9]+$/, "");
       const index = old.findIndex(
         (_, i) =>
-          item.src ===
+          given ===
             `/api/media/reward/${encodeURIComponent(p.id)}?index=${i}` ||
           (i === 0 &&
-            item.src === `/api/media/reward/${encodeURIComponent(p.id)}`),
+            given === `/api/media/reward/${encodeURIComponent(p.id)}`),
       );
       const src = index >= 0 ? old[index].src : item.src;
       assert(

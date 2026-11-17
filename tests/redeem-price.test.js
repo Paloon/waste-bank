@@ -101,3 +101,42 @@ test("pending request key survives only for the same request and for a short tim
     "no storage is fine",
   );
 });
+
+test("saving a reward keeps existing Drive images sent back as cache-tagged media URLs", async () => {
+  const { dir, store } = fixture();
+  const staff = { role: "staff", id: "teacher.mali" };
+  try {
+    await store.transact((s) => {
+      s.rewards.find((r) => r.id === "r1").images = [
+        { src: "drive:kept-file", zoom: 1, x: 0, y: 0 },
+      ];
+    });
+    const { rewardView } = await import("../server/views.js");
+    const shown = rewardView(store.read().rewards.find((r) => r.id === "r1"));
+    const body = actionBody({
+      action: "reward",
+      key: Date.now() + ":" + randomUUID(),
+      payload: {
+        id: "r1",
+        version: shown.version,
+        name: shown.name,
+        price: shown.price,
+        stock: shown.stock,
+        enabled: true,
+        images: shown.images.map(({ src, zoom, x, y }) => ({
+          src,
+          zoom,
+          x,
+          y,
+        })),
+      },
+    });
+    await performAction(store, { configured: true }, staff, body);
+    assert.equal(
+      store.read().rewards.find((r) => r.id === "r1").images[0].src,
+      "drive:kept-file",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

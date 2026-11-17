@@ -19,10 +19,12 @@
     "check:status": "node --env-file-if-exists=.env scripts/check-status.mjs",
     "verify:recovery": "node --env-file-if-exists=.env scripts/verify-recovery.mjs",
     "format": "prettier --write server src shared scripts tests",
+    "lint": "eslint .",
     "test:load": "node scripts/load-test.mjs",
     "test:performance": "node scripts/benchmark-performance.mjs"
   },
   "dependencies": {
+    "compression": "^1.8.2",
     "express": "^5.1.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
@@ -33,7 +35,12 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.55.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
     "prettier": "^3.9.9"
   },
   "engines": {

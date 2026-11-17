@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from "node:crypto";
 import { policy } from "../shared/policy.js";
-import { AppError, assert } from "./errors.js";
+import { AppError } from "./errors.js";
 const digest = (x) => createHash("sha256").update(x).digest("hex");
 export function createSecurity(
   store,
@@ -99,11 +99,19 @@ export function createSecurity(
     const buckets = [
       { id: `rate:${kind}:ip:${digest(req.ip || "unknown")}`, limit },
     ];
-    if (account)
-      buckets.push({
-        id: `rate:${kind}:account:${digest(account)}`,
-        limit: kind === "login" ? 10 : limit,
-      });
+    if (account && kind === "login")
+      // Strict per account from one address, so a stranger elsewhere cannot lock
+      // a teacher out with a few wrong PINs; a looser per-account cap still stops
+      // guessing spread over many addresses.
+      buckets.push(
+        {
+          id: `rate:${kind}:account-ip:${digest(`${account}\n${req.ip || "unknown"}`)}`,
+          limit: 10,
+        },
+        { id: `rate:${kind}:account:${digest(account)}`, limit: 100 },
+      );
+    else if (account)
+      buckets.push({ id: `rate:${kind}:account:${digest(account)}`, limit });
     for (const bucket of buckets) {
       const result = await store.control("rate", { ...bucket, window });
       if (!result.allowed) {
