@@ -36,8 +36,6 @@ export default function LeaderboardPage({
           {[
             ["overall", "ทั้งหมด"],
             ["month", "เดือนนี้"],
-            ["grade", "ระดับชั้น"],
-            ["class", "ห้องเรียน"],
           ].map(([t, label]) => (
             <button
               className={period === t ? "active" : ""}
@@ -81,6 +79,39 @@ export default function LeaderboardPage({
             </option>
           ))}
         </select>
+      </div>
+      <div className="panel rank-search">
+        <form
+          className="search-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSearch();
+          }}
+        >
+          <Search />
+          <input
+            aria-label="ค้นหาอันดับ"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ค้นหาด้วยชื่อหรือรหัสนักเรียน"
+            required
+          />
+          <button className="btn primary">ค้นหา</button>
+        </form>
+        {ranks &&
+          (!ranks.length ? (
+            <Empty text="ไม่พบชื่อในเงื่อนไขนี้" />
+          ) : (
+            ranks.map((p) => (
+              <div className="leader-row" key={p.rank}>
+                <b>#{p.rank}</b>
+                <span className="grow">
+                  {p.name} · ม.{p.grade}/{p.room}
+                </span>
+                <strong>{fmt(p.earned)} Coins</strong>
+              </div>
+            ))
+          ))}
       </div>
       <div className="podium">
         {ranked.slice(0, 3).map((p, i) => (
@@ -128,37 +159,6 @@ export default function LeaderboardPage({
           </div>
         ))}
         {!ranked.length && <Empty />}
-        <form
-          className="search-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSearch();
-          }}
-        >
-          <Search />
-          <input
-            aria-label="ค้นหาอันดับ"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ค้นหาด้วยชื่อหรือรหัสนักเรียน"
-            required
-          />
-          <button className="btn primary">ค้นหา</button>
-        </form>
-        {ranks &&
-          (!ranks.length ? (
-            <Empty text="ไม่พบชื่อในเงื่อนไขนี้" />
-          ) : (
-            ranks.map((p) => (
-              <div className="leader-row" key={p.rank}>
-                <b>#{p.rank}</b>
-                <span className="grow">
-                  {p.name} · ม.{p.grade}/{p.room}
-                </span>
-                <strong>{fmt(p.earned)} Coins</strong>
-              </div>
-            ))
-          ))}
       </div>
     </>
   );

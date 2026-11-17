@@ -570,10 +570,10 @@ export default function StaffWorkspace({ view, actions }) {
                   <RewardArt reward={r} onOpen={openRewardImage} />
                   <div className="reward-body">
                     <h3>{r.name}</h3>
-                    <p>
+                    <p className="reward-meta">
                       {r.price} Coins · เหลือ {r.stock} ชิ้น
                     </p>
-                    <p>
+                    <p className="reward-meta">
                       {r.enabled ? "เปิดให้แลก" : "ปิดให้แลก"}
                       {!r.stock
                         ? " · หมดแล้ว"
