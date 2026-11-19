@@ -504,6 +504,16 @@ function App() {
       setAdminTab("promotion");
     });
   }
+  useEffect(() => {
+    if (modal?.type !== "review") return;
+    const pending = (admin?.submissions || []).filter(
+      (s) => s.status === "Pending",
+    );
+    const at = pending.findIndex((s) => s.id === modal.item.id);
+    for (const s of pending.slice(at + 1, at + 3))
+      for (const src of [s.image, s.disposalImage])
+        if (src) new Image().src = src;
+  }, [modal, admin]);
   function openModal(value) {
     setError("");
     setModal(value);
@@ -1682,8 +1692,18 @@ function App() {
                       id: modal.item.id,
                       status: modal.status,
                     });
+                    // Continue with the next pending card so a batch needs no trips back to the list.
+                    const pending = (admin?.submissions || []).filter(
+                      (s) => s.status === "Pending",
+                    );
+                    const at = pending.findIndex((s) => s.id === modal.item.id);
+                    const next = pending[at + 1];
                     await refreshAdmin();
-                    setModal(null);
+                    setModal(
+                      next
+                        ? { type: "review", item: next, status: "Approved" }
+                        : null,
+                    );
                     setNotice("บันทึกผลตรวจแล้ว");
                   })}
                 />
