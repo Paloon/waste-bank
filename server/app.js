@@ -398,7 +398,8 @@ export function createApp({
       kind
     ][0];
     assert(item, "ไม่พบรูป", 404);
-    let ref;
+    let ref,
+      staffView = false;
     if (kind === "rewards") {
       if (!item.enabled) await security.actor(req, { staff: true });
       const index = Number(req.query.index || 0);
@@ -415,6 +416,7 @@ export function createApp({
         "ไม่มีสิทธิ์อ่านรูปนี้",
         403,
       );
+      staffView = actor.role === "staff";
       const index = Number(req.query.index || 0);
       assert(
         Number.isInteger(index) && index >= 0 && index <= 1,
@@ -434,9 +436,13 @@ export function createApp({
       502,
     );
     // Public reward images are safe to cache (the URL carries a content tag).
-    // Student evidence stays no-store so a shared kiosk never keeps it after logout.
+    // Student evidence stays no-store for students so a shared kiosk never keeps it after logout.
     if (kind === "rewards" && item.enabled && !item.deletedAt)
       res.set("Cache-Control", "public, max-age=86400");
+    // Staff reviewing a card then opening its dialog would otherwise re-download
+    // the same photo from Drive; keep it only in the staff browser, briefly.
+    else if (kind === "submissions" && staffView)
+      res.set("Cache-Control", "private, max-age=300");
     res.type(mime).send(Buffer.from(await response.arrayBuffer()));
   });
   app.post("/api/action", async (req, res) => {
