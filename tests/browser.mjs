@@ -404,6 +404,11 @@ try {
   await page.getByText("มอบให้ 6 Coins", { exact: true }).waitFor();
   await byName("ยืนยันผลการตรวจ").click();
   await page.getByText("บันทึกผลตรวจแล้ว").waitFor();
+  // Review continues with the next pending card; close it to return to the list.
+  if (await page.getByRole("dialog").count()) {
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+  }
   console.log("Testing rejection presets and student statuses");
   await page
     .locator(".review-card")
